@@ -28,8 +28,13 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config
 
-    // If 401 and not already retrying, try to refresh
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // If 401 and not already retrying, try to refresh. Never recurse into the
+    // refresh endpoint itself: a 401 there just means there is no valid session.
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.url?.endsWith('/auth/refresh')
+    ) {
       originalRequest._retry = true
 
       const authStore = useAuthStore()
