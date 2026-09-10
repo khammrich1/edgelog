@@ -22,3 +22,23 @@ EdgeLog is a manual-first trading journal built to help traders document their p
 **VS1 — Foundation** is the current authorized build.
 
 See [EDGELOG.md](EDGELOG.md) for the product specification and [ROADMAP.md](ROADMAP.md) for vertical slices.
+
+## Tech stack
+
+- **Frontend:** Vue 3, Pinia, Vite
+- **Backend:** FastAPI, PostgreSQL, SQLAlchemy 2.x
+- **Auth:** JWT with HttpOnly refresh cookies
+
+## Development
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for setup instructions.
+
+## Production
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for production deployment.
+
+---
+
+**EdgeLog** is a product of **Green Bread Enterprises LLC**, operated under **Green Bread Trades**.
+
+Domain: https://edgelog.trade
