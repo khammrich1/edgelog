@@ -22,3 +22,39 @@ EdgeLog is a manual-first trading journal built to help traders document their p
 **VS1 — Foundation** is the current authorized build.
 
 See [EDGELOG.md](EDGELOG.md) for the product specification and [ROADMAP.md](ROADMAP.md) for vertical slices.
+
+## Project layout
+
+- `backend/` — FastAPI + SQLAlchemy (async) + Alembic + PostgreSQL, Argon2/JWT auth
+- `frontend/` — Vue 3 + Vite + Pinia + Vue Router, CSS design tokens
+
+## Running locally
+
+### Database
+
+```
+docker compose up -d
+```
+
+### Backend
+
+```
+cd backend
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+cp .env.example .env
+alembic upgrade head
+uvicorn app.main:app --reload
+```
+
+Run tests with `pytest` from `backend/`.
+
+### Frontend
+
+```
+cd frontend
+npm install
+npm run dev
+```
+
+Vite proxies `/api/*` to `http://localhost:8000` in development. Production build: `npm run build`.

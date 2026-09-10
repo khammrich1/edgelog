@@ -1,0 +1,104 @@
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.auth-card__mark {
+  margin-bottom: var(--space-3);
+}
+
+.auth-card__title {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.auth-card__subtitle {
+  margin: var(--space-1) 0 var(--space-5);
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.field {
+  width: 100%;
+  text-align: left;
+  margin-bottom: var(--space-4);
+}
+
+.field__label {
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-1);
+}
+
+.field input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.field input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.auth-card__error {
+  color: var(--color-negative);
+  font-size: 13px;
+  margin: 0 0 var(--space-4);
+}
+
+.button-primary {
+  width: 100%;
+  padding: var(--space-3);
+  background: var(--color-accent);
+  color: var(--color-onyx);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+}
+
+.button-primary:hover:not(:disabled) {
+  background: var(--color-accent-strong);
+}
+
+.button-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.auth-card__link {
+  margin-top: var(--space-4);
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.auth-card__link:hover {
+  color: var(--color-accent);
+}

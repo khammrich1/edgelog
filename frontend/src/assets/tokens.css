@@ -1,0 +1,66 @@
+:root {
+  /* Brand */
+  --color-copper: #b87333;
+  --color-copper-strong: #d1884a;
+  --color-onyx: #0d0d0d;
+  --color-graphite: #2b2b2b;
+  --color-graphite-elevated: #363636;
+  --color-steel: #6b6b6b;
+  --color-steel-soft: #444444;
+  --color-off-white: #f5f5f5;
+
+  /* Functional */
+  --color-positive: #3fa66a;
+  --color-negative: #c1473f;
+  --color-neutral: #8a8a8a;
+
+  /* Semantic */
+  --color-bg: var(--color-onyx);
+  --color-surface: var(--color-graphite);
+  --color-surface-elevated: var(--color-graphite-elevated);
+  --color-border: var(--color-steel-soft);
+  --color-text: var(--color-off-white);
+  --color-text-muted: var(--color-steel);
+  --color-accent: var(--color-copper);
+  --color-accent-strong: var(--color-copper-strong);
+
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --nav-rail-width: 64px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+.numeric {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
