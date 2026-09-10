@@ -1,0 +1,14 @@
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- EdgeLog Mark: Geometric Layered E -->
+  <!-- Steel base layer -->
+  <path d="M12 8 L36 8 L36 14 L18 14 L18 20 L32 20 L32 26 L18 26 L18 32 L36 32 L36 38 L12 38 Z"
+        fill="#6B6B6B" opacity="0.4"/>
+
+  <!-- Copper primary layer (offset for depth) -->
+  <path d="M10 6 L34 6 L34 12 L16 12 L16 18 L30 18 L30 24 L16 24 L16 30 L34 30 L34 36 L10 36 Z"
+        fill="#B87333"/>
+
+  <!-- Steel accent edge -->
+  <path d="M10 6 L34 6 L34 8 L12 8 L12 34 L34 34 L34 36 L10 36 Z"
+        fill="#6B6B6B" opacity="0.6"/>
+</svg>

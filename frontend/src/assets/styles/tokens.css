@@ -1,0 +1,64 @@
+/* EdgeLog Design Tokens */
+
+:root {
+  /* Colors - Copper + Graphite + Steel + Onyx */
+  --el-bg: #0D0D0D;                    /* Onyx - primary background */
+  --el-surface: #2B2B2B;                /* Graphite - surfaces */
+  --el-surface-raised: #353535;         /* Raised surfaces */
+  --el-copper: #B87333;                 /* Copper - primary brand/accent */
+  --el-copper-hover: #CD8F4F;          /* Copper hover state */
+  --el-copper-active: #9D5F23;         /* Copper active state */
+  --el-steel: #6B6B6B;                  /* Steel - secondary elements */
+  --el-steel-light: #8B8B8B;           /* Lighter steel */
+
+  /* Text */
+  --el-text: #F5F5F5;                   /* Off-white primary text */
+  --el-text-muted: #A0A0A0;            /* Muted text */
+  --el-text-subtle: #707070;           /* Subtle text */
+
+  /* Borders */
+  --el-border: #3F3F3F;                /* Default border */
+  --el-border-focus: #B87333;          /* Focused border (copper) */
+
+  /* Functional Colors (separate from brand) */
+  --el-positive: #4ADE80;              /* Green for profit */
+  --el-negative: #F87171;              /* Red for loss */
+  --el-warning: #FBBF24;               /* Yellow for warnings */
+  --el-info: #60A5FA;                  /* Blue for info */
+
+  /* Spacing */
+  --el-space-1: 4px;
+  --el-space-2: 8px;
+  --el-space-3: 12px;
+  --el-space-4: 16px;
+  --el-space-6: 24px;
+  --el-space-8: 32px;
+  --el-space-12: 48px;
+
+  /* Typography */
+  --el-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --el-font-mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Consolas', monospace;
+
+  --el-text-xs: 0.75rem;    /* 12px */
+  --el-text-sm: 0.875rem;   /* 14px */
+  --el-text-base: 1rem;     /* 16px */
+  --el-text-lg: 1.125rem;   /* 18px */
+  --el-text-xl: 1.25rem;    /* 20px */
+  --el-text-2xl: 1.5rem;    /* 24px */
+  --el-text-3xl: 1.875rem;  /* 30px */
+
+  /* Border Radius */
+  --el-radius-sm: 4px;
+  --el-radius-md: 6px;
+  --el-radius-lg: 8px;
+
+  /* Shadows */
+  --el-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --el-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5);
+  --el-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.6);
+
+  /* Transitions */
+  --el-transition-fast: 150ms ease;
+  --el-transition-base: 200ms ease;
+  --el-transition-slow: 300ms ease;
+}
