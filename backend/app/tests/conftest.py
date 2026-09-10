@@ -9,9 +9,6 @@ from app.core.database import Base, get_db
 # Test database URL
 TEST_DATABASE_URL = "postgresql+asyncpg://edgelog:edgelog_dev_password@localhost/edgelog_test"
 
-# Configure pytest-asyncio
-pytest_plugins = ('pytest_asyncio',)
-
 
 @pytest.fixture(scope="function")
 async def test_engine():
