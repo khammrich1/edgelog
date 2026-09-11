@@ -133,9 +133,9 @@ Rules:
 
 ## Current authorized work
 
-**VS1 — Foundation only.**
+**VS1 — Foundation is accepted.** **VS2 — Daily Journal Core** is the current authorized work.
 
-No VS2+ functionality should be implemented until VS1 is tested and accepted.
+No VS3+ functionality should be implemented until VS2 is tested and accepted.
 
 ## VS1 technical direction
 
