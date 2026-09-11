@@ -94,12 +94,12 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 REFRESH_TOKEN_EXPIRE_DAYS=7
 
 # CORS - Your production domain(s)
-ALLOWED_ORIGINS=["https://edgelog.yourdomain.com"]
+ALLOWED_ORIGINS=["https://edgelog.trade"]
 
 # Cookies - IMPORTANT: Set these correctly for production
 COOKIE_SECURE=true
 COOKIE_SAMESITE=lax
-COOKIE_DOMAIN=edgelog.yourdomain.com
+COOKIE_DOMAIN=edgelog.trade
 
 # Environment
 ENVIRONMENT=production
@@ -132,7 +132,7 @@ User=your_user
 WorkingDirectory=/var/www/edgelog/backend
 Environment="PATH=/var/www/edgelog/backend/venv/bin"
 Environment="PYTHONPATH=/var/www/edgelog/backend"
-ExecStart=/var/www/edgelog/backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 4
+ExecStart=/var/www/edgelog/backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 4 --proxy-headers --forwarded-allow-ips=127.0.0.1
 Restart=always
 RestartSec=10
 
@@ -154,18 +154,21 @@ sudo systemctl status edgelog-backend
 
 ```bash
 cd frontend
-
-# Create production environment file
-cat > .env.production <<EOF
-VITE_API_URL=https://edgelog.yourdomain.com
-EOF
-
-# Install dependencies and build
 npm install
 npm run build
 ```
 
 This creates an optimized production build in `frontend/dist/`.
+
+**No `VITE_API_URL` or other API-host environment variable is needed.** The
+frontend calls the API with relative paths (`/api/v1/...`), which the browser
+resolves against whatever origin served the page. As long as Nginx serves the
+frontend and proxies `/api/` from that same origin/domain (see below), this
+"just works" over HTTPS with no build-time configuration. Hard-coding an
+absolute API URL (especially with `http://` instead of `https://`) is exactly
+what causes the frontend to issue a request to the wrong scheme, which the
+browser then treats as cross-origin and blocks with a CORS error after the
+inevitable redirect to HTTPS.
 
 ### 2. Deploy Static Files
 
@@ -187,66 +190,17 @@ sudo apt install nginx
 
 ### 2. Configure Site
 
-Create `/etc/nginx/sites-available/edgelog`:
-```nginx
-# Redirect HTTP to HTTPS
-server {
-    listen 80;
-    listen [::]:80;
-    server_name edgelog.yourdomain.com;
-    return 301 https://$server_name$request_uri;
-}
+Use the version-controlled config at [`deploy/nginx/edgelog.conf`](deploy/nginx/edgelog.conf) —
+don't hand-type an Nginx config from scratch; copy this file so the deployed
+config can never drift from what's reviewed and committed here:
 
-# HTTPS configuration
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name edgelog.yourdomain.com;
-
-    # SSL certificates (use Let's Encrypt certbot)
-    ssl_certificate /etc/letsencrypt/live/edgelog.yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/edgelog.yourdomain.com/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-
-    # Security headers
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-
-    # Frontend (Vue SPA)
-    location / {
-        root /var/www/edgelog/frontend;
-        try_files $uri $uri/ /index.html;
-        
-        # Cache static assets
-        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
-            expires 1y;
-            add_header Cache-Control "public, immutable";
-        }
-    }
-
-    # Backend API
-    location /api/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-        
-        # Timeouts
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-    }
-}
+```bash
+sudo cp deploy/nginx/edgelog.conf /etc/nginx/sites-available/edgelog
 ```
+
+It redirects all HTTP to HTTPS, serves the built frontend from `/`, and
+proxies `/api/` to the backend on the same origin — which is what lets the
+frontend use plain relative API paths instead of a hard-coded host.
 
 Enable the site:
 ```bash
@@ -262,7 +216,7 @@ sudo systemctl reload nginx
 sudo apt install certbot python3-certbot-nginx
 
 # Obtain certificate
-sudo certbot --nginx -d edgelog.yourdomain.com
+sudo certbot --nginx -d edgelog.trade
 
 # Auto-renewal is configured by default
 # Test renewal:
@@ -326,7 +280,7 @@ sudo tail -f /var/log/nginx/error.log
 Create a simple health check endpoint and monitor it:
 ```bash
 # Check backend is responding
-curl -f https://edgelog.yourdomain.com/api/v1/auth/login || echo "Backend down!"
+curl -f https://edgelog.trade/api/v1/auth/login || echo "Backend down!"
 ```
 
 ## Scaling Considerations
@@ -346,7 +300,8 @@ ExecStart=/var/www/edgelog/backend/venv/bin/uvicorn app.main:app \
   --host 127.0.0.1 \
   --port 8000 \
   --workers 4 \
-  --worker-class uvicorn.workers.UvicornWorker
+  --proxy-headers \
+  --forwarded-allow-ips=127.0.0.1
 ```
 
 Rule of thumb: workers = (2 × CPU cores) + 1
