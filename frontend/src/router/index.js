@@ -3,8 +3,9 @@ import { useAuthStore } from '@/stores/auth'
 import Login from '@/views/Login.vue'
 import Register from '@/views/Register.vue'
 import Journal from '@/views/Journal.vue'
+import NotFound from '@/views/NotFound.vue'
 
-const routes = [
+export const routes = [
   {
     path: '/',
     redirect: '/journal'
@@ -26,34 +27,48 @@ const routes = [
     name: 'Journal',
     component: Journal,
     meta: { requiresAuth: true }
+  },
+  {
+    // Catch-all: any route that doesn't match one of the above. Kept behind
+    // requiresAuth so an unauthenticated visitor to an unknown URL still
+    // goes through the normal login redirect rather than seeing app
+    // structure it isn't authenticated for; an authenticated visitor gets
+    // the branded Not Found view inside the app shell instead of a blank
+    // router-view.
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    component: NotFound,
+    meta: { requiresAuth: true }
   }
 ]
 
-const router = createRouter({
-  history: createWebHistory(),
-  routes
-})
+export function createAppRouter(history) {
+  const router = createRouter({ history, routes })
 
-// Navigation guard
-router.beforeEach(async (to, from, next) => {
-  const authStore = useAuthStore()
+  router.beforeEach(async (to, from, next) => {
+    const authStore = useAuthStore()
 
-  // Try to restore authentication on first load
-  if (!authStore.isAuthenticated && !authStore.loading) {
-    await authStore.refreshAuth()
-  }
+    // Try to restore authentication on first load
+    if (!authStore.isAuthenticated && !authStore.loading) {
+      await authStore.refreshAuth()
+    }
 
-  const requiresAuth = to.meta.requiresAuth !== false
+    const requiresAuth = to.meta.requiresAuth !== false
 
-  if (requiresAuth && !authStore.isAuthenticated) {
-    // Redirect to login if not authenticated
-    next('/login')
-  } else if (!requiresAuth && authStore.isAuthenticated) {
-    // Redirect to journal if already authenticated
-    next('/journal')
-  } else {
-    next()
-  }
-})
+    if (requiresAuth && !authStore.isAuthenticated) {
+      // Redirect to login if not authenticated
+      next('/login')
+    } else if (!requiresAuth && authStore.isAuthenticated) {
+      // Redirect to journal if already authenticated
+      next('/journal')
+    } else {
+      next()
+    }
+  })
+
+  return router
+}
+
+const router = createAppRouter(createWebHistory())
 
 export default router
