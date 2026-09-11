@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/auth'
 import Login from '@/views/Login.vue'
 import Register from '@/views/Register.vue'
 import Journal from '@/views/Journal.vue'
+import JournalDay from '@/views/JournalDay.vue'
 import NotFound from '@/views/NotFound.vue'
 
 export const routes = [
@@ -26,6 +27,15 @@ export const routes = [
     path: '/journal',
     name: 'Journal',
     component: Journal,
+    meta: { requiresAuth: true }
+  },
+  {
+    // Constrained to YYYY-MM-DD so a malformed date (or anything else under
+    // /journal/) falls through to the catch-all NotFound route below rather
+    // than reaching JournalDay with a value it can't parse.
+    path: '/journal/:date(\\d{4}-\\d{2}-\\d{2})',
+    name: 'JournalDay',
+    component: JournalDay,
     meta: { requiresAuth: true }
   },
   {

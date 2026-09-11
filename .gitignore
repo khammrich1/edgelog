@@ -67,3 +67,6 @@ Thumbs.db
 
 # Alembic
 alembic/versions/__pycache__/
+
+# User-uploaded content
+backend/uploads/
