@@ -1,5 +1,13 @@
 """Database models."""
 from .user import User
 from .journal import ChecklistItem, TradingDay, TradingDayChecklistItem
+from .trades import Trade, TradeExit
 
-__all__ = ["User", "TradingDay", "ChecklistItem", "TradingDayChecklistItem"]
+__all__ = [
+    "User",
+    "TradingDay",
+    "ChecklistItem",
+    "TradingDayChecklistItem",
+    "Trade",
+    "TradeExit",
+]
