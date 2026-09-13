@@ -5,6 +5,14 @@
  * without mounting a component.
  */
 
+/**
+ * Symbols offered in the quick-entry dropdown. This is a shortcut list for
+ * the trader's most-used instruments, not a restriction -- the backend
+ * accepts any symbol, and the form falls back to free text for anything
+ * not in this list.
+ */
+export const SYMBOL_PRESETS = ['MNQ', 'MES', 'MGC', 'MCL']
+
 export function formatPrice(value) {
   if (value === null || value === undefined || value === '') return ''
   return Number(value).toLocaleString(undefined, { maximumFractionDigits: 4 })

@@ -19,6 +19,7 @@ INSTRUMENT_MULTIPLIERS: dict[str, Decimal] = {
     "MNQ": Decimal("2"),    # Micro E-mini Nasdaq-100
     "MES": Decimal("5"),    # Micro E-mini S&P 500
     "MGC": Decimal("10"),   # Micro Gold (10 troy oz)
+    "MCL": Decimal("100"),  # Micro WTI Crude Oil (100 barrels)
     "NQ": Decimal("20"),    # E-mini Nasdaq-100
     "ES": Decimal("50"),    # E-mini S&P 500
     "GC": Decimal("100"),   # Gold (100 troy oz)

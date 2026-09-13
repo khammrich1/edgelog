@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { formatPrice, formatSignedDollars, formatSignedPoints, resultClass } from './trades'
+import { formatPrice, formatSignedDollars, formatSignedPoints, resultClass, SYMBOL_PRESETS } from './trades'
+
+describe('SYMBOL_PRESETS', () => {
+  it('offers the requested quick-entry symbols', () => {
+    expect(SYMBOL_PRESETS).toEqual(['MNQ', 'MES', 'MGC', 'MCL'])
+  })
+})
 
 describe('formatPrice', () => {
   it('formats whole numbers without decimals', () => {
