@@ -2,19 +2,69 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useJournalStore } from '@/stores/journal'
+import { useTradesStore } from '@/stores/trades'
+import { formatSignedDollars, formatSignedPoints, resultClass } from '@/utils/trades'
 import TradesSection from '@/components/journal/TradesSection.vue'
 
 const route = useRoute()
 const router = useRouter()
 const journalStore = useJournalStore()
+const tradesStore = useTradesStore()
 
 const marketBiasDraft = ref('')
 const newChecklistLabel = ref('')
 const biasChartObjectUrl = ref(null)
 const uploadError = ref(null)
+const activeTab = ref('mood')
 
 const day = computed(() => journalStore.currentDay)
 const isLocked = computed(() => day.value?.status === 'locked')
+
+const biasPreview = computed(() => {
+  const bias = day.value?.market_bias?.trim()
+  if (!bias) return null
+  return bias.length > 60 ? `${bias.slice(0, 60)}…` : bias
+})
+
+// Trades themselves are fetched by TradesSection (kept mounted via v-show
+// so its data -- and any in-progress form input -- survives switching
+// tabs); this just reads the same store's already-loaded state.
+const overviewStats = computed(() => {
+  const trades = (tradesStore.tradesByDate[route.params.date] || []).filter((t) => t.status !== 'canceled')
+  const closedTrades = trades.filter((t) => t.status === 'closed')
+
+  let dayPnlDollars = 0
+  let hasDollarPnl = false
+  let dayPnlPoints = 0
+  let wins = 0
+  let losses = 0
+
+  for (const trade of trades) {
+    // realized_pnl/realized_points only ever reflect exits actually
+    // recorded, so summing across still-open trades too is safe -- an
+    // open trade's unrealized remainder is never included.
+    if (trade.multiplier_known) {
+      dayPnlDollars += Number(trade.realized_pnl)
+      hasDollarPnl = true
+    } else {
+      dayPnlPoints += Number(trade.realized_points)
+    }
+  }
+
+  for (const trade of closedTrades) {
+    const result = trade.multiplier_known ? Number(trade.realized_pnl) : Number(trade.realized_points)
+    if (result > 0) wins += 1
+    else if (result < 0) losses += 1
+  }
+
+  return {
+    tradeCount: trades.length,
+    wins,
+    losses,
+    dayPnlDollars: hasDollarPnl ? dayPnlDollars : null,
+    dayPnlPoints
+  }
+})
 
 const formattedDate = computed(() => {
   // Parsed as local time (not UTC) so the displayed weekday can't shift by
@@ -132,6 +182,37 @@ onBeforeUnmount(revokeBiasChartPreview)
 
     <p v-if="isLocked" class="locked-hint">This day is locked. Unlock it to make changes.</p>
 
+    <div class="day-tabs" role="tablist">
+      <button
+        role="tab"
+        class="day-tab"
+        :class="{ 'day-tab--active': activeTab === 'mood' }"
+        :aria-selected="activeTab === 'mood'"
+        @click="activeTab = 'mood'"
+      >
+        Mood &amp; Bias
+      </button>
+      <button
+        role="tab"
+        class="day-tab"
+        :class="{ 'day-tab--active': activeTab === 'trades' }"
+        :aria-selected="activeTab === 'trades'"
+        @click="activeTab = 'trades'"
+      >
+        Trades
+      </button>
+      <button
+        role="tab"
+        class="day-tab"
+        :class="{ 'day-tab--active': activeTab === 'overview' }"
+        :aria-selected="activeTab === 'overview'"
+        @click="activeTab = 'overview'"
+      >
+        Overview
+      </button>
+    </div>
+
+    <div v-show="activeTab === 'mood'">
     <section class="field-section">
       <h2>Sleep quality</h2>
       <div class="scale-buttons">
@@ -230,8 +311,62 @@ onBeforeUnmount(revokeBiasChartPreview)
         </button>
       </div>
     </section>
+    </div>
 
-    <TradesSection :date="route.params.date" :locked="isLocked" />
+    <div v-show="activeTab === 'trades'">
+      <TradesSection :date="route.params.date" :locked="isLocked" />
+    </div>
+
+    <div v-show="activeTab === 'overview'" class="day-overview">
+      <h2>Day Overview</h2>
+      <div class="overview-grid">
+        <div class="overview-stat">
+          <span class="overview-label">Mood</span>
+          <span class="overview-value">{{ day.mood ?? '—' }}</span>
+        </div>
+        <div class="overview-stat">
+          <span class="overview-label">Sleep</span>
+          <span class="overview-value">{{ day.sleep_quality ?? '—' }}</span>
+        </div>
+        <div class="overview-stat overview-stat--wide">
+          <span class="overview-label">Bias</span>
+          <span class="overview-value overview-value--text">{{ biasPreview ?? '—' }}</span>
+        </div>
+      </div>
+
+      <div class="overview-grid">
+        <div class="overview-stat">
+          <span class="overview-label">Trades</span>
+          <span class="overview-value">{{ overviewStats.tradeCount }}</span>
+        </div>
+        <div class="overview-stat">
+          <span class="overview-label">Wins</span>
+          <span class="overview-value">{{ overviewStats.wins }}</span>
+        </div>
+        <div class="overview-stat">
+          <span class="overview-label">Losses</span>
+          <span class="overview-value">{{ overviewStats.losses }}</span>
+        </div>
+        <div class="overview-stat">
+          <span class="overview-label">Day P&amp;L</span>
+          <span
+            class="overview-value"
+            :class="resultClass(overviewStats.dayPnlDollars ?? overviewStats.dayPnlPoints)"
+          >
+            <template v-if="overviewStats.dayPnlDollars !== null">
+              {{ formatSignedDollars(overviewStats.dayPnlDollars) }}
+              <span v-if="overviewStats.dayPnlPoints !== 0" class="overview-value-note">
+                + {{ formatSignedPoints(overviewStats.dayPnlPoints) }} pts (unknown instrument)
+              </span>
+            </template>
+            <template v-else-if="overviewStats.tradeCount > 0">
+              {{ formatSignedPoints(overviewStats.dayPnlPoints) }} pts
+            </template>
+            <template v-else>—</template>
+          </span>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -313,6 +448,99 @@ onBeforeUnmount(revokeBiasChartPreview)
   color: var(--el-text-muted);
   font-size: var(--el-text-sm);
   margin-bottom: var(--el-space-6);
+}
+
+.day-tabs {
+  display: flex;
+  gap: var(--el-space-2);
+  border-bottom: 1px solid var(--el-border);
+  margin-bottom: var(--el-space-6);
+}
+
+.day-tab {
+  padding: var(--el-space-3) var(--el-space-4);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--el-text-muted);
+  font-size: var(--el-text-sm);
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.day-tab:hover {
+  color: var(--el-text);
+}
+
+.day-tab--active {
+  color: var(--el-copper);
+  border-bottom-color: var(--el-copper);
+}
+
+.day-overview h2 {
+  font-size: var(--el-text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--el-text-muted);
+  margin: 0 0 var(--el-space-4);
+}
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: var(--el-space-3);
+  margin-bottom: var(--el-space-6);
+}
+
+.overview-stat {
+  padding: var(--el-space-3) var(--el-space-4);
+  background-color: var(--el-surface);
+  border: 1px solid var(--el-border);
+  border-radius: var(--el-radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--el-space-1);
+}
+
+.overview-stat--wide {
+  grid-column: span 2;
+}
+
+.overview-label {
+  font-size: var(--el-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--el-text-muted);
+}
+
+.overview-value {
+  font-size: var(--el-text-lg);
+  font-weight: 600;
+  color: var(--el-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-value--text {
+  font-size: var(--el-text-sm);
+  font-weight: 400;
+  font-variant-numeric: normal;
+}
+
+.overview-value-note {
+  display: block;
+  font-size: var(--el-text-xs);
+  font-weight: 400;
+  color: var(--el-text-muted);
+}
+
+.result-positive {
+  color: var(--el-positive);
+}
+
+.result-negative {
+  color: var(--el-negative);
 }
 
 .field-section {
