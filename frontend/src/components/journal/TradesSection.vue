@@ -1,7 +1,9 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useTradesStore } from '@/stores/trades'
+import { useInstrumentsStore } from '@/stores/instruments'
 import { formatPrice, formatSignedDollars, formatSignedPoints, resultClass, SYMBOL_PRESETS } from '@/utils/trades'
+import { computeRiskReward, pointsToPrice, priceToPoints } from '@/utils/tradeMath'
 
 const props = defineProps({
   date: { type: String, required: true },
@@ -9,6 +11,7 @@ const props = defineProps({
 })
 
 const tradesStore = useTradesStore()
+const instrumentsStore = useInstrumentsStore()
 
 const trades = computed(() => tradesStore.tradesByDate[props.date] || [])
 const expandedTradeId = ref(null)
@@ -22,6 +25,11 @@ const symbolEntryMode = ref('preset')
 // Starts 'custom' until setups load so the field never renders an empty
 // dropdown before we know whether any setups are configured.
 const setupEntryMode = ref('custom')
+// Stop/target can be entered as an absolute price or a points distance from
+// entry; whichever mode isn't active still keeps its own last-typed value
+// (see tradeMath.js) so toggling never silently discards what was typed.
+const stopMode = ref('price')
+const targetMode = ref('price')
 
 // Screenshot capture: extraction only prefills the form below for the user
 // to review -- it never creates a trade on its own.
@@ -43,9 +51,13 @@ function applyExtraction(extracted) {
   if (extracted.direction) tradeForm.direction = extracted.direction
   if (extracted.initial_quantity != null) tradeForm.initial_quantity = String(extracted.initial_quantity)
   if (extracted.entry_price != null) tradeForm.entry_price = String(extracted.entry_price)
-  if (extracted.stop_price != null) tradeForm.stop_price = String(extracted.stop_price)
+  if (extracted.stop_price != null) {
+    tradeForm.stop_price = String(extracted.stop_price)
+    stopMode.value = 'price'
+  }
   if (extracted.target_price != null) {
     tradeForm.target_price = String(extracted.target_price)
+    targetMode.value = 'price'
     showMoreFields.value = true
   }
   extractionHint.value = extracted.notes || null
@@ -129,14 +141,57 @@ function emptyTradeForm() {
     initial_quantity: '',
     entry_price: '',
     stop_price: '',
+    stop_points: '',
     entry_time: nowForDateTimeLocal(),
     target_price: '',
+    target_points: '',
     setup: '',
     notes: ''
   }
 }
 
 const tradeForm = reactive(emptyTradeForm())
+
+// The price actually submitted, regardless of which representation
+// (price/points) is currently being edited -- see stopMode/targetMode.
+const effectiveStopPrice = computed(() =>
+  stopMode.value === 'price'
+    ? tradeForm.stop_price || null
+    : pointsToPrice(tradeForm.entry_price, tradeForm.stop_points, tradeForm.direction, 'stop')
+)
+const effectiveTargetPrice = computed(() =>
+  targetMode.value === 'price'
+    ? tradeForm.target_price || null
+    : pointsToPrice(tradeForm.entry_price, tradeForm.target_points, tradeForm.direction, 'target')
+)
+
+// Shows the converted counterpart of whichever representation is active,
+// without ever overwriting what the user actually typed.
+const stopConversionHint = computed(() => {
+  if (stopMode.value === 'price') {
+    const pts = priceToPoints(tradeForm.entry_price, tradeForm.stop_price, tradeForm.direction, 'stop')
+    return pts !== null ? `≈ ${pts} pts` : null
+  }
+  return effectiveStopPrice.value !== null ? `≈ ${formatPrice(effectiveStopPrice.value)}` : null
+})
+const targetConversionHint = computed(() => {
+  if (targetMode.value === 'price') {
+    const pts = priceToPoints(tradeForm.entry_price, tradeForm.target_price, tradeForm.direction, 'target')
+    return pts !== null ? `≈ ${pts} pts` : null
+  }
+  return effectiveTargetPrice.value !== null ? `≈ ${formatPrice(effectiveTargetPrice.value)}` : null
+})
+
+const riskRewardPreview = computed(() =>
+  computeRiskReward({
+    quantity: tradeForm.initial_quantity,
+    entryPrice: tradeForm.entry_price,
+    stopPrice: effectiveStopPrice.value,
+    targetPrice: effectiveTargetPrice.value,
+    direction: tradeForm.direction,
+    multiplier: instrumentsStore.getMultiplier(tradeForm.symbol)
+  })
+)
 const exitForms = reactive({}) // tradeId -> { quantity, exit_price, exit_time }
 const entryForms = reactive({}) // tradeId -> { quantity, entry_price, entry_time }
 
@@ -166,8 +221,8 @@ async function submitNewTrade() {
     initial_quantity: Number(tradeForm.initial_quantity),
     entry_price: tradeForm.entry_price,
     entry_time: new Date(tradeForm.entry_time).toISOString(),
-    stop_price: tradeForm.stop_price || null,
-    target_price: tradeForm.target_price || null,
+    stop_price: effectiveStopPrice.value,
+    target_price: effectiveTargetPrice.value,
     setup: tradeForm.setup || null,
     notes: tradeForm.notes || null
   }
@@ -176,6 +231,8 @@ async function submitNewTrade() {
     Object.assign(tradeForm, emptyTradeForm())
     symbolEntryMode.value = 'preset'
     resetSetupEntryMode()
+    stopMode.value = 'price'
+    targetMode.value = 'price'
     showMoreFields.value = false
     extractionHint.value = null
     screenshotError.value = null
@@ -261,6 +318,7 @@ async function removeTrade(trade) {
 watch(() => props.date, loadTrades)
 onMounted(async () => {
   loadTrades()
+  instrumentsStore.fetchMultipliers()
   await tradesStore.fetchSetups()
   resetSetupEntryMode()
 })
@@ -410,15 +468,62 @@ onMounted(async () => {
           <input v-model="tradeForm.symbol" type="text" placeholder="Symbol" maxlength="20" required />
           <button type="button" class="toggle-more-button" @click="switchToPresetList">Use list</button>
         </span>
-        <select v-model="tradeForm.direction">
-          <option value="long">Long</option>
-          <option value="short">Short</option>
-        </select>
+        <div class="direction-toggle" role="group" aria-label="Direction">
+          <button
+            type="button"
+            class="direction-toggle-btn"
+            :class="{ 'direction-toggle-btn--active': tradeForm.direction === 'long' }"
+            @click="tradeForm.direction = 'long'"
+          >
+            LONG
+          </button>
+          <button
+            type="button"
+            class="direction-toggle-btn"
+            :class="{ 'direction-toggle-btn--active': tradeForm.direction === 'short' }"
+            @click="tradeForm.direction = 'short'"
+          >
+            SHORT
+          </button>
+        </div>
         <input v-model="tradeForm.initial_quantity" type="number" min="1" placeholder="Qty" required />
         <input v-model="tradeForm.entry_price" type="number" step="any" placeholder="Entry" required />
-        <input v-model="tradeForm.stop_price" type="number" step="any" placeholder="Stop" />
+        <span class="price-points-field">
+          <input
+            v-if="stopMode === 'price'"
+            v-model="tradeForm.stop_price"
+            type="number"
+            step="any"
+            placeholder="Stop"
+          />
+          <input v-else v-model="tradeForm.stop_points" type="number" step="any" placeholder="Stop pts" />
+          <span class="price-points-toggle">
+            <button type="button" :class="{ active: stopMode === 'price' }" @click="stopMode = 'price'">
+              Price
+            </button>
+            <button type="button" :class="{ active: stopMode === 'points' }" @click="stopMode = 'points'">
+              Points
+            </button>
+          </span>
+          <span v-if="stopConversionHint" class="conversion-hint">{{ stopConversionHint }}</span>
+        </span>
         <button type="submit">Add trade</button>
       </div>
+
+      <p v-if="riskRewardPreview" class="rr-preview">
+        {{ riskRewardPreview.quantity }} {{ tradeForm.symbol || 'contracts' }}
+        <template v-if="riskRewardPreview.riskPoints !== null">
+          | Risk: {{ riskRewardPreview.riskPoints }} pts<template v-if="riskRewardPreview.riskDollars !== null">
+            / ${{ formatPrice(riskRewardPreview.riskDollars) }}</template
+          >
+        </template>
+        <template v-if="riskRewardPreview.rewardPoints !== null">
+          | Reward: {{ riskRewardPreview.rewardPoints }} pts<template v-if="riskRewardPreview.rewardDollars !== null">
+            / ${{ formatPrice(riskRewardPreview.rewardDollars) }}</template
+          >
+        </template>
+        <template v-if="riskRewardPreview.rrRatio !== null"> | R:R {{ riskRewardPreview.rrRatio.toFixed(1) }}</template>
+      </p>
 
       <button type="button" class="toggle-more-button" @click="showMoreFields = !showMoreFields">
         {{ showMoreFields ? 'Fewer fields' : 'More fields' }}
@@ -426,7 +531,25 @@ onMounted(async () => {
 
       <div v-if="showMoreFields" class="trade-form-secondary">
         <input v-model="tradeForm.entry_time" type="datetime-local" />
-        <input v-model="tradeForm.target_price" type="number" step="any" placeholder="Target" />
+        <span class="price-points-field">
+          <input
+            v-if="targetMode === 'price'"
+            v-model="tradeForm.target_price"
+            type="number"
+            step="any"
+            placeholder="Target"
+          />
+          <input v-else v-model="tradeForm.target_points" type="number" step="any" placeholder="Target pts" />
+          <span class="price-points-toggle">
+            <button type="button" :class="{ active: targetMode === 'price' }" @click="targetMode = 'price'">
+              Price
+            </button>
+            <button type="button" :class="{ active: targetMode === 'points' }" @click="targetMode = 'points'">
+              Points
+            </button>
+          </span>
+          <span v-if="targetConversionHint" class="conversion-hint">{{ targetConversionHint }}</span>
+        </span>
         <select
           v-if="setupEntryMode === 'preset'"
           :value="tradeForm.setup"
@@ -735,6 +858,76 @@ onMounted(async () => {
   border-radius: var(--el-radius-sm);
   font-weight: 500;
   cursor: pointer;
+}
+
+.direction-toggle {
+  display: flex;
+}
+
+.trade-form-primary .direction-toggle-btn {
+  padding: var(--el-space-2) var(--el-space-3);
+  background-color: var(--el-surface);
+  color: var(--el-text-muted);
+  border: 1px solid var(--el-border);
+  font-weight: 600;
+  font-size: var(--el-text-xs);
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+
+.direction-toggle .direction-toggle-btn:first-child {
+  border-radius: var(--el-radius-sm) 0 0 var(--el-radius-sm);
+}
+
+.direction-toggle .direction-toggle-btn:last-child {
+  border-radius: 0 var(--el-radius-sm) var(--el-radius-sm) 0;
+  border-left: none;
+}
+
+.trade-form-primary .direction-toggle-btn--active {
+  background-color: var(--el-copper);
+  color: var(--el-bg);
+  border-color: var(--el-copper);
+}
+
+.price-points-field {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--el-space-1);
+}
+
+.price-points-toggle {
+  display: flex;
+  gap: 2px;
+}
+
+.trade-form-primary .price-points-toggle button,
+.trade-form-secondary .price-points-toggle button {
+  padding: 2px var(--el-space-2);
+  background: none;
+  color: var(--el-text-subtle);
+  border: 1px solid var(--el-border);
+  border-radius: var(--el-radius-sm);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.trade-form-primary .price-points-toggle button.active,
+.trade-form-secondary .price-points-toggle button.active {
+  color: var(--el-copper);
+  border-color: var(--el-copper);
+}
+
+.conversion-hint {
+  color: var(--el-text-subtle);
+  font-size: var(--el-text-xs);
+}
+
+.rr-preview {
+  color: var(--el-text-muted);
+  font-size: var(--el-text-sm);
+  margin: var(--el-space-2) 0 0;
 }
 
 .toggle-more-button {
