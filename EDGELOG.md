@@ -133,9 +133,9 @@ Rules:
 
 ## Current authorized work
 
-**VS1 — Foundation is accepted.** **VS2 — Daily Journal Core** is the current authorized work.
+**VS1 — Foundation** and **VS2 — Daily Journal Core** are accepted. **VS3 — Trade Lifecycle** is the current authorized work.
 
-No VS3+ functionality should be implemented until VS2 is tested and accepted.
+No VS4+ functionality should be implemented until VS3 is tested and accepted.
 
 ## VS1 technical direction
 

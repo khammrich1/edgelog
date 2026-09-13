@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useJournalStore } from '@/stores/journal'
+import TradesSection from '@/components/journal/TradesSection.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -229,6 +230,8 @@ onBeforeUnmount(revokeBiasChartPreview)
         </button>
       </div>
     </section>
+
+    <TradesSection :date="route.params.date" :locked="isLocked" />
   </div>
 </template>
 

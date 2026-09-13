@@ -19,7 +19,7 @@ EdgeLog is a manual-first trading journal built to help traders document their p
 
 ## Current status
 
-**VS1 — Foundation** is accepted. **VS2 — Daily Journal Core** is the current authorized build.
+**VS1 — Foundation** and **VS2 — Daily Journal Core** are accepted. **VS3 — Trade Lifecycle** is the current authorized build (pending manual acceptance).
 
 See [EDGELOG.md](EDGELOG.md) for the product specification and [ROADMAP.md](ROADMAP.md) for vertical slices.
 
