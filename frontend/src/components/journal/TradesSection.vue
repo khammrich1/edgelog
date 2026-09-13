@@ -15,6 +15,8 @@ const instrumentsStore = useInstrumentsStore()
 
 const trades = computed(() => tradesStore.tradesByDate[props.date] || [])
 const expandedTradeId = ref(null)
+const editingTradeId = ref(null)
+const editingExitId = ref(null)
 const showMoreFields = ref(false)
 const submitError = ref(null)
 // 'preset' shows the symbol dropdown; 'custom' shows a free-text field for
@@ -129,9 +131,13 @@ function resetSetupEntryMode() {
 }
 
 function nowForDateTimeLocal() {
-  const now = new Date()
+  return toDateTimeLocal(new Date())
+}
+
+function toDateTimeLocal(date) {
+  const d = new Date(date)
   const pad = (n) => String(n).padStart(2, '0')
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 function emptyTradeForm() {
@@ -207,6 +213,76 @@ function entryFormFor(tradeId) {
     entryForms[tradeId] = { quantity: '', entry_price: '', entry_time: nowForDateTimeLocal() }
   }
   return entryForms[tradeId]
+}
+
+const editExitForms = reactive({}) // exitId -> { quantity, exit_price, exit_time }
+
+function startEditExit(exit) {
+  editExitForms[exit.id] = {
+    quantity: exit.quantity,
+    exit_price: Number(exit.exit_price),
+    exit_time: toDateTimeLocal(exit.exit_time)
+  }
+  editingExitId.value = exit.id
+}
+
+function cancelEditExit() {
+  editingExitId.value = null
+}
+
+async function submitEditExit(trade, exit) {
+  const form = editExitForms[exit.id]
+  try {
+    await tradesStore.updateExit(props.date, trade.id, exit.id, {
+      quantity: Number(form.quantity),
+      exit_price: form.exit_price,
+      exit_time: new Date(form.exit_time).toISOString()
+    })
+    editingExitId.value = null
+  } catch (error) {
+    window.alert(error.response?.data?.detail || 'Could not update that trim.')
+  }
+}
+
+const editTradeForms = reactive({}) // tradeId -> full trade field set
+
+function startEditTrade(trade) {
+  editTradeForms[trade.id] = {
+    symbol: trade.symbol,
+    direction: trade.direction,
+    initial_quantity: trade.initial_quantity,
+    entry_price: Number(trade.entry_price),
+    entry_time: toDateTimeLocal(trade.entry_time),
+    stop_price: trade.stop_price !== null ? Number(trade.stop_price) : '',
+    target_price: trade.target_price !== null ? Number(trade.target_price) : '',
+    setup: trade.setup ?? '',
+    notes: trade.notes ?? ''
+  }
+  editingTradeId.value = trade.id
+}
+
+function cancelEditTrade() {
+  editingTradeId.value = null
+}
+
+async function submitEditTrade(trade) {
+  const form = editTradeForms[trade.id]
+  try {
+    await tradesStore.updateTrade(props.date, trade.id, {
+      symbol: form.symbol.trim(),
+      direction: form.direction,
+      initial_quantity: Number(form.initial_quantity),
+      entry_price: form.entry_price,
+      entry_time: new Date(form.entry_time).toISOString(),
+      stop_price: form.stop_price || null,
+      target_price: form.target_price || null,
+      setup: form.setup || null,
+      notes: form.notes || null
+    })
+    editingTradeId.value = null
+  } catch (error) {
+    window.alert(error.response?.data?.detail || 'Could not update that trade.')
+  }
 }
 
 async function loadTrades() {
@@ -329,60 +405,104 @@ onMounted(async () => {
     <h2>Trades</h2>
 
     <ul class="trade-list">
-      <li v-for="trade in trades" :key="trade.id" class="trade-row">
-        <div class="trade-summary" @click="toggleExpand(trade.id)">
-          <span class="trade-symbol">{{ trade.symbol }}</span>
-          <span class="trade-direction" :class="`trade-direction--${trade.direction}`">
-            {{ trade.direction === 'long' ? 'LONG' : 'SHORT' }}
-          </span>
-          <span class="trade-quantity">{{ trade.total_quantity }}</span>
-          <span class="trade-entry">Entry {{ formatPrice(trade.average_entry_price) }}</span>
-
-          <template v-if="trade.status === 'canceled'">
-            <span class="trade-status trade-status--canceled">CANCELED</span>
-          </template>
-          <template v-else-if="trade.status === 'open'">
-            <span class="trade-remaining">Remaining {{ trade.remaining_quantity }}</span>
-            <span class="trade-status trade-status--open">OPEN</span>
-          </template>
-          <template v-else>
-            <span class="trade-status trade-status--closed">CLOSED</span>
-            <span v-if="trade.multiplier_known" class="trade-result" :class="resultClass(trade.realized_pnl)">
-              {{ formatSignedDollars(trade.realized_pnl) }}
+      <li v-for="trade in trades" :key="trade.id" class="trade-card" :class="`trade-card--${trade.status}`">
+        <div class="trade-card__header" @click="toggleExpand(trade.id)">
+          <div class="trade-card__title">
+            <span class="trade-card__symbol">{{ trade.symbol }}</span>
+            <span class="trade-direction" :class="`trade-direction--${trade.direction}`">
+              {{ trade.direction === 'long' ? 'LONG' : 'SHORT' }}
             </span>
-            <span v-else class="trade-result" :class="resultClass(trade.realized_points)">
-              {{ formatSignedPoints(trade.realized_points) }} pts
-            </span>
-          </template>
+            <span class="trade-status" :class="`trade-status--${trade.status}`">{{ trade.status.toUpperCase() }}</span>
+          </div>
+          <div class="trade-card__summary-right">
+            <span v-if="trade.status === 'open'" class="trade-remaining">Remaining {{ trade.remaining_quantity }}</span>
+            <template v-else-if="trade.status === 'closed'">
+              <span v-if="trade.multiplier_known" class="trade-result" :class="resultClass(trade.realized_pnl)">
+                {{ formatSignedDollars(trade.realized_pnl) }}
+              </span>
+              <span v-else class="trade-result" :class="resultClass(trade.realized_points)">
+                {{ formatSignedPoints(trade.realized_points) }} pts
+              </span>
+            </template>
+          </div>
         </div>
 
-        <div v-if="expandedTradeId === trade.id" class="trade-detail">
+        <div v-if="expandedTradeId === trade.id" class="trade-card__body">
           <p v-if="trade.status === 'canceled'" class="canceled-hint">Canceled -- excluded from P&L.</p>
-          <div class="trade-detail-grid">
-            <span v-if="trade.stop_price">Stop {{ formatPrice(trade.stop_price) }}</span>
-            <span v-if="trade.target_price">Target {{ formatPrice(trade.target_price) }}</span>
-            <span v-if="trade.setup">Setup: {{ trade.setup }}</span>
-            <span v-if="trade.planned_risk_dollars">Planned risk: ${{ formatPrice(trade.planned_risk_dollars) }}</span>
-            <span v-else-if="trade.planned_risk_points">Planned risk: {{ formatPrice(trade.planned_risk_points) }} pts</span>
+
+          <div class="trade-card__info">
+            <div class="info-item">
+              <span class="info-label">Entry</span>
+              <span class="info-value">{{ formatPrice(trade.average_entry_price) }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Contracts</span>
+              <span class="info-value">{{ trade.total_quantity }}</span>
+            </div>
+            <div v-if="trade.stop_price" class="info-item">
+              <span class="info-label">Stop</span>
+              <span class="info-value info-value--negative">{{ formatPrice(trade.stop_price) }}</span>
+            </div>
+            <div v-if="trade.target_price" class="info-item">
+              <span class="info-label">Target</span>
+              <span class="info-value info-value--positive">{{ formatPrice(trade.target_price) }}</span>
+            </div>
+            <div v-if="trade.setup" class="info-item">
+              <span class="info-label">Setup</span>
+              <span class="info-value">{{ trade.setup }}</span>
+            </div>
+            <div v-if="trade.planned_risk_dollars || trade.planned_risk_points" class="info-item">
+              <span class="info-label">Planned risk</span>
+              <span class="info-value">
+                <template v-if="trade.planned_risk_dollars">${{ formatPrice(trade.planned_risk_dollars) }}</template>
+                <template v-else>{{ formatPrice(trade.planned_risk_points) }} pts</template>
+              </span>
+            </div>
           </div>
+
           <p v-if="trade.notes" class="trade-notes">{{ trade.notes }}</p>
 
-          <ul v-if="trade.entries.length" class="exit-list">
-            <li class="exit-row">
-              <span>{{ trade.initial_quantity }} @ {{ formatPrice(trade.entry_price) }} (original)</span>
-            </li>
-            <li v-for="entry in trade.entries" :key="entry.id" class="exit-row">
-              <span>{{ entry.quantity }} @ {{ formatPrice(entry.entry_price) }}</span>
-              <button class="remove-item-button" :disabled="locked" @click="removeEntry(trade, entry)">&times;</button>
-            </li>
-          </ul>
+          <div v-if="trade.entries.length" class="trade-card__section">
+            <div class="trade-card__section-label">Entries</div>
+            <ul class="exit-list">
+              <li class="exit-row">
+                <span>{{ trade.initial_quantity }} @ {{ formatPrice(trade.entry_price) }} <small>(original)</small></span>
+              </li>
+              <li v-for="entry in trade.entries" :key="entry.id" class="exit-row">
+                <span>{{ entry.quantity }} @ {{ formatPrice(entry.entry_price) }}</span>
+                <button class="remove-item-button" :disabled="locked" @click="removeEntry(trade, entry)">&times;</button>
+              </li>
+            </ul>
+          </div>
 
-          <ul v-if="trade.exits.length" class="exit-list">
-            <li v-for="exit in trade.exits" :key="exit.id" class="exit-row">
-              <span>{{ exit.quantity }} @ {{ formatPrice(exit.exit_price) }}</span>
-              <button class="remove-item-button" :disabled="locked" @click="removeExit(trade, exit)">&times;</button>
-            </li>
-          </ul>
+          <div v-if="trade.exits.length" class="trade-card__section">
+            <div class="trade-card__section-label">Trims</div>
+            <ul class="exit-list">
+              <li v-for="exit in trade.exits" :key="exit.id" class="exit-row">
+                <form v-if="editingExitId === exit.id" class="exit-form exit-edit-form" @submit.prevent="submitEditExit(trade, exit)">
+                  <input v-model="editExitForms[exit.id].quantity" type="number" min="1" required />
+                  <input v-model="editExitForms[exit.id].exit_price" type="number" step="any" required />
+                  <input v-model="editExitForms[exit.id].exit_time" type="datetime-local" required />
+                  <button type="submit">Save</button>
+                  <button type="button" @click="cancelEditExit">Cancel</button>
+                </form>
+                <template v-else>
+                  <span>{{ exit.quantity }} @ {{ formatPrice(exit.exit_price) }}</span>
+                  <span class="exit-row-actions">
+                    <button
+                      v-if="!locked"
+                      class="remove-item-button edit-item-button"
+                      title="Edit trim"
+                      @click="startEditExit(exit)"
+                    >
+                      ✎
+                    </button>
+                    <button class="remove-item-button" :disabled="locked" @click="removeExit(trade, exit)">&times;</button>
+                  </span>
+                </template>
+              </li>
+            </ul>
+          </div>
 
           <template v-if="trade.status === 'open' && !locked">
             <form class="exit-form" @submit.prevent="submitEntry(trade)">
@@ -417,16 +537,52 @@ onMounted(async () => {
             </button>
           </template>
 
-          <div class="trade-detail-actions">
+          <div v-if="editingTradeId === trade.id" class="trade-card__section">
+            <div class="trade-card__section-label">Edit trade</div>
+            <div class="trade-form-secondary">
+              <input v-model="editTradeForms[trade.id].symbol" type="text" placeholder="Symbol" maxlength="20" required />
+              <select v-model="editTradeForms[trade.id].direction">
+                <option value="long">Long</option>
+                <option value="short">Short</option>
+              </select>
+              <input v-model="editTradeForms[trade.id].initial_quantity" type="number" min="1" placeholder="Qty" required />
+              <input
+                v-model="editTradeForms[trade.id].entry_price"
+                type="number"
+                step="any"
+                placeholder="Entry"
+                required
+              />
+              <input v-model="editTradeForms[trade.id].entry_time" type="datetime-local" required />
+              <input v-model="editTradeForms[trade.id].stop_price" type="number" step="any" placeholder="Stop" />
+              <input v-model="editTradeForms[trade.id].target_price" type="number" step="any" placeholder="Target" />
+              <input v-model="editTradeForms[trade.id].setup" type="text" placeholder="Setup" maxlength="200" />
+              <textarea v-model="editTradeForms[trade.id].notes" rows="2" placeholder="Notes"></textarea>
+            </div>
+            <div class="trade-card__edit-actions">
+              <button type="button" class="btn-chip btn-chip--ghost" @click="cancelEditTrade">Cancel</button>
+              <button type="button" class="btn-chip btn-chip--primary" @click="submitEditTrade(trade)">Save changes</button>
+            </div>
+          </div>
+
+          <div class="trade-card__actions">
+            <button
+              v-if="editingTradeId !== trade.id"
+              class="btn-chip btn-chip--ghost"
+              :disabled="locked"
+              @click="startEditTrade(trade)"
+            >
+              Edit trade
+            </button>
             <button
               v-if="trade.status === 'open' && trade.exits.length === 0 && trade.entries.length === 0"
-              class="remove-item-button remove-item-button--text"
+              class="btn-chip btn-chip--warning"
               :disabled="locked"
               @click="cancelTradeAction(trade)"
             >
               Cancel trade
             </button>
-            <button class="remove-item-button remove-item-button--text" :disabled="locked" @click="removeTrade(trade)">
+            <button class="btn-chip btn-chip--danger" :disabled="locked" @click="removeTrade(trade)">
               Delete trade
             </button>
           </div>
@@ -598,37 +754,64 @@ onMounted(async () => {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  background-color: var(--el-border);
+  gap: var(--el-space-3);
+}
+
+.trade-card {
+  background-color: var(--el-surface);
   border: 1px solid var(--el-border);
+  border-left: 3px solid var(--el-border);
   border-radius: var(--el-radius-md);
   overflow: hidden;
 }
 
-.trade-row {
-  background-color: var(--el-bg);
+.trade-card--open {
+  border-left-color: var(--el-copper);
 }
 
-.trade-summary {
+.trade-card--closed {
+  border-left-color: var(--el-steel);
+}
+
+.trade-card--canceled {
+  border-left-color: var(--el-steel);
+  opacity: 0.7;
+}
+
+.trade-card__header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--el-space-3);
-  padding: var(--el-space-3);
+  padding: var(--el-space-3) var(--el-space-4);
   cursor: pointer;
   font-size: var(--el-text-sm);
 }
 
-.trade-summary:hover {
-  background-color: var(--el-surface);
+.trade-card__header:hover {
+  background-color: var(--el-surface-raised);
 }
 
-.trade-symbol {
-  font-weight: 600;
-  min-width: 48px;
+.trade-card__title {
+  display: flex;
+  align-items: center;
+  gap: var(--el-space-2);
+}
+
+.trade-card__symbol {
+  font-weight: 700;
+  font-family: var(--el-font-mono);
+}
+
+.trade-card__summary-right {
+  display: flex;
+  align-items: center;
+  gap: var(--el-space-2);
 }
 
 .trade-direction {
   font-size: var(--el-text-xs);
+  font-weight: 600;
   letter-spacing: 0.04em;
   padding: 2px var(--el-space-2);
   border-radius: var(--el-radius-sm);
@@ -644,39 +827,38 @@ onMounted(async () => {
   border: 1px solid var(--el-steel);
 }
 
-.trade-quantity,
-.trade-entry,
 .trade-remaining {
   color: var(--el-text-muted);
+  font-size: var(--el-text-xs);
 }
 
 .trade-status {
-  margin-left: auto;
   font-size: var(--el-text-xs);
+  font-weight: 600;
   letter-spacing: 0.05em;
+  padding: 2px var(--el-space-2);
+  border-radius: var(--el-radius-sm);
 }
 
 .trade-status--open {
   color: var(--el-copper);
+  background-color: rgba(184, 115, 51, 0.12);
 }
 
 .trade-status--closed {
   color: var(--el-text-subtle);
+  background-color: var(--el-bg);
 }
 
 .trade-status--canceled {
   color: var(--el-steel-light);
+  background-color: var(--el-bg);
 }
 
 .canceled-hint {
   color: var(--el-text-muted);
   font-size: var(--el-text-sm);
   margin: 0 0 var(--el-space-2);
-}
-
-.trade-detail-actions {
-  display: flex;
-  gap: var(--el-space-4);
 }
 
 .trade-result {
@@ -692,18 +874,111 @@ onMounted(async () => {
   color: var(--el-negative);
 }
 
-.trade-detail {
-  padding: 0 var(--el-space-3) var(--el-space-3);
+.trade-card__body {
+  padding: 0 var(--el-space-4) var(--el-space-4);
   border-top: 1px solid var(--el-border);
 }
 
-.trade-detail-grid {
+.trade-card__info {
   display: flex;
   flex-wrap: wrap;
   gap: var(--el-space-4);
-  color: var(--el-text-muted);
-  font-size: var(--el-text-sm);
+  padding: var(--el-space-3) var(--el-space-4);
   margin: var(--el-space-3) 0;
+  background-color: var(--el-bg);
+  border-radius: var(--el-radius-sm);
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--el-text-sm);
+}
+
+.info-label {
+  font-size: var(--el-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--el-text-subtle);
+}
+
+.info-value {
+  color: var(--el-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.info-value--positive {
+  color: var(--el-positive);
+}
+
+.info-value--negative {
+  color: var(--el-negative);
+}
+
+.trade-card__section {
+  margin-bottom: var(--el-space-3);
+}
+
+.trade-card__section-label {
+  font-size: var(--el-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--el-text-subtle);
+  margin-bottom: var(--el-space-1);
+}
+
+.trade-card__actions,
+.trade-card__edit-actions {
+  display: flex;
+  gap: var(--el-space-2);
+  flex-wrap: wrap;
+  margin-top: var(--el-space-3);
+}
+
+.btn-chip {
+  padding: var(--el-space-1) var(--el-space-3);
+  background-color: transparent;
+  border: 1px solid var(--el-border);
+  border-radius: var(--el-radius-sm);
+  color: var(--el-text-muted);
+  font-size: var(--el-text-xs);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.btn-chip--ghost:hover:not(:disabled) {
+  border-color: var(--el-copper);
+  color: var(--el-copper);
+}
+
+.btn-chip--primary {
+  background-color: var(--el-copper);
+  border-color: var(--el-copper);
+  color: var(--el-bg);
+}
+
+.btn-chip--warning {
+  border-color: var(--el-warning);
+  color: var(--el-warning);
+}
+
+.btn-chip--warning:hover:not(:disabled) {
+  background-color: rgba(251, 191, 36, 0.12);
+}
+
+.btn-chip--danger {
+  border-color: var(--el-negative);
+  color: var(--el-negative);
+}
+
+.btn-chip--danger:hover:not(:disabled) {
+  background-color: rgba(248, 113, 113, 0.12);
 }
 
 .trade-notes {
@@ -729,6 +1004,11 @@ onMounted(async () => {
   color: var(--el-text-muted);
 }
 
+.exit-row-actions {
+  display: flex;
+  gap: var(--el-space-1);
+}
+
 .remove-item-button {
   background: none;
   border: none;
@@ -742,14 +1022,13 @@ onMounted(async () => {
   color: var(--el-negative);
 }
 
+.edit-item-button:hover {
+  color: var(--el-copper);
+}
+
 .remove-item-button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
-}
-
-.remove-item-button--text {
-  font-size: var(--el-text-xs);
-  margin-top: var(--el-space-2);
 }
 
 .exit-form {
