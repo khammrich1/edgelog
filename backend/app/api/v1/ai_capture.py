@@ -3,6 +3,7 @@ broker screenshot for the user to review and edit. Never creates or modifies
 a Trade -- the client must still submit the normal create-trade request."""
 import base64
 import json
+import logging
 
 import anthropic
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
@@ -11,6 +12,8 @@ from app.api.deps import get_current_user
 from app.core.config import settings
 from app.models.user import User
 from app.schemas.ai_capture import ScreenshotTradeExtraction
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -21,7 +24,7 @@ EXTRACTION_SCHEMA = {
     "type": "object",
     "properties": {
         "symbol": {"type": ["string", "null"]},
-        "direction": {"type": ["string", "null"], "enum": ["long", "short", None]},
+        "direction": {"anyOf": [{"type": "string", "enum": ["long", "short"]}, {"type": "null"}]},
         "entry_price": {"type": ["string", "null"]},
         "stop_price": {"type": ["string", "null"]},
         "target_price": {"type": ["string", "null"]},
@@ -101,16 +104,19 @@ def _extract_trade_details_via_claude(image_bytes: bytes, content_type: str) -> 
             ],
         )
     except anthropic.RateLimitError:
+        logger.warning("Screenshot capture rate-limited by Anthropic", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Screenshot capture is rate-limited right now. Try again shortly, or enter the trade manually.",
         )
     except anthropic.APIConnectionError:
+        logger.error("Could not reach Anthropic for screenshot capture", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Could not reach the screenshot capture service. Enter the trade manually.",
         )
     except anthropic.APIStatusError:
+        logger.error("Anthropic returned an error status during screenshot capture", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Screenshot capture failed. Enter the trade manually.",
