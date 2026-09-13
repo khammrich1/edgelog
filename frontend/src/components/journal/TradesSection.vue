@@ -18,6 +18,67 @@ const submitError = ref(null)
 // any symbol not in SYMBOL_PRESETS -- the backend accepts either.
 const symbolEntryMode = ref('preset')
 
+// Screenshot capture: extraction only prefills the form below for the user
+// to review -- it never creates a trade on its own.
+const screenshotState = ref('idle') // idle | loading | error
+const screenshotError = ref(null)
+const extractionHint = ref(null)
+const dragActive = ref(false)
+const fileInput = ref(null)
+
+function applyExtraction(extracted) {
+  if (extracted.symbol) {
+    if (SYMBOL_PRESETS.includes(extracted.symbol)) {
+      symbolEntryMode.value = 'preset'
+    } else {
+      symbolEntryMode.value = 'custom'
+    }
+    tradeForm.symbol = extracted.symbol
+  }
+  if (extracted.direction) tradeForm.direction = extracted.direction
+  if (extracted.initial_quantity != null) tradeForm.initial_quantity = String(extracted.initial_quantity)
+  if (extracted.entry_price != null) tradeForm.entry_price = String(extracted.entry_price)
+  if (extracted.stop_price != null) tradeForm.stop_price = String(extracted.stop_price)
+  if (extracted.target_price != null) {
+    tradeForm.target_price = String(extracted.target_price)
+    showMoreFields.value = true
+  }
+  extractionHint.value = extracted.notes || null
+}
+
+async function handleScreenshotFile(file) {
+  if (!file) return
+  screenshotState.value = 'loading'
+  screenshotError.value = null
+  try {
+    const extracted = await tradesStore.parseScreenshot(file)
+    applyExtraction(extracted)
+    screenshotState.value = 'idle'
+  } catch (error) {
+    screenshotError.value = error.response?.data?.detail || 'Could not read that screenshot. Enter the trade manually below.'
+    screenshotState.value = 'error'
+  }
+}
+
+function onFilePicked(event) {
+  const file = event.target.files?.[0]
+  handleScreenshotFile(file)
+  event.target.value = ''
+}
+
+function onDrop(event) {
+  dragActive.value = false
+  const file = event.dataTransfer?.files?.[0]
+  handleScreenshotFile(file)
+}
+
+function onPaste(event) {
+  const item = Array.from(event.clipboardData?.items || []).find((i) => i.type.startsWith('image/'))
+  if (item) {
+    handleScreenshotFile(item.getAsFile())
+  }
+}
+
 function handleSymbolPresetChange(value) {
   if (value === '__custom__') {
     symbolEntryMode.value = 'custom'
@@ -84,6 +145,8 @@ async function submitNewTrade() {
     Object.assign(tradeForm, emptyTradeForm())
     symbolEntryMode.value = 'preset'
     showMoreFields.value = false
+    extractionHint.value = null
+    screenshotError.value = null
   } catch (error) {
     submitError.value = error.response?.data?.detail || 'Could not save that trade.'
   }
@@ -193,6 +256,24 @@ onMounted(loadTrades)
     </ul>
 
     <form v-if="!locked" class="trade-form" @submit.prevent="submitNewTrade">
+      <div
+        class="screenshot-dropzone"
+        :class="{ 'screenshot-dropzone--active': dragActive, 'screenshot-dropzone--loading': screenshotState === 'loading' }"
+        tabindex="0"
+        @click="fileInput.click()"
+        @keydown.enter="fileInput.click()"
+        @dragover.prevent="dragActive = true"
+        @dragleave.prevent="dragActive = false"
+        @drop.prevent="onDrop"
+        @paste="onPaste"
+      >
+        <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/webp" class="screenshot-input" @change="onFilePicked" />
+        <span v-if="screenshotState === 'loading'">Reading screenshot…</span>
+        <span v-else>Drop, paste, or click to upload a trade screenshot</span>
+      </div>
+      <p v-if="screenshotError" class="submit-error">{{ screenshotError }}</p>
+      <p v-if="extractionHint" class="extraction-hint">Note: {{ extractionHint }}</p>
+
       <div class="trade-form-primary">
         <select
           v-if="symbolEntryMode === 'preset'"
@@ -418,6 +499,47 @@ onMounted(loadTrades)
   border: 1px solid var(--el-copper);
   border-radius: var(--el-radius-sm);
   cursor: pointer;
+}
+
+.screenshot-dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--el-space-2);
+  padding: var(--el-space-4);
+  margin-bottom: var(--el-space-3);
+  border: 1px dashed var(--el-border);
+  border-radius: var(--el-radius-md);
+  color: var(--el-text-muted);
+  font-size: var(--el-text-sm);
+  cursor: pointer;
+  text-align: center;
+}
+
+.screenshot-dropzone:hover,
+.screenshot-dropzone:focus-visible {
+  border-color: var(--el-copper);
+  color: var(--el-text);
+  outline: none;
+}
+
+.screenshot-dropzone--active {
+  border-color: var(--el-copper);
+  background-color: var(--el-surface);
+}
+
+.screenshot-dropzone--loading {
+  color: var(--el-copper);
+}
+
+.screenshot-input {
+  display: none;
+}
+
+.extraction-hint {
+  color: var(--el-text-muted);
+  font-size: var(--el-text-sm);
+  margin: 0 0 var(--el-space-3);
 }
 
 .trade-form-primary {

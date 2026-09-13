@@ -232,10 +232,10 @@ Goal: speed manual logging without making AI authoritative.
 
 Planned:
 
-- paste/drag/drop chart screenshot
-- infer candidate symbol/direction/prices/setup
+- paste/drag/drop chart screenshot (pulled forward into VS3 at the user's explicit request -- see `POST /api/v1/trades/parse-screenshot`)
+- infer candidate symbol/direction/prices/setup (implemented for symbol/direction/entry/stop/target/quantity; setup inference still pending)
 - voice-to-draft trade entry
-- user confirmation before saving extracted values
+- user confirmation before saving extracted values (implemented: extraction only prefills the manual trade form, it never creates a trade on its own)
 
 AI must never silently commit interpreted trade data.
 

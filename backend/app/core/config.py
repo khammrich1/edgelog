@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     COOKIE_SAMESITE: str = "lax"
     COOKIE_DOMAIN: str = "localhost"
 
+    # AI screenshot trade capture
+    ANTHROPIC_API_KEY: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True

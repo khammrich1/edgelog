@@ -58,6 +58,17 @@ export const useTradesStore = defineStore('trades', () => {
     return data
   }
 
+  async function parseScreenshot(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    // The api instance defaults Content-Type to application/json; that has
+    // to be cleared so the browser can set the multipart boundary itself.
+    const { data } = await api.post('/trades/parse-screenshot', formData, {
+      headers: { 'Content-Type': undefined }
+    })
+    return data
+  }
+
   return {
     tradesByDate,
     fetchTrades,
@@ -65,6 +76,7 @@ export const useTradesStore = defineStore('trades', () => {
     updateTrade,
     deleteTrade,
     addExit,
-    deleteExit
+    deleteExit,
+    parseScreenshot
   }
 })
