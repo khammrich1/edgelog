@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useTradesStore } from '@/stores/trades'
-import { formatPrice, formatSignedDollars, formatSignedPoints, resultClass } from '@/utils/trades'
+import { formatPrice, formatSignedDollars, formatSignedPoints, resultClass, SYMBOL_PRESETS } from '@/utils/trades'
 
 const props = defineProps({
   date: { type: String, required: true },
@@ -14,6 +14,23 @@ const trades = computed(() => tradesStore.tradesByDate[props.date] || [])
 const expandedTradeId = ref(null)
 const showMoreFields = ref(false)
 const submitError = ref(null)
+// 'preset' shows the symbol dropdown; 'custom' shows a free-text field for
+// any symbol not in SYMBOL_PRESETS -- the backend accepts either.
+const symbolEntryMode = ref('preset')
+
+function handleSymbolPresetChange(value) {
+  if (value === '__custom__') {
+    symbolEntryMode.value = 'custom'
+    tradeForm.symbol = ''
+  } else {
+    tradeForm.symbol = value
+  }
+}
+
+function switchToPresetList() {
+  symbolEntryMode.value = 'preset'
+  tradeForm.symbol = ''
+}
 
 function nowForDateTimeLocal() {
   const now = new Date()
@@ -65,6 +82,7 @@ async function submitNewTrade() {
   try {
     await tradesStore.createTrade(props.date, payload)
     Object.assign(tradeForm, emptyTradeForm())
+    symbolEntryMode.value = 'preset'
     showMoreFields.value = false
   } catch (error) {
     submitError.value = error.response?.data?.detail || 'Could not save that trade.'
@@ -176,7 +194,20 @@ onMounted(loadTrades)
 
     <form v-if="!locked" class="trade-form" @submit.prevent="submitNewTrade">
       <div class="trade-form-primary">
-        <input v-model="tradeForm.symbol" type="text" placeholder="Symbol" maxlength="20" required />
+        <select
+          v-if="symbolEntryMode === 'preset'"
+          :value="tradeForm.symbol"
+          required
+          @change="handleSymbolPresetChange($event.target.value)"
+        >
+          <option value="" disabled>Symbol</option>
+          <option v-for="symbol in SYMBOL_PRESETS" :key="symbol" :value="symbol">{{ symbol }}</option>
+          <option value="__custom__">Other…</option>
+        </select>
+        <span v-else class="custom-symbol">
+          <input v-model="tradeForm.symbol" type="text" placeholder="Symbol" maxlength="20" required />
+          <button type="button" class="toggle-more-button" @click="switchToPresetList">Use list</button>
+        </span>
         <select v-model="tradeForm.direction">
           <option value="long">Long</option>
           <option value="short">Short</option>
@@ -407,6 +438,12 @@ onMounted(loadTrades)
 
 .trade-form-primary input[type='text'] {
   width: 90px;
+}
+
+.custom-symbol {
+  display: flex;
+  align-items: center;
+  gap: var(--el-space-2);
 }
 
 .trade-form-primary input[type='number'] {

@@ -332,6 +332,24 @@ async def test_mgc_multiplier(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_mcl_multiplier(client: AsyncClient):
+    headers = await _register_and_auth_headers(client)
+    day = await _open_day(client, headers)
+    create_response = await client.post(
+        f"/api/v1/journal/days/{day}/trades",
+        headers=headers,
+        json=_base_trade_payload(symbol="MCL", entry_price="100", initial_quantity=1),
+    )
+    trade_id = create_response.json()["id"]
+    response = await client.post(
+        f"/api/v1/journal/days/{day}/trades/{trade_id}/exits",
+        headers=headers,
+        json={"quantity": 1, "exit_price": "101", "exit_time": "2026-02-01T09:45:00Z"},
+    )
+    assert Decimal(response.json()["realized_pnl"]) == Decimal("100")  # 1 point * $100
+
+
+@pytest.mark.asyncio
 async def test_planned_risk_calculation_long_and_short(client: AsyncClient):
     headers = await _register_and_auth_headers(client)
     day = await _open_day(client, headers)
