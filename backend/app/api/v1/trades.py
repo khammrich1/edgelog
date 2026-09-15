@@ -1,19 +1,31 @@
 """Trade lifecycle endpoints (VS3): manually-logged trades and their exits."""
 from decimal import Decimal
-from datetime import date as date_type
+from datetime import date as date_type, datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.core.instruments import get_multiplier
 from app.models.journal import TradingDay
-from app.models.trades import Trade, TradeExit
+from app.models.trades import Trade, TradeEntry, TradeExit, TradeSetup
 from app.models.user import User
-from app.schemas.trades import TradeCreate, TradeExitCreate, TradeExitRead, TradeExitUpdate, TradeRead, TradeUpdate
+from app.schemas.trades import (
+    TradeCreate,
+    TradeEntryCreate,
+    TradeEntryRead,
+    TradeExitCreate,
+    TradeExitRead,
+    TradeExitUpdate,
+    TradeRead,
+    TradeSetupCreate,
+    TradeSetupRead,
+    TradeSetupUpdate,
+    TradeUpdate,
+)
 
 router = APIRouter()
 
@@ -51,39 +63,62 @@ async def _get_exits(db: AsyncSession, trade_id: int) -> list[TradeExit]:
     return list(result.scalars().all())
 
 
+async def _get_entries(db: AsyncSession, trade_id: int) -> list[TradeEntry]:
+    result = await db.execute(
+        select(TradeEntry).where(TradeEntry.trade_id == trade_id).order_by(TradeEntry.entry_time, TradeEntry.id)
+    )
+    return list(result.scalars().all())
+
+
 def _require_unlocked(trading_day: TradingDay) -> None:
     if trading_day.status == "locked":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=LOCKED_DAY_DETAIL)
 
 
-def _compute_trade_math(trade: Trade, exits: list[TradeExit]):
-    """Single source of truth for remaining quantity, status, and P&L/risk.
+def _compute_trade_math(trade: Trade, exits: list[TradeExit], entries: list[TradeEntry]):
+    """Single source of truth for total/remaining quantity, average entry
+    price, status, and P&L/risk.
 
-    Status is always derived from remaining quantity rather than trusted
-    from the stored column, so it can never drift from the actual exits.
+    Status is always derived from remaining quantity (and canceled_at)
+    rather than trusted from the stored column, so it can never drift from
+    the actual exits. Average entry price is a quantity-weighted average of
+    the original entry plus any scale-in entries; it equals trade.entry_price
+    exactly when there are no scale-ins.
     """
+    total_quantity = trade.initial_quantity + sum(e.quantity for e in entries)
+    total_entry_value = trade.entry_price * trade.initial_quantity + sum(
+        e.entry_price * e.quantity for e in entries
+    )
+    average_entry_price = total_entry_value / total_quantity
+
     exited_qty = sum(e.quantity for e in exits)
-    remaining_qty = trade.initial_quantity - exited_qty
-    computed_status = "closed" if remaining_qty <= 0 else "open"
+    remaining_qty = total_quantity - exited_qty
+
+    if trade.canceled_at is not None:
+        computed_status = "canceled"
+    else:
+        computed_status = "closed" if remaining_qty <= 0 else "open"
 
     sign = Decimal(1) if trade.direction == "long" else Decimal(-1)
     multiplier = get_multiplier(trade.symbol)
 
     realized_points = Decimal("0")
     for exit_row in exits:
-        movement = (exit_row.exit_price - trade.entry_price) * sign
+        movement = (exit_row.exit_price - average_entry_price) * sign
         realized_points += movement * exit_row.quantity
     realized_pnl = realized_points * multiplier if multiplier is not None else None
 
     planned_risk_points: Optional[Decimal] = None
     planned_risk_dollars: Optional[Decimal] = None
     if trade.stop_price is not None:
-        risk_per_unit = (trade.entry_price - trade.stop_price) * sign
-        planned_risk_points = risk_per_unit * trade.initial_quantity
+        risk_per_unit = (average_entry_price - trade.stop_price) * sign
+        planned_risk_points = risk_per_unit * total_quantity
         if multiplier is not None:
             planned_risk_dollars = planned_risk_points * multiplier
 
     return {
+        "total_quantity": total_quantity,
+        "average_entry_price": average_entry_price,
         "remaining_quantity": remaining_qty,
         "status": computed_status,
         "realized_points": realized_points,
@@ -94,8 +129,8 @@ def _compute_trade_math(trade: Trade, exits: list[TradeExit]):
     }
 
 
-def _serialize_trade(trade: Trade, exits: list[TradeExit]) -> TradeRead:
-    math = _compute_trade_math(trade, exits)
+def _serialize_trade(trade: Trade, exits: list[TradeExit], entries: list[TradeEntry]) -> TradeRead:
+    math = _compute_trade_math(trade, exits, entries)
     return TradeRead(
         id=trade.id,
         trading_day_id=trade.trading_day_id,
@@ -109,7 +144,11 @@ def _serialize_trade(trade: Trade, exits: list[TradeExit]) -> TradeRead:
         setup=trade.setup,
         notes=trade.notes,
         status=math["status"],
+        canceled_at=trade.canceled_at,
         remaining_quantity=math["remaining_quantity"],
+        total_quantity=math["total_quantity"],
+        average_entry_price=math["average_entry_price"],
+        entries=[TradeEntryRead.model_validate(e) for e in entries],
         exits=[TradeExitRead.model_validate(e) for e in exits],
         realized_points=math["realized_points"],
         realized_pnl=math["realized_pnl"],
@@ -119,6 +158,84 @@ def _serialize_trade(trade: Trade, exits: list[TradeExit]) -> TradeRead:
         created_at=trade.created_at,
         updated_at=trade.updated_at,
     )
+
+
+# ---- Trade setup configuration ----
+
+@router.get("/trade-setups", response_model=list[TradeSetupRead])
+async def list_trade_setups(
+    include_inactive: bool = False,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    query = select(TradeSetup).where(TradeSetup.user_id == current_user.id)
+    if not include_inactive:
+        query = query.where(TradeSetup.is_active.is_(True))
+    query = query.order_by(TradeSetup.sort_order, TradeSetup.id)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+@router.post("/trade-setups", response_model=TradeSetupRead, status_code=status.HTTP_201_CREATED)
+async def create_trade_setup(
+    payload: TradeSetupCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    max_order_result = await db.execute(
+        select(func.max(TradeSetup.sort_order)).where(TradeSetup.user_id == current_user.id)
+    )
+    next_order = (max_order_result.scalar() or 0) + 1
+
+    setup = TradeSetup(user_id=current_user.id, name=payload.name, sort_order=next_order)
+    db.add(setup)
+    await db.flush()
+    await db.refresh(setup)
+    return setup
+
+
+@router.put("/trade-setups/{setup_id}", response_model=TradeSetupRead)
+async def update_trade_setup(
+    setup_id: int,
+    payload: TradeSetupUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    setup = await _get_owned_trade_setup(db, current_user.id, setup_id)
+
+    if payload.name is not None:
+        setup.name = payload.name
+    if payload.sort_order is not None:
+        setup.sort_order = payload.sort_order
+    if payload.is_active is not None:
+        setup.is_active = payload.is_active
+
+    await db.flush()
+    await db.refresh(setup)
+    return setup
+
+
+@router.delete("/trade-setups/{setup_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_trade_setup(
+    setup_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    setup = await _get_owned_trade_setup(db, current_user.id, setup_id)
+    # Soft delete: a trade already logged with this setup keeps its own
+    # setup string regardless of later changes to the configured list.
+    setup.is_active = False
+    await db.flush()
+
+
+async def _get_owned_trade_setup(db: AsyncSession, user_id: int, setup_id: int) -> TradeSetup:
+    result = await db.execute(
+        select(TradeSetup).where(TradeSetup.id == setup_id, TradeSetup.user_id == user_id)
+    )
+    setup = result.scalar_one_or_none()
+    if setup is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade setup not found")
+    return setup
 
 
 # ---- Trades ----
@@ -140,7 +257,8 @@ async def list_trades(
     serialized = []
     for trade in trades:
         exits = await _get_exits(db, trade.id)
-        serialized.append(_serialize_trade(trade, exits))
+        entries = await _get_entries(db, trade.id)
+        serialized.append(_serialize_trade(trade, exits, entries))
     return serialized
 
 
@@ -171,7 +289,7 @@ async def create_trade(
     db.add(trade)
     await db.flush()
     await db.refresh(trade)
-    return _serialize_trade(trade, [])
+    return _serialize_trade(trade, [], [])
 
 
 @router.get("/days/{day}/trades/{trade_id}", response_model=TradeRead)
@@ -184,7 +302,8 @@ async def get_trade(
     trading_day = await _get_owned_trading_day(db, current_user.id, day)
     trade = await _get_owned_trade(db, current_user.id, trading_day.id, trade_id)
     exits = await _get_exits(db, trade.id)
-    return _serialize_trade(trade, exits)
+    entries = await _get_entries(db, trade.id)
+    return _serialize_trade(trade, exits, entries)
 
 
 @router.put("/days/{day}/trades/{trade_id}", response_model=TradeRead)
@@ -200,10 +319,14 @@ async def update_trade(
     _require_unlocked(trading_day)
 
     exits = await _get_exits(db, trade.id)
+    entries = await _get_entries(db, trade.id)
     exited_qty = sum(e.quantity for e in exits)
+    entries_qty = sum(e.quantity for e in entries)
 
-    new_quantity = payload.initial_quantity if payload.initial_quantity is not None else trade.initial_quantity
-    if new_quantity < exited_qty:
+    new_initial_quantity = (
+        payload.initial_quantity if payload.initial_quantity is not None else trade.initial_quantity
+    )
+    if new_initial_quantity + entries_qty < exited_qty:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot set quantity below the {exited_qty} contracts/shares already exited",
@@ -228,10 +351,12 @@ async def update_trade(
     if payload.notes is not None:
         trade.notes = payload.notes
 
-    trade.status = "closed" if (trade.initial_quantity - exited_qty) <= 0 else "open"
+    await db.flush()
+    math = _compute_trade_math(trade, exits, entries)
+    trade.status = math["status"]
     await db.flush()
     await db.refresh(trade)
-    return _serialize_trade(trade, exits)
+    return _serialize_trade(trade, exits, entries)
 
 
 @router.delete("/days/{day}/trades/{trade_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -249,6 +374,112 @@ async def delete_trade(
     await db.flush()
 
 
+@router.post("/days/{day}/trades/{trade_id}/cancel", response_model=TradeRead)
+async def cancel_trade(
+    day: date_type,
+    trade_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Marks a trade Canceled instead of deleting it -- for a trade that was
+    logged but never really happened (e.g. invalidated before anything was
+    realized against it). Only allowed while nothing has been recorded
+    beyond the original entry, since a trade with real exits or scale-ins
+    represents money that actually moved."""
+    trading_day = await _get_owned_trading_day(db, current_user.id, day)
+    trade = await _get_owned_trade(db, current_user.id, trading_day.id, trade_id)
+    _require_unlocked(trading_day)
+
+    if trade.canceled_at is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Trade is already canceled")
+
+    exits = await _get_exits(db, trade.id)
+    entries = await _get_entries(db, trade.id)
+    if exits or entries:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot cancel a trade that already has exits or additional entries recorded",
+        )
+
+    trade.canceled_at = datetime.now(timezone.utc)
+    trade.status = "canceled"
+    await db.flush()
+    await db.refresh(trade)
+    return _serialize_trade(trade, exits, entries)
+
+
+# ---- Entries (scale-ins) ----
+
+@router.post(
+    "/days/{day}/trades/{trade_id}/entries", response_model=TradeRead, status_code=status.HTTP_201_CREATED
+)
+async def create_entry(
+    day: date_type,
+    trade_id: int,
+    payload: TradeEntryCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    trading_day = await _get_owned_trading_day(db, current_user.id, day)
+    trade = await _get_owned_trade(db, current_user.id, trading_day.id, trade_id)
+    _require_unlocked(trading_day)
+
+    exits = await _get_exits(db, trade.id)
+    entries = await _get_entries(db, trade.id)
+    current_status = _compute_trade_math(trade, exits, entries)["status"]
+    if current_status != "open":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot add contracts to a trade that isn't open",
+        )
+
+    entry_row = TradeEntry(
+        trade_id=trade.id,
+        quantity=payload.quantity,
+        entry_price=payload.entry_price,
+        entry_time=payload.entry_time,
+    )
+    db.add(entry_row)
+    await db.flush()
+
+    entries.append(entry_row)
+    await db.refresh(trade)
+    return _serialize_trade(trade, exits, entries)
+
+
+@router.delete("/days/{day}/trades/{trade_id}/entries/{entry_id}", response_model=TradeRead)
+async def delete_entry(
+    day: date_type,
+    trade_id: int,
+    entry_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    trading_day = await _get_owned_trading_day(db, current_user.id, day)
+    trade = await _get_owned_trade(db, current_user.id, trading_day.id, trade_id)
+    _require_unlocked(trading_day)
+
+    entries = await _get_entries(db, trade.id)
+    entry_row = next((e for e in entries if e.id == entry_id), None)
+    if entry_row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
+
+    exits = await _get_exits(db, trade.id)
+    remaining_entries = [e for e in entries if e.id != entry_id]
+    exited_qty = sum(e.quantity for e in exits)
+    remaining_total_qty = trade.initial_quantity + sum(e.quantity for e in remaining_entries)
+    if remaining_total_qty < exited_qty:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot remove that entry; {exited_qty} contracts/shares are already exited",
+        )
+
+    await db.delete(entry_row)
+    await db.flush()
+    await db.refresh(trade)
+    return _serialize_trade(trade, exits, remaining_entries)
+
+
 # ---- Exits ----
 
 @router.post("/days/{day}/trades/{trade_id}/exits", response_model=TradeRead, status_code=status.HTTP_201_CREATED)
@@ -264,8 +495,10 @@ async def create_exit(
     _require_unlocked(trading_day)
 
     exits = await _get_exits(db, trade.id)
+    entries = await _get_entries(db, trade.id)
+    total_quantity = trade.initial_quantity + sum(e.quantity for e in entries)
     exited_qty = sum(e.quantity for e in exits)
-    remaining_qty = trade.initial_quantity - exited_qty
+    remaining_qty = total_quantity - exited_qty
     if payload.quantity > remaining_qty:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -282,11 +515,11 @@ async def create_exit(
     await db.flush()
 
     exits.append(exit_row)
-    new_remaining = trade.initial_quantity - (exited_qty + payload.quantity)
+    new_remaining = total_quantity - (exited_qty + payload.quantity)
     trade.status = "closed" if new_remaining <= 0 else "open"
     await db.flush()
     await db.refresh(trade)
-    return _serialize_trade(trade, exits)
+    return _serialize_trade(trade, exits, entries)
 
 
 @router.put("/days/{day}/trades/{trade_id}/exits/{exit_id}", response_model=TradeRead)
@@ -303,14 +536,16 @@ async def update_exit(
     _require_unlocked(trading_day)
 
     exits = await _get_exits(db, trade.id)
+    entries = await _get_entries(db, trade.id)
+    total_quantity = trade.initial_quantity + sum(e.quantity for e in entries)
     exit_row = next((e for e in exits if e.id == exit_id), None)
     if exit_row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exit not found")
 
     new_quantity = payload.quantity if payload.quantity is not None else exit_row.quantity
     other_exited_qty = sum(e.quantity for e in exits if e.id != exit_id)
-    if other_exited_qty + new_quantity > trade.initial_quantity:
-        remaining_for_this_exit = trade.initial_quantity - other_exited_qty
+    if other_exited_qty + new_quantity > total_quantity:
+        remaining_for_this_exit = total_quantity - other_exited_qty
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot exit {new_quantity}; only {remaining_for_this_exit} remain open for this exit",
@@ -326,12 +561,12 @@ async def update_exit(
     await db.flush()
 
     new_exited_qty = other_exited_qty + new_quantity
-    trade.status = "closed" if (trade.initial_quantity - new_exited_qty) <= 0 else "open"
+    trade.status = "closed" if (total_quantity - new_exited_qty) <= 0 else "open"
     await db.flush()
     await db.refresh(trade)
 
     refreshed_exits = await _get_exits(db, trade.id)
-    return _serialize_trade(trade, refreshed_exits)
+    return _serialize_trade(trade, refreshed_exits, entries)
 
 
 @router.delete("/days/{day}/trades/{trade_id}/exits/{exit_id}", response_model=TradeRead)
@@ -347,6 +582,8 @@ async def delete_exit(
     _require_unlocked(trading_day)
 
     exits = await _get_exits(db, trade.id)
+    entries = await _get_entries(db, trade.id)
+    total_quantity = trade.initial_quantity + sum(e.quantity for e in entries)
     exit_row = next((e for e in exits if e.id == exit_id), None)
     if exit_row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exit not found")
@@ -356,7 +593,7 @@ async def delete_exit(
 
     remaining_exits = [e for e in exits if e.id != exit_id]
     exited_qty = sum(e.quantity for e in remaining_exits)
-    trade.status = "closed" if (trade.initial_quantity - exited_qty) <= 0 else "open"
+    trade.status = "closed" if (total_quantity - exited_qty) <= 0 else "open"
     await db.flush()
     await db.refresh(trade)
-    return _serialize_trade(trade, remaining_exits)
+    return _serialize_trade(trade, remaining_exits, entries)
