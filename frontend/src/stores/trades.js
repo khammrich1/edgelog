@@ -56,6 +56,12 @@ export const useTradesStore = defineStore('trades', () => {
     return data
   }
 
+  async function updateExit(date, tradeId, exitId, payload) {
+    const { data } = await api.put(`/journal/days/${date}/trades/${tradeId}/exits/${exitId}`, payload)
+    _replaceTrade(date, data)
+    return data
+  }
+
   async function deleteExit(date, tradeId, exitId) {
     const { data } = await api.delete(`/journal/days/${date}/trades/${tradeId}/exits/${exitId}`)
     _replaceTrade(date, data)
@@ -116,6 +122,7 @@ export const useTradesStore = defineStore('trades', () => {
     updateTrade,
     deleteTrade,
     addExit,
+    updateExit,
     deleteExit,
     addEntry,
     deleteEntry,
