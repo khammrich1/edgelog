@@ -17,6 +17,72 @@ const submitError = ref(null)
 // 'preset' shows the symbol dropdown; 'custom' shows a free-text field for
 // any symbol not in SYMBOL_PRESETS -- the backend accepts either.
 const symbolEntryMode = ref('preset')
+// Same preset/custom split as the symbol field, but sourced from the
+// user's configured trade setups (Settings page) instead of a fixed list.
+// Starts 'custom' until setups load so the field never renders an empty
+// dropdown before we know whether any setups are configured.
+const setupEntryMode = ref('custom')
+
+// Screenshot capture: extraction only prefills the form below for the user
+// to review -- it never creates a trade on its own.
+const screenshotState = ref('idle') // idle | loading | error
+const screenshotError = ref(null)
+const extractionHint = ref(null)
+const dragActive = ref(false)
+const fileInput = ref(null)
+
+function applyExtraction(extracted) {
+  if (extracted.symbol) {
+    if (SYMBOL_PRESETS.includes(extracted.symbol)) {
+      symbolEntryMode.value = 'preset'
+    } else {
+      symbolEntryMode.value = 'custom'
+    }
+    tradeForm.symbol = extracted.symbol
+  }
+  if (extracted.direction) tradeForm.direction = extracted.direction
+  if (extracted.initial_quantity != null) tradeForm.initial_quantity = String(extracted.initial_quantity)
+  if (extracted.entry_price != null) tradeForm.entry_price = String(extracted.entry_price)
+  if (extracted.stop_price != null) tradeForm.stop_price = String(extracted.stop_price)
+  if (extracted.target_price != null) {
+    tradeForm.target_price = String(extracted.target_price)
+    showMoreFields.value = true
+  }
+  extractionHint.value = extracted.notes || null
+}
+
+async function handleScreenshotFile(file) {
+  if (!file) return
+  screenshotState.value = 'loading'
+  screenshotError.value = null
+  try {
+    const extracted = await tradesStore.parseScreenshot(file)
+    applyExtraction(extracted)
+    screenshotState.value = 'idle'
+  } catch (error) {
+    screenshotError.value = error.response?.data?.detail || 'Could not read that screenshot. Enter the trade manually below.'
+    screenshotState.value = 'error'
+  }
+}
+
+function onFilePicked(event) {
+  const file = event.target.files?.[0]
+  handleScreenshotFile(file)
+  event.target.value = ''
+}
+
+function onDrop(event) {
+  dragActive.value = false
+  const file = event.dataTransfer?.files?.[0]
+  handleScreenshotFile(file)
+}
+
+function onPaste(event) {
+  const item = Array.from(event.clipboardData?.items || []).find((i) => i.type.startsWith('image/'))
+  if (item) {
+    handleScreenshotFile(item.getAsFile())
+  }
+}
 
 function handleSymbolPresetChange(value) {
   if (value === '__custom__') {
@@ -30,6 +96,24 @@ function handleSymbolPresetChange(value) {
 function switchToPresetList() {
   symbolEntryMode.value = 'preset'
   tradeForm.symbol = ''
+}
+
+function handleSetupPresetChange(value) {
+  if (value === '__custom__') {
+    setupEntryMode.value = 'custom'
+    tradeForm.setup = ''
+  } else {
+    tradeForm.setup = value
+  }
+}
+
+function switchToSetupPresetList() {
+  setupEntryMode.value = 'preset'
+  tradeForm.setup = ''
+}
+
+function resetSetupEntryMode() {
+  setupEntryMode.value = tradesStore.setups.length > 0 ? 'preset' : 'custom'
 }
 
 function nowForDateTimeLocal() {
@@ -54,12 +138,20 @@ function emptyTradeForm() {
 
 const tradeForm = reactive(emptyTradeForm())
 const exitForms = reactive({}) // tradeId -> { quantity, exit_price, exit_time }
+const entryForms = reactive({}) // tradeId -> { quantity, entry_price, entry_time }
 
 function exitFormFor(tradeId) {
   if (!exitForms[tradeId]) {
     exitForms[tradeId] = { quantity: '', exit_price: '', exit_time: nowForDateTimeLocal() }
   }
   return exitForms[tradeId]
+}
+
+function entryFormFor(tradeId) {
+  if (!entryForms[tradeId]) {
+    entryForms[tradeId] = { quantity: '', entry_price: '', entry_time: nowForDateTimeLocal() }
+  }
+  return entryForms[tradeId]
 }
 
 async function loadTrades() {
@@ -83,7 +175,10 @@ async function submitNewTrade() {
     await tradesStore.createTrade(props.date, payload)
     Object.assign(tradeForm, emptyTradeForm())
     symbolEntryMode.value = 'preset'
+    resetSetupEntryMode()
     showMoreFields.value = false
+    extractionHint.value = null
+    screenshotError.value = null
   } catch (error) {
     submitError.value = error.response?.data?.detail || 'Could not save that trade.'
   }
@@ -112,13 +207,63 @@ async function removeExit(trade, exit) {
   await tradesStore.deleteExit(props.date, trade.id, exit.id)
 }
 
+async function submitEntry(trade) {
+  const form = entryFormFor(trade.id)
+  try {
+    await tradesStore.addEntry(props.date, trade.id, {
+      quantity: Number(form.quantity),
+      entry_price: form.entry_price,
+      entry_time: new Date(form.entry_time).toISOString()
+    })
+    delete entryForms[trade.id]
+  } catch (error) {
+    window.alert(error.response?.data?.detail || 'Could not add that entry.')
+  }
+}
+
+async function removeEntry(trade, entry) {
+  if (!window.confirm(`Remove the ${entry.quantity} @ ${entry.entry_price} entry? This cannot be undone.`)) return
+  await tradesStore.deleteEntry(props.date, trade.id, entry.id)
+}
+
+async function stopHit(trade) {
+  if (
+    !window.confirm(
+      `Mark stop hit? This exits the remaining ${trade.remaining_quantity} @ ${trade.stop_price}.`
+    )
+  )
+    return
+  try {
+    await tradesStore.addExit(props.date, trade.id, {
+      quantity: trade.remaining_quantity,
+      exit_price: trade.stop_price,
+      exit_time: new Date().toISOString()
+    })
+  } catch (error) {
+    window.alert(error.response?.data?.detail || 'Could not record the stop-hit exit.')
+  }
+}
+
+async function cancelTradeAction(trade) {
+  if (!window.confirm(`Cancel this ${trade.symbol} trade? It will be kept but excluded from P&L.`)) return
+  try {
+    await tradesStore.cancelTrade(props.date, trade.id)
+  } catch (error) {
+    window.alert(error.response?.data?.detail || 'Could not cancel that trade.')
+  }
+}
+
 async function removeTrade(trade) {
   if (!window.confirm(`Delete this ${trade.symbol} trade and all of its exits? This cannot be undone.`)) return
   await tradesStore.deleteTrade(props.date, trade.id)
 }
 
 watch(() => props.date, loadTrades)
-onMounted(loadTrades)
+onMounted(async () => {
+  loadTrades()
+  await tradesStore.fetchSetups()
+  resetSetupEntryMode()
+})
 </script>
 
 <template>
@@ -132,10 +277,13 @@ onMounted(loadTrades)
           <span class="trade-direction" :class="`trade-direction--${trade.direction}`">
             {{ trade.direction === 'long' ? 'LONG' : 'SHORT' }}
           </span>
-          <span class="trade-quantity">{{ trade.initial_quantity }}</span>
-          <span class="trade-entry">Entry {{ formatPrice(trade.entry_price) }}</span>
+          <span class="trade-quantity">{{ trade.total_quantity }}</span>
+          <span class="trade-entry">Entry {{ formatPrice(trade.average_entry_price) }}</span>
 
-          <template v-if="trade.status === 'open'">
+          <template v-if="trade.status === 'canceled'">
+            <span class="trade-status trade-status--canceled">CANCELED</span>
+          </template>
+          <template v-else-if="trade.status === 'open'">
             <span class="trade-remaining">Remaining {{ trade.remaining_quantity }}</span>
             <span class="trade-status trade-status--open">OPEN</span>
           </template>
@@ -151,6 +299,7 @@ onMounted(loadTrades)
         </div>
 
         <div v-if="expandedTradeId === trade.id" class="trade-detail">
+          <p v-if="trade.status === 'canceled'" class="canceled-hint">Canceled -- excluded from P&L.</p>
           <div class="trade-detail-grid">
             <span v-if="trade.stop_price">Stop {{ formatPrice(trade.stop_price) }}</span>
             <span v-if="trade.target_price">Target {{ formatPrice(trade.target_price) }}</span>
@@ -160,6 +309,16 @@ onMounted(loadTrades)
           </div>
           <p v-if="trade.notes" class="trade-notes">{{ trade.notes }}</p>
 
+          <ul v-if="trade.entries.length" class="exit-list">
+            <li class="exit-row">
+              <span>{{ trade.initial_quantity }} @ {{ formatPrice(trade.entry_price) }} (original)</span>
+            </li>
+            <li v-for="entry in trade.entries" :key="entry.id" class="exit-row">
+              <span>{{ entry.quantity }} @ {{ formatPrice(entry.entry_price) }}</span>
+              <button class="remove-item-button" :disabled="locked" @click="removeEntry(trade, entry)">&times;</button>
+            </li>
+          </ul>
+
           <ul v-if="trade.exits.length" class="exit-list">
             <li v-for="exit in trade.exits" :key="exit.id" class="exit-row">
               <span>{{ exit.quantity }} @ {{ formatPrice(exit.exit_price) }}</span>
@@ -167,32 +326,75 @@ onMounted(loadTrades)
             </li>
           </ul>
 
-          <form
-            v-if="trade.status === 'open' && !locked"
-            class="exit-form"
-            @submit.prevent="submitExit(trade)"
-          >
-            <input
-              v-model="exitFormFor(trade.id).quantity"
-              type="number"
-              min="1"
-              :max="trade.remaining_quantity"
-              placeholder="Qty"
-              required
-            />
-            <input v-model="exitFormFor(trade.id).exit_price" type="number" step="any" placeholder="Exit price" required />
-            <input v-model="exitFormFor(trade.id).exit_time" type="datetime-local" required />
-            <button type="submit">Add exit</button>
-          </form>
+          <template v-if="trade.status === 'open' && !locked">
+            <form class="exit-form" @submit.prevent="submitEntry(trade)">
+              <input v-model="entryFormFor(trade.id).quantity" type="number" min="1" placeholder="Qty" required />
+              <input
+                v-model="entryFormFor(trade.id).entry_price"
+                type="number"
+                step="any"
+                placeholder="Entry price"
+                required
+              />
+              <input v-model="entryFormFor(trade.id).entry_time" type="datetime-local" required />
+              <button type="submit">Add contracts</button>
+            </form>
 
-          <button class="remove-item-button remove-item-button--text" :disabled="locked" @click="removeTrade(trade)">
-            Delete trade
-          </button>
+            <form class="exit-form" @submit.prevent="submitExit(trade)">
+              <input
+                v-model="exitFormFor(trade.id).quantity"
+                type="number"
+                min="1"
+                :max="trade.remaining_quantity"
+                placeholder="Qty"
+                required
+              />
+              <input v-model="exitFormFor(trade.id).exit_price" type="number" step="any" placeholder="Exit price" required />
+              <input v-model="exitFormFor(trade.id).exit_time" type="datetime-local" required />
+              <button type="submit">Add trim</button>
+            </form>
+
+            <button v-if="trade.stop_price" type="button" class="toggle-more-button" @click="stopHit(trade)">
+              Stop hit
+            </button>
+          </template>
+
+          <div class="trade-detail-actions">
+            <button
+              v-if="trade.status === 'open' && trade.exits.length === 0 && trade.entries.length === 0"
+              class="remove-item-button remove-item-button--text"
+              :disabled="locked"
+              @click="cancelTradeAction(trade)"
+            >
+              Cancel trade
+            </button>
+            <button class="remove-item-button remove-item-button--text" :disabled="locked" @click="removeTrade(trade)">
+              Delete trade
+            </button>
+          </div>
         </div>
       </li>
     </ul>
 
     <form v-if="!locked" class="trade-form" @submit.prevent="submitNewTrade">
+      <div
+        class="screenshot-dropzone"
+        :class="{ 'screenshot-dropzone--active': dragActive, 'screenshot-dropzone--loading': screenshotState === 'loading' }"
+        tabindex="0"
+        @click="fileInput.click()"
+        @keydown.enter="fileInput.click()"
+        @dragover.prevent="dragActive = true"
+        @dragleave.prevent="dragActive = false"
+        @drop.prevent="onDrop"
+        @paste="onPaste"
+      >
+        <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/webp" class="screenshot-input" @change="onFilePicked" />
+        <span v-if="screenshotState === 'loading'">Reading screenshot…</span>
+        <span v-else>Drop, paste, or click to upload a trade screenshot</span>
+      </div>
+      <p v-if="screenshotError" class="submit-error">{{ screenshotError }}</p>
+      <p v-if="extractionHint" class="extraction-hint">Note: {{ extractionHint }}</p>
+
       <div class="trade-form-primary">
         <select
           v-if="symbolEntryMode === 'preset'"
@@ -225,7 +427,26 @@ onMounted(loadTrades)
       <div v-if="showMoreFields" class="trade-form-secondary">
         <input v-model="tradeForm.entry_time" type="datetime-local" />
         <input v-model="tradeForm.target_price" type="number" step="any" placeholder="Target" />
-        <input v-model="tradeForm.setup" type="text" placeholder="Setup" maxlength="200" />
+        <select
+          v-if="setupEntryMode === 'preset'"
+          :value="tradeForm.setup"
+          @change="handleSetupPresetChange($event.target.value)"
+        >
+          <option value="">No setup</option>
+          <option v-for="setup in tradesStore.setups" :key="setup.id" :value="setup.name">{{ setup.name }}</option>
+          <option value="__custom__">Other…</option>
+        </select>
+        <span v-else class="custom-symbol">
+          <input v-model="tradeForm.setup" type="text" placeholder="Setup" maxlength="200" />
+          <button
+            v-if="tradesStore.setups.length > 0"
+            type="button"
+            class="toggle-more-button"
+            @click="switchToSetupPresetList"
+          >
+            Use list
+          </button>
+        </span>
         <textarea v-model="tradeForm.notes" rows="2" placeholder="Notes"></textarea>
       </div>
 
@@ -318,6 +539,21 @@ onMounted(loadTrades)
 
 .trade-status--closed {
   color: var(--el-text-subtle);
+}
+
+.trade-status--canceled {
+  color: var(--el-steel-light);
+}
+
+.canceled-hint {
+  color: var(--el-text-muted);
+  font-size: var(--el-text-sm);
+  margin: 0 0 var(--el-space-2);
+}
+
+.trade-detail-actions {
+  display: flex;
+  gap: var(--el-space-4);
 }
 
 .trade-result {
@@ -418,6 +654,47 @@ onMounted(loadTrades)
   border: 1px solid var(--el-copper);
   border-radius: var(--el-radius-sm);
   cursor: pointer;
+}
+
+.screenshot-dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--el-space-2);
+  padding: var(--el-space-4);
+  margin-bottom: var(--el-space-3);
+  border: 1px dashed var(--el-border);
+  border-radius: var(--el-radius-md);
+  color: var(--el-text-muted);
+  font-size: var(--el-text-sm);
+  cursor: pointer;
+  text-align: center;
+}
+
+.screenshot-dropzone:hover,
+.screenshot-dropzone:focus-visible {
+  border-color: var(--el-copper);
+  color: var(--el-text);
+  outline: none;
+}
+
+.screenshot-dropzone--active {
+  border-color: var(--el-copper);
+  background-color: var(--el-surface);
+}
+
+.screenshot-dropzone--loading {
+  color: var(--el-copper);
+}
+
+.screenshot-input {
+  display: none;
+}
+
+.extraction-hint {
+  color: var(--el-text-muted);
+  font-size: var(--el-text-sm);
+  margin: 0 0 var(--el-space-3);
 }
 
 .trade-form-primary {

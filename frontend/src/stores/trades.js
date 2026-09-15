@@ -5,6 +5,10 @@ import api from '@/services/api'
 export const useTradesStore = defineStore('trades', () => {
   // State: date (YYYY-MM-DD) -> array of TradeRead
   const tradesByDate = ref({})
+  // Configured trade setups (quick-pick options for the trade form's Setup
+  // dropdown) -- same shortcut-not-restriction relationship SYMBOL_PRESETS
+  // has to Trade.symbol.
+  const setups = ref([])
 
   function _setTrades(date, trades) {
     tradesByDate.value = { ...tradesByDate.value, [date]: trades }
@@ -58,13 +62,67 @@ export const useTradesStore = defineStore('trades', () => {
     return data
   }
 
+  async function addEntry(date, tradeId, payload) {
+    const { data } = await api.post(`/journal/days/${date}/trades/${tradeId}/entries`, payload)
+    _replaceTrade(date, data)
+    return data
+  }
+
+  async function deleteEntry(date, tradeId, entryId) {
+    const { data } = await api.delete(`/journal/days/${date}/trades/${tradeId}/entries/${entryId}`)
+    _replaceTrade(date, data)
+    return data
+  }
+
+  async function cancelTrade(date, tradeId) {
+    const { data } = await api.post(`/journal/days/${date}/trades/${tradeId}/cancel`)
+    _replaceTrade(date, data)
+    return data
+  }
+
+  async function parseScreenshot(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    // The api instance defaults Content-Type to application/json; that has
+    // to be cleared so the browser can set the multipart boundary itself.
+    const { data } = await api.post('/trades/parse-screenshot', formData, {
+      headers: { 'Content-Type': undefined }
+    })
+    return data
+  }
+
+  async function fetchSetups() {
+    const { data } = await api.get('/journal/trade-setups')
+    setups.value = data
+    return data
+  }
+
+  async function createSetup(name) {
+    const { data } = await api.post('/journal/trade-setups', { name })
+    setups.value = [...setups.value, data]
+    return data
+  }
+
+  async function deleteSetup(setupId) {
+    await api.delete(`/journal/trade-setups/${setupId}`)
+    setups.value = setups.value.filter((s) => s.id !== setupId)
+  }
+
   return {
     tradesByDate,
+    setups,
     fetchTrades,
     createTrade,
     updateTrade,
     deleteTrade,
     addExit,
-    deleteExit
+    deleteExit,
+    addEntry,
+    deleteEntry,
+    cancelTrade,
+    parseScreenshot,
+    fetchSetups,
+    createSetup,
+    deleteSetup
   }
 })

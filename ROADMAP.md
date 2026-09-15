@@ -4,7 +4,7 @@ EdgeLog is built and accepted one vertical slice at a time. Future slices establ
 
 ## VS1 — Foundation
 
-**Current authorized slice.**
+**Accepted.**
 
 Goal: create the standalone EdgeLog application foundation.
 
@@ -25,6 +25,8 @@ Acceptance: a user can register, log in, refresh without losing the session, acc
 
 ## VS2 — Daily Journal Core
 
+**Accepted.**
+
 Goal: establish the trading day as the center of EdgeLog.
 
 Planned:
@@ -42,6 +44,8 @@ Planned:
 The Daily Journal calendar represents the trader's **day and process**, not individual trade cards.
 
 ## VS3 — Trade Lifecycle
+
+**Current authorized slice.** Core lifecycle merged; the AI screenshot capture and configurable-setups work below is still on open branches/PRs pending review.
 
 Goal: accurately record a futures trade from idea through exit.
 
@@ -64,6 +68,19 @@ Planned:
 - R-multiple where sufficient information exists
 
 Trade data created here becomes the source used by Trade Calendar and analytics. Do not duplicate trade records across features.
+
+Built in this slice, ahead of its original roadmap position:
+
+- **AI screenshot trade capture**, pulled forward from VS9 -- a dropzone on
+  the trade entry form sends an uploaded broker screenshot to Claude, which
+  extracts candidate symbol/direction/entry/stop/target/quantity fields to
+  prefill the manual form. It never creates or saves a trade on its own; the
+  trader still reviews and submits. See VS9 below for what that slice still
+  owns.
+- **Configurable trade setups** -- a Settings page lets the trader maintain
+  their own list of setup/strategy labels, offered as a dropdown on the
+  trade form (with free-text fallback), the same shortcut-not-restriction
+  relationship the symbol dropdown has to `Trade.symbol`.
 
 ## VS4 — Trade Calendar
 
@@ -232,10 +249,10 @@ Goal: speed manual logging without making AI authoritative.
 
 Planned:
 
-- paste/drag/drop chart screenshot
-- infer candidate symbol/direction/prices/setup
+- paste/drag/drop chart screenshot (pulled forward into VS3 at the user's explicit request -- see `POST /api/v1/trades/parse-screenshot`)
+- infer candidate symbol/direction/prices/setup (implemented for symbol/direction/entry/stop/target/quantity; setup inference still pending)
 - voice-to-draft trade entry
-- user confirmation before saving extracted values
+- user confirmation before saving extracted values (implemented: extraction only prefills the manual trade form, it never creates a trade on its own)
 
 AI must never silently commit interpreted trade data.
 

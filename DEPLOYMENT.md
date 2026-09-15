@@ -103,6 +103,11 @@ COOKIE_DOMAIN=edgelog.trade
 
 # Environment
 ENVIRONMENT=production
+
+# AI screenshot trade capture (optional) - enables the screenshot-upload
+# dropzone on the trades form. Leave blank to disable it; the app falls
+# back to manual entry with no other impact.
+ANTHROPIC_API_KEY=
 ```
 
 **Security Notes:**
@@ -110,6 +115,7 @@ ENVIRONMENT=production
 - Set COOKIE_SECURE=true for HTTPS
 - Use your actual production domain in COOKIE_DOMAIN and ALLOWED_ORIGINS
 - Never commit .env file to version control
+- ANTHROPIC_API_KEY is only needed if you want screenshot-based trade capture; get a key from the Anthropic Console
 
 ### 4. Run Migrations
 
