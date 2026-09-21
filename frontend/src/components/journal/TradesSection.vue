@@ -200,6 +200,18 @@ const riskRewardPreview = computed(() =>
 )
 const exitForms = reactive({}) // tradeId -> { quantity, exit_price, exit_time }
 const entryForms = reactive({}) // tradeId -> { quantity, entry_price, entry_time }
+// Add-contracts/add-trim forms stay collapsed until the user asks for them --
+// only one trade's entry form and one trade's exit form can be open at once.
+const entryFormOpenId = ref(null)
+const exitFormOpenId = ref(null)
+
+function toggleEntryForm(tradeId) {
+  entryFormOpenId.value = entryFormOpenId.value === tradeId ? null : tradeId
+}
+
+function toggleExitForm(tradeId) {
+  exitFormOpenId.value = exitFormOpenId.value === tradeId ? null : tradeId
+}
 
 function exitFormFor(tradeId) {
   if (!exitForms[tradeId]) {
@@ -330,6 +342,7 @@ async function submitExit(trade) {
       exit_time: new Date(form.exit_time).toISOString()
     })
     delete exitForms[trade.id]
+    exitFormOpenId.value = null
   } catch (error) {
     window.alert(error.response?.data?.detail || 'Could not save that exit.')
   }
@@ -349,6 +362,7 @@ async function submitEntry(trade) {
       entry_time: new Date(form.entry_time).toISOString()
     })
     delete entryForms[trade.id]
+    entryFormOpenId.value = null
   } catch (error) {
     window.alert(error.response?.data?.detail || 'Could not add that entry.')
   }
@@ -505,7 +519,19 @@ onMounted(async () => {
           </div>
 
           <template v-if="trade.status === 'open' && !locked">
-            <form class="exit-form" @submit.prevent="submitEntry(trade)">
+            <div class="trade-card__actions">
+              <button type="button" class="btn-chip btn-chip--ghost" @click="toggleEntryForm(trade.id)">
+                {{ entryFormOpenId === trade.id ? 'Cancel' : '+ Add contracts' }}
+              </button>
+              <button type="button" class="btn-chip btn-chip--ghost" @click="toggleExitForm(trade.id)">
+                {{ exitFormOpenId === trade.id ? 'Cancel' : '+ Add trim' }}
+              </button>
+              <button v-if="trade.stop_price" type="button" class="toggle-more-button" @click="stopHit(trade)">
+                Stop hit
+              </button>
+            </div>
+
+            <form v-if="entryFormOpenId === trade.id" class="exit-form" @submit.prevent="submitEntry(trade)">
               <input v-model="entryFormFor(trade.id).quantity" type="number" min="1" placeholder="Qty" required />
               <input
                 v-model="entryFormFor(trade.id).entry_price"
@@ -518,7 +544,7 @@ onMounted(async () => {
               <button type="submit">Add contracts</button>
             </form>
 
-            <form class="exit-form" @submit.prevent="submitExit(trade)">
+            <form v-if="exitFormOpenId === trade.id" class="exit-form" @submit.prevent="submitExit(trade)">
               <input
                 v-model="exitFormFor(trade.id).quantity"
                 type="number"
@@ -531,10 +557,6 @@ onMounted(async () => {
               <input v-model="exitFormFor(trade.id).exit_time" type="datetime-local" required />
               <button type="submit">Add trim</button>
             </form>
-
-            <button v-if="trade.stop_price" type="button" class="toggle-more-button" @click="stopHit(trade)">
-              Stop hit
-            </button>
           </template>
 
           <div v-if="editingTradeId === trade.id" class="trade-card__section">
