@@ -391,6 +391,24 @@ async function stopHit(trade) {
   }
 }
 
+async function targetHit(trade) {
+  if (
+    !window.confirm(
+      `Mark target hit? This exits the remaining ${trade.remaining_quantity} @ ${trade.target_price}.`
+    )
+  )
+    return
+  try {
+    await tradesStore.addExit(props.date, trade.id, {
+      quantity: trade.remaining_quantity,
+      exit_price: trade.target_price,
+      exit_time: new Date().toISOString()
+    })
+  } catch (error) {
+    window.alert(error.response?.data?.detail || 'Could not record the target-hit exit.')
+  }
+}
+
 async function cancelTradeAction(trade) {
   if (!window.confirm(`Cancel this ${trade.symbol} trade? It will be kept but excluded from P&L.`)) return
   try {
@@ -526,9 +544,6 @@ onMounted(async () => {
               <button type="button" class="btn-chip btn-chip--ghost" @click="toggleExitForm(trade.id)">
                 {{ exitFormOpenId === trade.id ? 'Cancel' : '+ Add trim' }}
               </button>
-              <button v-if="trade.stop_price" type="button" class="toggle-more-button" @click="stopHit(trade)">
-                Stop hit
-              </button>
             </div>
 
             <form v-if="entryFormOpenId === trade.id" class="exit-form" @submit.prevent="submitEntry(trade)">
@@ -557,6 +572,15 @@ onMounted(async () => {
               <input v-model="exitFormFor(trade.id).exit_time" type="datetime-local" required />
               <button type="submit">Add trim</button>
             </form>
+
+            <div class="quick-exit-buttons">
+              <button v-if="trade.target_price" type="button" class="toggle-more-button" @click="targetHit(trade)">
+                Target hit
+              </button>
+              <button v-if="trade.stop_price" type="button" class="toggle-more-button" @click="stopHit(trade)">
+                Stop hit
+              </button>
+            </div>
           </template>
 
           <div v-if="editingTradeId === trade.id" class="trade-card__section">
@@ -617,8 +641,6 @@ onMounted(async () => {
         class="screenshot-dropzone"
         :class="{ 'screenshot-dropzone--active': dragActive, 'screenshot-dropzone--loading': screenshotState === 'loading' }"
         tabindex="0"
-        @click="fileInput.click()"
-        @keydown.enter="fileInput.click()"
         @dragover.prevent="dragActive = true"
         @dragleave.prevent="dragActive = false"
         @drop.prevent="onDrop"
@@ -626,7 +648,10 @@ onMounted(async () => {
       >
         <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/webp" class="screenshot-input" @change="onFilePicked" />
         <span v-if="screenshotState === 'loading'">Reading screenshot…</span>
-        <span v-else>Drop, paste, or click to upload a trade screenshot</span>
+        <span v-else>
+          Drop or paste a trade screenshot, or
+          <button type="button" class="screenshot-browse-button" @click="fileInput.click()">browse a file</button>
+        </span>
       </div>
       <p v-if="screenshotError" class="submit-error">{{ screenshotError }}</p>
       <p v-if="extractionHint" class="extraction-hint">Note: {{ extractionHint }}</p>
@@ -649,7 +674,7 @@ onMounted(async () => {
         <div class="direction-toggle" role="group" aria-label="Direction">
           <button
             type="button"
-            class="direction-toggle-btn"
+            class="direction-toggle-btn direction-toggle-btn--long"
             :class="{ 'direction-toggle-btn--active': tradeForm.direction === 'long' }"
             @click="tradeForm.direction = 'long'"
           >
@@ -657,7 +682,7 @@ onMounted(async () => {
           </button>
           <button
             type="button"
-            class="direction-toggle-btn"
+            class="direction-toggle-btn direction-toggle-btn--short"
             :class="{ 'direction-toggle-btn--active': tradeForm.direction === 'short' }"
             @click="tradeForm.direction = 'short'"
           >
@@ -840,13 +865,13 @@ onMounted(async () => {
 }
 
 .trade-direction--long {
-  color: var(--el-copper);
-  border: 1px solid var(--el-copper);
+  color: var(--el-positive);
+  border: 1px solid var(--el-positive);
 }
 
 .trade-direction--short {
-  color: var(--el-steel-light);
-  border: 1px solid var(--el-steel);
+  color: var(--el-negative);
+  border: 1px solid var(--el-negative);
 }
 
 .trade-remaining {
@@ -1077,6 +1102,7 @@ onMounted(async () => {
   color: var(--el-copper);
   border: 1px solid var(--el-copper);
   border-radius: var(--el-radius-sm);
+  font-size: var(--el-text-sm);
   cursor: pointer;
 }
 
@@ -1091,7 +1117,7 @@ onMounted(async () => {
   border-radius: var(--el-radius-md);
   color: var(--el-text-muted);
   font-size: var(--el-text-sm);
-  cursor: pointer;
+  cursor: text;
   text-align: center;
 }
 
@@ -1109,6 +1135,21 @@ onMounted(async () => {
 
 .screenshot-dropzone--loading {
   color: var(--el-copper);
+}
+
+.screenshot-browse-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--el-copper);
+  font-size: inherit;
+  font-family: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.screenshot-browse-button:hover {
+  color: var(--el-copper-hover);
 }
 
 .screenshot-input {
@@ -1152,7 +1193,7 @@ onMounted(async () => {
 }
 
 .trade-form-primary button {
-  padding: var(--el-space-2) var(--el-space-5);
+  padding: var(--el-space-2) var(--el-space-6);
   background-color: var(--el-copper);
   color: var(--el-bg);
   border: none;
@@ -1182,13 +1223,26 @@ onMounted(async () => {
 
 .direction-toggle .direction-toggle-btn:last-child {
   border-radius: 0 var(--el-radius-sm) var(--el-radius-sm) 0;
-  border-left: none;
 }
 
-.trade-form-primary .direction-toggle-btn--active {
-  background-color: var(--el-copper);
+.trade-form-primary .direction-toggle-btn--long {
+  color: var(--el-positive);
+  border-color: var(--el-positive);
+}
+
+.trade-form-primary .direction-toggle-btn--short {
+  color: var(--el-negative);
+  border-color: var(--el-negative);
+}
+
+.trade-form-primary .direction-toggle-btn--long.direction-toggle-btn--active {
+  background-color: var(--el-positive);
   color: var(--el-bg);
-  border-color: var(--el-copper);
+}
+
+.trade-form-primary .direction-toggle-btn--short.direction-toggle-btn--active {
+  background-color: var(--el-negative);
+  color: var(--el-bg);
 }
 
 .price-points-field {
@@ -1239,6 +1293,11 @@ onMounted(async () => {
   cursor: pointer;
   margin-top: var(--el-space-2);
   padding: 0;
+}
+
+.quick-exit-buttons {
+  display: flex;
+  gap: var(--el-space-4);
 }
 
 .toggle-more-button:hover {

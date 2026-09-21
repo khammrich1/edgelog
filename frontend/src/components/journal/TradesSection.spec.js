@@ -77,13 +77,18 @@ describe('TradesSection direction toggle', () => {
     expect(long.classes()).not.toContain('direction-toggle-btn--active')
   })
 
-  it('never uses a green/red result class for the direction toggle itself', () => {
+  it('colors LONG green and SHORT red, distinct from the shared P&L result classes', () => {
     const { wrapper } = mountTradesSection()
     const buttons = wrapper.findAll('.direction-toggle-btn')
-    for (const button of buttons) {
-      expect(button.classes()).not.toContain('result-positive')
-      expect(button.classes()).not.toContain('result-negative')
-    }
+    const long = buttons.find((b) => b.text() === 'LONG')
+    const short = buttons.find((b) => b.text() === 'SHORT')
+
+    expect(long.classes()).toContain('direction-toggle-btn--long')
+    expect(short.classes()).toContain('direction-toggle-btn--short')
+    // Direction coloring is its own class, not the trade-result P&L classes
+    // (those stay reserved for actual profit/loss figures elsewhere).
+    expect(long.classes()).not.toContain('result-positive')
+    expect(short.classes()).not.toContain('result-negative')
   })
 })
 
