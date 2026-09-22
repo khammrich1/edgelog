@@ -1,9 +1,12 @@
 """Trade lifecycle endpoints (VS3): manually-logged trades and their exits."""
+import uuid
 from decimal import Decimal
 from datetime import date as date_type, datetime, timezone
+from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,6 +33,10 @@ from app.schemas.trades import (
 router = APIRouter()
 
 LOCKED_DAY_DETAIL = "Day is locked. Unlock it to make changes."
+
+TRADE_SCREENSHOT_DIR = Path(__file__).resolve().parents[3] / "uploads" / "trade_screenshots"
+ALLOWED_IMAGE_TYPES = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
 # ---- Shared lookups ----
@@ -155,6 +162,7 @@ def _serialize_trade(trade: Trade, exits: list[TradeExit], entries: list[TradeEn
         planned_risk_points=math["planned_risk_points"],
         planned_risk_dollars=math["planned_risk_dollars"],
         multiplier_known=math["multiplier_known"],
+        has_screenshot=trade.screenshot_path is not None,
         created_at=trade.created_at,
         updated_at=trade.updated_at,
     )
@@ -597,3 +605,88 @@ async def delete_exit(
     await db.flush()
     await db.refresh(trade)
     return _serialize_trade(trade, remaining_exits, entries)
+
+
+# ---- Trade screenshot ----
+
+def _remove_existing_trade_screenshot(trade: Trade) -> None:
+    if trade.screenshot_path:
+        existing = TRADE_SCREENSHOT_DIR / trade.screenshot_path
+        if existing.exists():
+            existing.unlink()
+        trade.screenshot_path = None
+
+
+@router.post("/days/{day}/trades/{trade_id}/screenshot", response_model=TradeRead)
+async def upload_trade_screenshot(
+    day: date_type,
+    trade_id: int,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    trading_day = await _get_owned_trading_day(db, current_user.id, day)
+    trade = await _get_owned_trade(db, current_user.id, trading_day.id, trade_id)
+    _require_unlocked(trading_day)
+
+    extension = ALLOWED_IMAGE_TYPES.get(file.content_type)
+    if extension is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported image type")
+
+    contents = await file.read()
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image is too large (max 5MB)")
+
+    TRADE_SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
+    _remove_existing_trade_screenshot(trade)
+
+    filename = f"{uuid.uuid4().hex}.{extension}"
+    (TRADE_SCREENSHOT_DIR / filename).write_bytes(contents)
+
+    trade.screenshot_path = filename
+    await db.flush()
+    await db.refresh(trade)
+
+    exits = await _get_exits(db, trade.id)
+    entries = await _get_entries(db, trade.id)
+    return _serialize_trade(trade, exits, entries)
+
+
+@router.get("/days/{day}/trades/{trade_id}/screenshot")
+async def get_trade_screenshot(
+    day: date_type,
+    trade_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    trading_day = await _get_owned_trading_day(db, current_user.id, day)
+    trade = await _get_owned_trade(db, current_user.id, trading_day.id, trade_id)
+
+    if trade.screenshot_path is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No screenshot for this trade")
+
+    file_path = TRADE_SCREENSHOT_DIR / trade.screenshot_path
+    if not file_path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Screenshot file missing")
+
+    return FileResponse(file_path)
+
+
+@router.delete("/days/{day}/trades/{trade_id}/screenshot", response_model=TradeRead)
+async def delete_trade_screenshot(
+    day: date_type,
+    trade_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    trading_day = await _get_owned_trading_day(db, current_user.id, day)
+    trade = await _get_owned_trade(db, current_user.id, trading_day.id, trade_id)
+    _require_unlocked(trading_day)
+
+    _remove_existing_trade_screenshot(trade)
+    await db.flush()
+    await db.refresh(trade)
+
+    exits = await _get_exits(db, trade.id)
+    entries = await _get_entries(db, trade.id)
+    return _serialize_trade(trade, exits, entries)

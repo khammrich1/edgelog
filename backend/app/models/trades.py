@@ -29,6 +29,7 @@ class Trade(Base):
     notes = Column(Text, nullable=True)
     status = Column(String, nullable=False, default="open")  # open | closed | canceled
     canceled_at = Column(DateTime(timezone=True), nullable=True)
+    screenshot_path = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

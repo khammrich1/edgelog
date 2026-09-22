@@ -519,3 +519,91 @@ async def test_malformed_date_and_missing_trade_id(client: AsyncClient):
     day = await _open_day(client, headers)
     missing_trade = await client.get(f"/api/v1/journal/days/{day}/trades/999999", headers=headers)
     assert missing_trade.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_trade_screenshot_upload_get_and_delete(client: AsyncClient):
+    headers = await _register_and_auth_headers(client)
+    day = await _open_day(client, headers)
+    create_response = await client.post(
+        f"/api/v1/journal/days/{day}/trades", headers=headers, json=_base_trade_payload()
+    )
+    trade_id = create_response.json()["id"]
+    assert create_response.json()["has_screenshot"] is False
+
+    upload_response = await client.post(
+        f"/api/v1/journal/days/{day}/trades/{trade_id}/screenshot",
+        headers=headers,
+        files={"file": ("setup.png", b"fake-png-bytes", "image/png")},
+    )
+    assert upload_response.status_code == 200
+    assert upload_response.json()["has_screenshot"] is True
+
+    get_response = await client.get(
+        f"/api/v1/journal/days/{day}/trades/{trade_id}/screenshot", headers=headers
+    )
+    assert get_response.status_code == 200
+    assert get_response.content == b"fake-png-bytes"
+
+    delete_response = await client.delete(
+        f"/api/v1/journal/days/{day}/trades/{trade_id}/screenshot", headers=headers
+    )
+    assert delete_response.status_code == 200
+    assert delete_response.json()["has_screenshot"] is False
+
+    missing_response = await client.get(
+        f"/api/v1/journal/days/{day}/trades/{trade_id}/screenshot", headers=headers
+    )
+    assert missing_response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_trade_screenshot_rejects_unsupported_content_type(client: AsyncClient):
+    headers = await _register_and_auth_headers(client)
+    day = await _open_day(client, headers)
+    create_response = await client.post(
+        f"/api/v1/journal/days/{day}/trades", headers=headers, json=_base_trade_payload()
+    )
+    trade_id = create_response.json()["id"]
+
+    response = await client.post(
+        f"/api/v1/journal/days/{day}/trades/{trade_id}/screenshot",
+        headers=headers,
+        files={"file": ("notes.txt", b"not an image", "text/plain")},
+    )
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_trade_screenshot_requires_auth(client: AsyncClient):
+    headers = await _register_and_auth_headers(client)
+    day = await _open_day(client, headers)
+    create_response = await client.post(
+        f"/api/v1/journal/days/{day}/trades", headers=headers, json=_base_trade_payload()
+    )
+    trade_id = create_response.json()["id"]
+
+    response = await client.post(
+        f"/api/v1/journal/days/{day}/trades/{trade_id}/screenshot",
+        files={"file": ("setup.png", b"fake-png-bytes", "image/png")},
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_trade_screenshot_blocked_on_locked_day(client: AsyncClient):
+    headers = await _register_and_auth_headers(client)
+    day = await _open_day(client, headers)
+    create_response = await client.post(
+        f"/api/v1/journal/days/{day}/trades", headers=headers, json=_base_trade_payload()
+    )
+    trade_id = create_response.json()["id"]
+
+    await client.post(f"/api/v1/journal/days/{day}/lock", headers=headers)
+
+    response = await client.post(
+        f"/api/v1/journal/days/{day}/trades/{trade_id}/screenshot",
+        headers=headers,
+        files={"file": ("setup.png", b"fake-png-bytes", "image/png")},
+    )
+    assert response.status_code == 409
