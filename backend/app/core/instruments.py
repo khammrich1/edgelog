@@ -11,6 +11,7 @@ safely produce a dollar P&L or dollar risk, since we have no verified point
 value for it, so callers should preserve the trade and its price movement
 and simply omit the dollar figures rather than guess.
 """
+import re
 from decimal import Decimal
 from typing import Optional
 
@@ -25,8 +26,25 @@ INSTRUMENT_MULTIPLIERS: dict[str, Decimal] = {
     "GC": Decimal("100"),   # Gold (100 troy oz)
 }
 
+# Standard futures contract-month codes (CME convention): F=Jan G=Feb H=Mar
+# J=Apr K=May M=Jun N=Jul Q=Aug U=Sep V=Oct X=Nov Z=Dec. A dated contract
+# symbol like "MNQZ26" is root "MNQ" + month code "Z" + 1-4 digit year; the
+# per-point dollar value doesn't depend on expiry, so it should resolve to
+# exactly the same multiplier as its root.
+_CONTRACT_MONTH_CODES = "FGHJKMNQUVXZ"
+_DATED_CONTRACT_RE = re.compile(rf"^([A-Z]{{1,3}})[{_CONTRACT_MONTH_CODES}]\d{{1,4}}$")
+
 
 def get_multiplier(symbol: str) -> Optional[Decimal]:
     """Returns the known per-point dollar multiplier for a symbol, or None
-    if EdgeLog has no verified contract spec for it."""
-    return INSTRUMENT_MULTIPLIERS.get(symbol.strip().upper())
+    if EdgeLog has no verified contract spec for it. Accepts either a bare
+    root (MNQ) or a dated contract (MNQZ26) -- see _DATED_CONTRACT_RE."""
+    normalized = symbol.strip().upper()
+    multiplier = INSTRUMENT_MULTIPLIERS.get(normalized)
+    if multiplier is not None:
+        return multiplier
+
+    match = _DATED_CONTRACT_RE.match(normalized)
+    if match:
+        return INSTRUMENT_MULTIPLIERS.get(match.group(1))
+    return None
