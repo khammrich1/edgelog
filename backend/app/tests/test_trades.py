@@ -350,6 +350,29 @@ async def test_mcl_multiplier(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_dated_futures_contract_resolves_to_its_root_multiplier(client: AsyncClient):
+    """A dated contract symbol like MNQZ26 (root + month code + year) should
+    price exactly like its root MNQ -- the per-point value doesn't depend on
+    expiry. Regression test: this previously fell back to points-only P&L
+    because the multiplier lookup required an exact symbol match."""
+    headers = await _register_and_auth_headers(client)
+    day = await _open_day(client, headers)
+    create_response = await client.post(
+        f"/api/v1/journal/days/{day}/trades",
+        headers=headers,
+        json=_base_trade_payload(symbol="MNQZ26", entry_price="100", initial_quantity=1),
+    )
+    assert create_response.json()["multiplier_known"] is True
+    trade_id = create_response.json()["id"]
+    response = await client.post(
+        f"/api/v1/journal/days/{day}/trades/{trade_id}/exits",
+        headers=headers,
+        json={"quantity": 1, "exit_price": "101", "exit_time": "2026-02-01T09:45:00Z"},
+    )
+    assert Decimal(response.json()["realized_pnl"]) == Decimal("2")  # 1 point * $2, same as MNQ
+
+
+@pytest.mark.asyncio
 async def test_planned_risk_calculation_long_and_short(client: AsyncClient):
     headers = await _register_and_auth_headers(client)
     day = await _open_day(client, headers)
