@@ -97,6 +97,34 @@ export const useTradesStore = defineStore('trades', () => {
     return data
   }
 
+  async function uploadTradeScreenshot(date, tradeId, file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const { data } = await api.post(`/journal/days/${date}/trades/${tradeId}/screenshot`, formData, {
+      headers: { 'Content-Type': undefined }
+    })
+    _replaceTrade(date, data)
+    return data
+  }
+
+  async function deleteTradeScreenshot(date, tradeId) {
+    const { data } = await api.delete(`/journal/days/${date}/trades/${tradeId}/screenshot`)
+    _replaceTrade(date, data)
+    return data
+  }
+
+  /**
+   * The trade screenshot endpoint requires the in-memory bearer token, so a
+   * plain <img src> can't be used. Fetch it through the authenticated api
+   * client and hand back an object URL instead; callers must revoke it.
+   */
+  async function fetchTradeScreenshotObjectUrl(date, tradeId) {
+    const response = await api.get(`/journal/days/${date}/trades/${tradeId}/screenshot`, {
+      responseType: 'blob'
+    })
+    return URL.createObjectURL(response.data)
+  }
+
   async function fetchSetups() {
     const { data } = await api.get('/journal/trade-setups')
     setups.value = data
@@ -128,6 +156,9 @@ export const useTradesStore = defineStore('trades', () => {
     deleteEntry,
     cancelTrade,
     parseScreenshot,
+    uploadTradeScreenshot,
+    deleteTradeScreenshot,
+    fetchTradeScreenshotObjectUrl,
     fetchSetups,
     createSetup,
     deleteSetup

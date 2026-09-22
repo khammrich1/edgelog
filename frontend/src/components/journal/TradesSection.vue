@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useTradesStore } from '@/stores/trades'
 import { useInstrumentsStore } from '@/stores/instruments'
 import { formatPrice, formatSignedDollars, formatSignedPoints, resultClass, SYMBOL_PRESETS } from '@/utils/trades'
@@ -34,12 +34,64 @@ const stopMode = ref('price')
 const targetMode = ref('price')
 
 // Screenshot capture: extraction only prefills the form below for the user
-// to review -- it never creates a trade on its own.
+// to review -- it never creates a trade on its own. The uploaded file itself
+// is kept in screenshotFile so it can be attached to the trade once saved,
+// even if AI extraction failed or the field is unconfigured.
 const screenshotState = ref('idle') // idle | loading | error
 const screenshotError = ref(null)
+const screenshotFile = ref(null)
 const extractionHint = ref(null)
 const dragActive = ref(false)
 const fileInput = ref(null)
+
+// Per-trade stored setup screenshots (separate from the new-trade dropzone
+// above) -- object URLs are fetched lazily when a card is expanded and
+// revoked when replaced or when this component goes away.
+const screenshotUrls = reactive({}) // tradeId -> object URL
+const tradeScreenshotInputs = {} // tradeId -> <input type=file> element, not reactive
+
+function setTradeScreenshotInputRef(tradeId, el) {
+  tradeScreenshotInputs[tradeId] = el
+}
+
+function triggerTradeScreenshotPicker(tradeId) {
+  tradeScreenshotInputs[tradeId]?.click()
+}
+
+function revokeTradeScreenshot(tradeId) {
+  if (screenshotUrls[tradeId]) {
+    URL.revokeObjectURL(screenshotUrls[tradeId])
+    delete screenshotUrls[tradeId]
+  }
+}
+
+async function loadTradeScreenshot(trade) {
+  if (!trade?.has_screenshot || screenshotUrls[trade.id]) return
+  screenshotUrls[trade.id] = await tradesStore.fetchTradeScreenshotObjectUrl(props.date, trade.id)
+}
+
+function openTradeScreenshot(tradeId) {
+  if (screenshotUrls[tradeId]) window.open(screenshotUrls[tradeId], '_blank')
+}
+
+async function onTradeScreenshotPicked(trade, event) {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file) return
+  try {
+    await tradesStore.uploadTradeScreenshot(props.date, trade.id, file)
+    revokeTradeScreenshot(trade.id)
+    await loadTradeScreenshot(trades.value.find((t) => t.id === trade.id))
+  } catch (error) {
+    window.alert(error.response?.data?.detail || 'Could not save that screenshot.')
+  }
+}
+
+async function removeTradeScreenshot(trade) {
+  if (!window.confirm('Remove this screenshot?')) return
+  await tradesStore.deleteTradeScreenshot(props.date, trade.id)
+  revokeTradeScreenshot(trade.id)
+}
 
 function applyExtraction(extracted) {
   if (extracted.symbol) {
@@ -67,6 +119,7 @@ function applyExtraction(extracted) {
 
 async function handleScreenshotFile(file) {
   if (!file) return
+  screenshotFile.value = file
   screenshotState.value = 'loading'
   screenshotError.value = null
   try {
@@ -315,7 +368,17 @@ async function submitNewTrade() {
     notes: tradeForm.notes || null
   }
   try {
-    await tradesStore.createTrade(props.date, payload)
+    const created = await tradesStore.createTrade(props.date, payload)
+    if (screenshotFile.value) {
+      try {
+        await tradesStore.uploadTradeScreenshot(props.date, created.id, screenshotFile.value)
+      } catch (screenshotUploadError) {
+        // The trade itself saved fine; only the screenshot attach failed.
+        window.alert(
+          screenshotUploadError.response?.data?.detail || 'Trade saved, but the screenshot could not be attached.'
+        )
+      }
+    }
     Object.assign(tradeForm, emptyTradeForm())
     symbolEntryMode.value = 'preset'
     resetSetupEntryMode()
@@ -324,13 +387,19 @@ async function submitNewTrade() {
     showMoreFields.value = false
     extractionHint.value = null
     screenshotError.value = null
+    screenshotFile.value = null
   } catch (error) {
     submitError.value = error.response?.data?.detail || 'Could not save that trade.'
   }
 }
 
 function toggleExpand(tradeId) {
-  expandedTradeId.value = expandedTradeId.value === tradeId ? null : tradeId
+  if (expandedTradeId.value === tradeId) {
+    expandedTradeId.value = null
+    return
+  }
+  expandedTradeId.value = tradeId
+  loadTradeScreenshot(trades.value.find((t) => t.id === tradeId))
 }
 
 async function submitExit(trade) {
@@ -423,13 +492,21 @@ async function removeTrade(trade) {
   await tradesStore.deleteTrade(props.date, trade.id)
 }
 
-watch(() => props.date, loadTrades)
+function revokeAllTradeScreenshots() {
+  Object.keys(screenshotUrls).forEach((id) => revokeTradeScreenshot(Number(id)))
+}
+
+watch(() => props.date, () => {
+  revokeAllTradeScreenshots()
+  loadTrades()
+})
 onMounted(async () => {
   loadTrades()
   instrumentsStore.fetchMultipliers()
   await tradesStore.fetchSetups()
   resetSetupEntryMode()
 })
+onUnmounted(revokeAllTradeScreenshots)
 </script>
 
 <template>
@@ -493,6 +570,37 @@ onMounted(async () => {
           </div>
 
           <p v-if="trade.notes" class="trade-notes">{{ trade.notes }}</p>
+
+          <div v-if="trade.has_screenshot || !locked" class="trade-card__section">
+            <div class="trade-card__section-label">Setup screenshot</div>
+            <img
+              v-if="screenshotUrls[trade.id]"
+              :src="screenshotUrls[trade.id]"
+              alt="Trade setup screenshot"
+              class="trade-screenshot-preview"
+              @click="openTradeScreenshot(trade.id)"
+            />
+            <input
+              :ref="(el) => setTradeScreenshotInputRef(trade.id, el)"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              class="screenshot-input"
+              @change="onTradeScreenshotPicked(trade, $event)"
+            />
+            <div v-if="!locked" class="trade-card__actions">
+              <button type="button" class="btn-chip btn-chip--ghost" @click="triggerTradeScreenshotPicker(trade.id)">
+                {{ trade.has_screenshot ? 'Replace screenshot' : '+ Add screenshot' }}
+              </button>
+              <button
+                v-if="trade.has_screenshot"
+                type="button"
+                class="btn-chip btn-chip--danger"
+                @click="removeTradeScreenshot(trade)"
+              >
+                Remove screenshot
+              </button>
+            </div>
+          </div>
 
           <div v-if="trade.entries.length" class="trade-card__section">
             <div class="trade-card__section-label">Entries</div>
@@ -655,6 +763,10 @@ onMounted(async () => {
       </div>
       <p v-if="screenshotError" class="submit-error">{{ screenshotError }}</p>
       <p v-if="extractionHint" class="extraction-hint">Note: {{ extractionHint }}</p>
+      <p v-if="screenshotFile && screenshotState !== 'loading'" class="extraction-hint">
+        Screenshot attached -- will be saved with this trade.
+        <button type="button" class="toggle-more-button" @click="screenshotFile = null">Remove</button>
+      </p>
 
       <div class="trade-form-primary">
         <select
@@ -710,6 +822,25 @@ onMounted(async () => {
           </span>
           <span v-if="stopConversionHint" class="conversion-hint">{{ stopConversionHint }}</span>
         </span>
+        <span class="price-points-field">
+          <input
+            v-if="targetMode === 'price'"
+            v-model="tradeForm.target_price"
+            type="number"
+            step="any"
+            placeholder="Target"
+          />
+          <input v-else v-model="tradeForm.target_points" type="number" step="any" placeholder="Target pts" />
+          <span class="price-points-toggle">
+            <button type="button" :class="{ active: targetMode === 'price' }" @click="targetMode = 'price'">
+              Price
+            </button>
+            <button type="button" :class="{ active: targetMode === 'points' }" @click="targetMode = 'points'">
+              Points
+            </button>
+          </span>
+          <span v-if="targetConversionHint" class="conversion-hint">{{ targetConversionHint }}</span>
+        </span>
         <button type="submit">Add trade</button>
       </div>
 
@@ -734,25 +865,6 @@ onMounted(async () => {
 
       <div v-if="showMoreFields" class="trade-form-secondary">
         <input v-model="tradeForm.entry_time" type="datetime-local" />
-        <span class="price-points-field">
-          <input
-            v-if="targetMode === 'price'"
-            v-model="tradeForm.target_price"
-            type="number"
-            step="any"
-            placeholder="Target"
-          />
-          <input v-else v-model="tradeForm.target_points" type="number" step="any" placeholder="Target pts" />
-          <span class="price-points-toggle">
-            <button type="button" :class="{ active: targetMode === 'price' }" @click="targetMode = 'price'">
-              Price
-            </button>
-            <button type="button" :class="{ active: targetMode === 'points' }" @click="targetMode = 'points'">
-              Points
-            </button>
-          </span>
-          <span v-if="targetConversionHint" class="conversion-hint">{{ targetConversionHint }}</span>
-        </span>
         <select
           v-if="setupEntryMode === 'preset'"
           :value="tradeForm.setup"
@@ -1032,6 +1144,16 @@ onMounted(async () => {
   color: var(--el-text);
   font-size: var(--el-text-sm);
   margin: 0 0 var(--el-space-3);
+}
+
+.trade-screenshot-preview {
+  display: block;
+  max-width: 220px;
+  max-height: 140px;
+  border-radius: var(--el-radius-sm);
+  border: 1px solid var(--el-border);
+  cursor: zoom-in;
+  margin-bottom: var(--el-space-2);
 }
 
 .exit-list {

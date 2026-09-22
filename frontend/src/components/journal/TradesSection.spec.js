@@ -43,6 +43,7 @@ function openTrade() {
     planned_risk_dollars: '250',
     planned_risk_points: null,
     multiplier_known: true,
+    has_screenshot: false,
     realized_pnl: null,
     realized_points: null,
     entries: [],
@@ -144,5 +145,53 @@ describe('TradesSection add-contracts / add-trim forms', () => {
 
     await toggle.trigger('click')
     expect(wrapper.find('input[placeholder="Entry price"]').exists()).toBe(false)
+  })
+})
+
+describe('TradesSection new-trade form target field', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('shows Target directly on the primary form, not behind More fields', () => {
+    const { wrapper } = mountTradesSection()
+    expect(wrapper.find('input[placeholder="Target"]').exists()).toBe(true)
+  })
+})
+
+describe('TradesSection trade screenshot storage', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('offers "+ Add screenshot" for a trade with none yet, and never fetches one', async () => {
+    const trade = openTrade()
+    const { wrapper, tradesStore } = mountTradesSection({ trades: [trade] })
+    tradesStore.fetchTradeScreenshotObjectUrl = vi.fn()
+
+    await wrapper.find('.trade-card__header').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).toContain('+ Add screenshot')
+    expect(wrapper.text()).not.toContain('Remove screenshot')
+    expect(tradesStore.fetchTradeScreenshotObjectUrl).not.toHaveBeenCalled()
+  })
+
+  it('fetches and displays the screenshot when expanding a trade that has one', async () => {
+    const trade = { ...openTrade(), has_screenshot: true }
+    const objectUrl = 'blob:mock-url'
+    const { wrapper, tradesStore } = mountTradesSection({ trades: [trade] })
+    tradesStore.fetchTradeScreenshotObjectUrl = vi.fn().mockResolvedValue(objectUrl)
+
+    await wrapper.find('.trade-card__header').trigger('click')
+    await wrapper.vm.$nextTick()
+    await wrapper.vm.$nextTick()
+
+    expect(tradesStore.fetchTradeScreenshotObjectUrl).toHaveBeenCalledWith('2026-01-01', trade.id)
+    const img = wrapper.find('.trade-screenshot-preview')
+    expect(img.exists()).toBe(true)
+    expect(img.attributes('src')).toBe(objectUrl)
+    expect(wrapper.text()).toContain('Replace screenshot')
+    expect(wrapper.text()).toContain('Remove screenshot')
   })
 })

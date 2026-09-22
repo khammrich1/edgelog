@@ -120,5 +120,6 @@ class TradeRead(BaseModel):
     planned_risk_points: Optional[Decimal]
     planned_risk_dollars: Optional[Decimal]
     multiplier_known: bool
+    has_screenshot: bool
     created_at: datetime
     updated_at: datetime
