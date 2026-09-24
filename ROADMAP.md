@@ -45,7 +45,7 @@ The Daily Journal calendar represents the trader's **day and process**, not indi
 
 ## VS3 — Trade Lifecycle
 
-**Current authorized slice.** Core lifecycle merged; the AI screenshot capture and configurable-setups work below is still on open branches/PRs pending review.
+**Accepted and merged**, including the pulled-forward work below. Two gaps remain against the original list: no `Draft` trade state (trades go straight to `Open`), and no `reasoning`/`emotional state` per-trade fields (explicitly deferred by the user, not an oversight). R-multiple, listed below, ended up implemented as part of VS4 instead (client-side, since it's derivable from fields the API already returns).
 
 Goal: accurately record a futures trade from idea through exit.
 
@@ -83,6 +83,8 @@ Built in this slice, ahead of its original roadmap position:
   relationship the symbol dropdown has to `Trade.symbol`.
 
 ## VS4 — Trade Calendar
+
+**Current authorized slice.** Built (PR #19); pending the user's manual acceptance pass on a deployed environment.
 
 Goal: create a dedicated chronological visual view of actual trades.
 
