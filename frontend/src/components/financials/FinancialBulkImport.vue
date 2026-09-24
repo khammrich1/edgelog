@@ -19,7 +19,8 @@ const submitting = ref(false)
 
 function draftFromExtraction(extracted) {
   return {
-    include: true,
+    include: !extracted.possible_duplicate,
+    possibleDuplicate: !!extracted.possible_duplicate,
     entry_type: extracted.entry_type || 'expense',
     category: extracted.category || '',
     amount: extracted.amount != null ? String(extracted.amount) : '',
@@ -65,10 +66,12 @@ function onPaste(event) {
 }
 
 function rowIsValid(row) {
-  return row.category.trim().length > 0 && Number(row.amount) > 0 && !!row.date
+  // Zero is a valid amount (e.g. a free reset) -- only blank/negative isn't.
+  return row.category.trim().length > 0 && row.amount !== '' && Number(row.amount) >= 0 && !!row.date
 }
 
 const includedCount = computed(() => draftRows.value.filter((row) => row.include).length)
+const duplicateCount = computed(() => draftRows.value.filter((row) => row.possibleDuplicate).length)
 
 const canImport = computed(
   () => includedCount.value > 0 && draftRows.value.every((row) => !row.include || rowIsValid(row))
@@ -125,6 +128,11 @@ async function submitImport() {
       </span>
     </div>
     <p v-if="screenshotError" class="submit-error">{{ screenshotError }}</p>
+    <p v-if="duplicateCount > 0" class="extraction-hint">
+      {{ duplicateCount }} row{{ duplicateCount === 1 ? '' : 's' }} matched an entry you already have (same date,
+      amount, and category) and {{ duplicateCount === 1 ? 'was' : 'were' }} unchecked automatically -- review before
+      importing.
+    </p>
 
     <table v-if="draftRows.length" class="draft-table">
       <thead>
@@ -141,6 +149,9 @@ async function submitImport() {
         <tr v-for="(row, index) in draftRows" :key="index" :class="{ 'draft-row--excluded': !row.include }">
           <td>
             <input type="checkbox" v-model="row.include" :aria-label="`Include row ${index + 1}`" />
+            <span v-if="row.possibleDuplicate" class="duplicate-flag" title="Matches an existing entry (same date, amount, category)">
+              dup
+            </span>
           </td>
           <td>
             <div class="type-toggle type-toggle--compact" role="group" aria-label="Entry type">
@@ -225,6 +236,26 @@ async function submitImport() {
   text-decoration: underline;
   cursor: pointer;
   font-size: inherit;
+}
+
+.extraction-hint {
+  color: var(--el-text-muted);
+  font-size: var(--el-text-sm);
+  margin: 0 0 var(--el-space-3);
+}
+
+.duplicate-flag {
+  display: inline-block;
+  margin-left: var(--el-space-1);
+  padding: 1px var(--el-space-1);
+  border: 1px solid var(--el-copper);
+  border-radius: var(--el-radius-sm);
+  color: var(--el-copper);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: help;
 }
 
 .draft-table {

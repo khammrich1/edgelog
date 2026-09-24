@@ -261,3 +261,106 @@ async def test_parse_financial_screenshot_bulk_single_row_still_returns_a_list(c
     data = response.json()
     assert len(data) == 1
     assert data[0]["category"] == "evaluation fee"
+
+
+@pytest.mark.asyncio
+async def test_parse_financial_screenshot_bulk_flags_possible_duplicates(client: AsyncClient, monkeypatch):
+    headers = await _register_and_auth_headers(client, email="findupe@example.com")
+
+    await client.post(
+        "/api/v1/financial-entries",
+        headers=headers,
+        json={"entry_type": "income", "category": "payout", "amount": "450.00", "date": "2026-06-18"},
+    )
+
+    def fake_extract_bulk(image_bytes: bytes, content_type: str) -> list:
+        return [
+            {
+                "entry_type": "income",
+                "category": "payout",
+                "amount": "450.00",
+                "date": "2026-06-18",
+                "firm": None,
+                "notes": None,
+            },
+            {
+                "entry_type": "income",
+                "category": "payout",
+                "amount": "480.00",
+                "date": "2026-06-12",
+                "firm": None,
+                "notes": None,
+            },
+        ]
+
+    monkeypatch.setattr(financial_ai_capture, "_extract_financial_entries_bulk_via_claude", fake_extract_bulk)
+
+    response = await client.post(
+        "/api/v1/financial-entries/parse-screenshot-bulk",
+        headers=headers,
+        files={"file": ("payouts.png", _tiny_png_bytes(), "image/png")},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data[0]["possible_duplicate"] is True
+    assert data[1]["possible_duplicate"] is False
+
+
+@pytest.mark.asyncio
+async def test_parse_financial_screenshot_bulk_duplicate_check_is_scoped_to_the_user(
+    client: AsyncClient, monkeypatch
+):
+    headers_a = await _register_and_auth_headers(client, email="findupe_a@example.com")
+    headers_b = await _register_and_auth_headers(client, email="findupe_b@example.com")
+
+    await client.post(
+        "/api/v1/financial-entries",
+        headers=headers_a,
+        json={"entry_type": "income", "category": "payout", "amount": "450.00", "date": "2026-06-18"},
+    )
+
+    def fake_extract_bulk(image_bytes: bytes, content_type: str) -> list:
+        return [
+            {
+                "entry_type": "income",
+                "category": "payout",
+                "amount": "450.00",
+                "date": "2026-06-18",
+                "firm": None,
+                "notes": None,
+            }
+        ]
+
+    monkeypatch.setattr(financial_ai_capture, "_extract_financial_entries_bulk_via_claude", fake_extract_bulk)
+
+    response = await client.post(
+        "/api/v1/financial-entries/parse-screenshot-bulk",
+        headers=headers_b,
+        files={"file": ("payouts.png", _tiny_png_bytes(), "image/png")},
+    )
+
+    assert response.json()[0]["possible_duplicate"] is False
+
+
+@pytest.mark.asyncio
+async def test_parse_financial_screenshot_bulk_duplicate_check_tolerates_null_fields(
+    client: AsyncClient, monkeypatch
+):
+    headers = await _register_and_auth_headers(client, email="findupe_null@example.com")
+
+    def fake_extract_bulk(image_bytes: bytes, content_type: str) -> list:
+        return [
+            {"entry_type": None, "category": None, "amount": None, "date": None, "firm": None, "notes": None}
+        ]
+
+    monkeypatch.setattr(financial_ai_capture, "_extract_financial_entries_bulk_via_claude", fake_extract_bulk)
+
+    response = await client.post(
+        "/api/v1/financial-entries/parse-screenshot-bulk",
+        headers=headers,
+        files={"file": ("payouts.png", _tiny_png_bytes(), "image/png")},
+    )
+
+    assert response.status_code == 200
+    assert response.json()[0]["possible_duplicate"] is False

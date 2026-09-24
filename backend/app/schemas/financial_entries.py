@@ -12,7 +12,9 @@ EntryType = Literal["expense", "income"]
 class FinancialEntryCreate(BaseModel):
     entry_type: EntryType
     category: str = Field(min_length=1, max_length=200)
-    amount: Decimal = Field(gt=0)
+    # Zero is valid -- a free reset or comped item is still worth logging to
+    # count the event, even though it cost nothing. Only negative is nonsense.
+    amount: Decimal = Field(ge=0)
     date: date_type
     firm: Optional[str] = Field(default=None, max_length=200)
     notes: Optional[str] = Field(default=None, max_length=4000)
@@ -28,7 +30,7 @@ class FinancialEntryBulkCreate(BaseModel):
 class FinancialEntryUpdate(BaseModel):
     entry_type: Optional[EntryType] = None
     category: Optional[str] = Field(default=None, min_length=1, max_length=200)
-    amount: Optional[Decimal] = Field(default=None, gt=0)
+    amount: Optional[Decimal] = Field(default=None, ge=0)
     date: Optional[date_type] = None
     firm: Optional[str] = Field(default=None, max_length=200)
     notes: Optional[str] = Field(default=None, max_length=4000)
@@ -57,3 +59,12 @@ class FinancialEntryExtraction(BaseModel):
     date: Optional[date_type] = None
     firm: Optional[str] = None
     notes: Optional[str] = None
+
+
+class FinancialEntryBulkExtractionItem(FinancialEntryExtraction):
+    """One row from a bulk (multi-row table) extraction. possible_duplicate
+    is set when an existing entry already matches this row's date, amount,
+    and category -- the client defaults such a row to unchecked in the
+    review table, but the user can still re-check and import it."""
+
+    possible_duplicate: bool = False

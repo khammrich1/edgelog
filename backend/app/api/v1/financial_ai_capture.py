@@ -1,18 +1,26 @@
 """AI screenshot capture for the Financial Tracker: extracts candidate
 expense/income fields from a receipt/payout/eval-fee screenshot for the
 user to review. Never creates a FinancialEntry -- the client must still
-submit the normal create request."""
+submit the normal create request. The bulk endpoint additionally reads
+(never writes) the database, to flag rows that look like duplicates of an
+entry the user already has."""
 import base64
 import json
 import logging
+from datetime import date as date_type
+from decimal import Decimal, InvalidOperation
 
 import anthropic
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.config import settings
+from app.core.database import get_db
+from app.models.financial_entries import FinancialEntry
 from app.models.user import User
-from app.schemas.financial_entries import FinancialEntryExtraction
+from app.schemas.financial_entries import FinancialEntryBulkExtractionItem, FinancialEntryExtraction
 
 logger = logging.getLogger(__name__)
 
@@ -229,6 +237,35 @@ def _extract_financial_entries_bulk_via_claude(image_bytes: bytes, content_type:
     return json.loads(text_block)["entries"]
 
 
+async def _flag_possible_duplicates(db: AsyncSession, user_id: int, extracted: list[dict]) -> list[dict]:
+    """Marks a row as possible_duplicate when an existing entry for this
+    user already matches its date, amount, and category. Rows with a
+    missing/unparseable date, amount, or category are never flagged --
+    there isn't enough to match on."""
+    for entry in extracted:
+        entry["possible_duplicate"] = False
+        if not (entry.get("date") and entry.get("category") and entry.get("amount") is not None):
+            continue
+        try:
+            parsed_date = date_type.fromisoformat(entry["date"])
+            parsed_amount = Decimal(str(entry["amount"]))
+        except (ValueError, InvalidOperation):
+            continue
+
+        result = await db.execute(
+            select(FinancialEntry.id).where(
+                FinancialEntry.user_id == user_id,
+                FinancialEntry.date == parsed_date,
+                FinancialEntry.amount == parsed_amount,
+                FinancialEntry.category == entry["category"],
+            )
+        )
+        if result.scalar_one_or_none() is not None:
+            entry["possible_duplicate"] = True
+
+    return extracted
+
+
 @router.post("/financial-entries/parse-screenshot", response_model=FinancialEntryExtraction)
 async def parse_financial_entry_screenshot(
     file: UploadFile = File(...),
@@ -245,10 +282,11 @@ async def parse_financial_entry_screenshot(
     return FinancialEntryExtraction(**extracted)
 
 
-@router.post("/financial-entries/parse-screenshot-bulk", response_model=list[FinancialEntryExtraction])
+@router.post("/financial-entries/parse-screenshot-bulk", response_model=list[FinancialEntryBulkExtractionItem])
 async def parse_financial_entries_bulk_screenshot(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported image type")
@@ -258,4 +296,5 @@ async def parse_financial_entries_bulk_screenshot(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image is too large (max 5MB)")
 
     extracted = _extract_financial_entries_bulk_via_claude(contents, file.content_type)
-    return [FinancialEntryExtraction(**entry) for entry in extracted]
+    extracted = await _flag_possible_duplicates(db, current_user.id, extracted)
+    return [FinancialEntryBulkExtractionItem(**entry) for entry in extracted]
