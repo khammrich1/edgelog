@@ -112,4 +112,38 @@ describe('router auth guard', () => {
 
     expect(router.currentRoute.value.name).toBe('NotFound')
   })
+
+  it('resolves /financials to the Financials view and requires auth like other protected routes', async () => {
+    const { router, authStore } = setupRouter()
+    authStore.refreshAuth = vi.fn().mockResolvedValue(false)
+
+    await router.push('/financials')
+    expect(router.currentRoute.value.path).toBe('/login')
+
+    authStore.user = { id: 1, email: 'trader@edgelog.trade' }
+    authStore.accessToken = 'fake-access-token'
+    await router.push('/financials')
+    expect(router.currentRoute.value.name).toBe('Financials')
+  })
+
+  it('resolves /financials/:year to the FinancialsYear view for a valid year', async () => {
+    const { router, authStore } = setupRouter()
+    authStore.user = { id: 1, email: 'trader@edgelog.trade' }
+    authStore.accessToken = 'fake-access-token'
+
+    await router.push('/financials/2026')
+
+    expect(router.currentRoute.value.name).toBe('FinancialsYear')
+    expect(router.currentRoute.value.params.year).toBe('2026')
+  })
+
+  it('falls through to Not Found for a malformed /financials year', async () => {
+    const { router, authStore } = setupRouter()
+    authStore.user = { id: 1, email: 'trader@edgelog.trade' }
+    authStore.accessToken = 'fake-access-token'
+
+    await router.push('/financials/abc')
+
+    expect(router.currentRoute.value.name).toBe('NotFound')
+  })
 })

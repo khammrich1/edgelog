@@ -5,6 +5,7 @@ import Register from '@/views/Register.vue'
 import Journal from '@/views/Journal.vue'
 import JournalDay from '@/views/JournalDay.vue'
 import TradeCalendar from '@/views/TradeCalendar.vue'
+import Financials from '@/views/Financials.vue'
 import Settings from '@/views/Settings.vue'
 import Stats from '@/views/Stats.vue'
 import NotFound from '@/views/NotFound.vue'
@@ -56,6 +57,22 @@ export const routes = [
     path: '/trades/:date(\\d{4}-\\d{2}-\\d{2})',
     name: 'TradeCalendarWeek',
     component: TradeCalendar,
+    meta: { requiresAuth: true }
+  },
+  {
+    // Annual P&L / Financial Tracker -- a separate cash ledger (evals,
+    // deposits, expenses vs. payouts), independent of Trade/TradingDay.
+    path: '/financials',
+    name: 'Financials',
+    component: Financials,
+    meta: { requiresAuth: true }
+  },
+  {
+    // :year picks which year to display, mirroring TradeCalendarWeek's
+    // :date -- deep-linkable year URLs.
+    path: '/financials/:year(\\d{4})',
+    name: 'FinancialsYear',
+    component: Financials,
     meta: { requiresAuth: true }
   },
   {

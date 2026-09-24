@@ -8,6 +8,7 @@
         <router-link to="/journal" class="nav-link">Calendar</router-link>
         <router-link to="/trades" class="nav-link">Trades</router-link>
         <router-link to="/stats" class="nav-link">Stats</router-link>
+        <router-link to="/financials" class="nav-link">Financials</router-link>
       </div>
 
       <div class="nav-spacer"></div>
