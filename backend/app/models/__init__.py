@@ -2,6 +2,7 @@
 from .user import User
 from .journal import ChecklistItem, TradingDay, TradingDayChecklistItem
 from .trades import Trade, TradeExit
+from .financial_entries import FinancialEntry
 
 __all__ = [
     "User",
@@ -10,4 +11,5 @@ __all__ = [
     "TradingDayChecklistItem",
     "Trade",
     "TradeExit",
+    "FinancialEntry",
 ]
