@@ -132,3 +132,132 @@ async def test_parse_financial_screenshot_extraction_partial_nulls_are_allowed(c
     data = response.json()
     assert data["entry_type"] is None
     assert data["notes"] == "Screenshot was too blurry to read most fields."
+
+
+# ---- Bulk (multi-row table) extraction ----
+
+
+@pytest.mark.asyncio
+async def test_parse_financial_screenshot_bulk_requires_auth(client: AsyncClient):
+    response = await client.post(
+        "/api/v1/financial-entries/parse-screenshot-bulk",
+        files={"file": ("payouts.png", _tiny_png_bytes(), "image/png")},
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_parse_financial_screenshot_bulk_returns_multiple_rows(client: AsyncClient, monkeypatch):
+    headers = await _register_and_auth_headers(client)
+
+    def fake_extract_bulk(image_bytes: bytes, content_type: str) -> list:
+        assert content_type == "image/png"
+        return [
+            {
+                "entry_type": "income",
+                "category": "payout",
+                "amount": "450.00",
+                "date": "2026-06-18",
+                "firm": None,
+                "notes": None,
+            },
+            {
+                "entry_type": "income",
+                "category": "payout",
+                "amount": "480.00",
+                "date": "2026-06-12",
+                "firm": None,
+                "notes": None,
+            },
+            {
+                "entry_type": "income",
+                "category": "payout",
+                "amount": "295.00",
+                "date": "2026-05-01",
+                "firm": None,
+                "notes": "Requested amount differed from the finalized payout amount.",
+            },
+        ]
+
+    monkeypatch.setattr(financial_ai_capture, "_extract_financial_entries_bulk_via_claude", fake_extract_bulk)
+
+    response = await client.post(
+        "/api/v1/financial-entries/parse-screenshot-bulk",
+        headers=headers,
+        files={"file": ("payouts.png", _tiny_png_bytes(), "image/png")},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 3
+    assert [row["amount"] for row in data] == ["450.00", "480.00", "295.00"]
+    assert all(row["entry_type"] == "income" for row in data)
+
+
+@pytest.mark.asyncio
+async def test_parse_financial_screenshot_bulk_missing_api_key_returns_503(client: AsyncClient, monkeypatch):
+    headers = await _register_and_auth_headers(client)
+    monkeypatch.setattr(financial_ai_capture.settings, "ANTHROPIC_API_KEY", "")
+
+    response = await client.post(
+        "/api/v1/financial-entries/parse-screenshot-bulk",
+        headers=headers,
+        files={"file": ("payouts.png", _tiny_png_bytes(), "image/png")},
+    )
+
+    assert response.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_parse_financial_screenshot_bulk_rejects_unsupported_image_type(client: AsyncClient):
+    headers = await _register_and_auth_headers(client)
+
+    response = await client.post(
+        "/api/v1/financial-entries/parse-screenshot-bulk",
+        headers=headers,
+        files={"file": ("notes.txt", b"not an image", "text/plain")},
+    )
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_parse_financial_screenshot_bulk_rejects_oversized_image(client: AsyncClient, monkeypatch):
+    headers = await _register_and_auth_headers(client)
+    monkeypatch.setattr(financial_ai_capture, "MAX_UPLOAD_BYTES", 10)
+
+    response = await client.post(
+        "/api/v1/financial-entries/parse-screenshot-bulk",
+        headers=headers,
+        files={"file": ("payouts.png", _tiny_png_bytes(), "image/png")},
+    )
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_parse_financial_screenshot_bulk_single_row_still_returns_a_list(client: AsyncClient, monkeypatch):
+    headers = await _register_and_auth_headers(client)
+
+    def fake_extract_bulk(image_bytes: bytes, content_type: str) -> list:
+        return [
+            {
+                "entry_type": "expense",
+                "category": "evaluation fee",
+                "amount": "149.00",
+                "date": "2026-02-01",
+                "firm": "TopStep",
+                "notes": None,
+            }
+        ]
+
+    monkeypatch.setattr(financial_ai_capture, "_extract_financial_entries_bulk_via_claude", fake_extract_bulk)
+
+    response = await client.post(
+        "/api/v1/financial-entries/parse-screenshot-bulk",
+        headers=headers,
+        files={"file": ("receipt.png", _tiny_png_bytes(), "image/png")},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["category"] == "evaluation fee"

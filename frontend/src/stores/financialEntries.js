@@ -66,6 +66,21 @@ export const useFinancialEntriesStore = defineStore('financialEntries', () => {
     return data
   }
 
+  async function parseFinancialScreenshotBulk(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const { data } = await api.post('/financial-entries/parse-screenshot-bulk', formData, {
+      headers: { 'Content-Type': undefined }
+    })
+    return data
+  }
+
+  async function bulkCreateEntries(entries) {
+    const { data } = await api.post('/financial-entries/bulk', { entries })
+    data.forEach(_upsertIntoYear)
+    return data
+  }
+
   async function uploadEntryScreenshot(entryId, file) {
     const formData = new FormData()
     formData.append('file', file)
@@ -102,6 +117,8 @@ export const useFinancialEntriesStore = defineStore('financialEntries', () => {
     updateEntry,
     deleteEntry,
     parseFinancialScreenshot,
+    parseFinancialScreenshotBulk,
+    bulkCreateEntries,
     uploadEntryScreenshot,
     deleteEntryScreenshot,
     fetchEntryScreenshotObjectUrl

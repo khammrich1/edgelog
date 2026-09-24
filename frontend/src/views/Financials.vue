@@ -6,6 +6,7 @@ import { formatSignedDollars, resultClass } from '@/utils/trades'
 import FinancialEntryForm from '@/components/financials/FinancialEntryForm.vue'
 import FinancialChart from '@/components/financials/FinancialChart.vue'
 import FinancialEntriesTable from '@/components/financials/FinancialEntriesTable.vue'
+import FinancialBulkImport from '@/components/financials/FinancialBulkImport.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -21,6 +22,7 @@ const totalExpenses = computed(() => entries.value.filter((e) => e.entry_type ==
 const netProfit = computed(() => totalIncome.value - totalExpenses.value)
 
 const editingEntry = ref(null)
+const showBulkImport = ref(false)
 
 async function fetchYear() {
   await financialEntriesStore.fetchEntriesForYear(viewedYear.value)
@@ -104,6 +106,11 @@ watch(viewedYear, fetchYear, { immediate: true })
 
     <h2 class="section-title">{{ editingEntry ? 'Edit entry' : 'Add entry' }}</h2>
     <FinancialEntryForm :entry="editingEntry" @saved="onEntrySaved" @cancel="onCancelEdit" />
+
+    <button type="button" class="toggle-more-button" @click="showBulkImport = !showBulkImport">
+      {{ showBulkImport ? 'Hide bulk import' : 'Import multiple from a screenshot' }}
+    </button>
+    <FinancialBulkImport v-if="showBulkImport" />
 
     <h2 class="section-title">Entries</h2>
     <FinancialEntriesTable :entries="entries" @edit="onEditRequested" />
@@ -210,6 +217,19 @@ watch(viewedYear, fetchYear, { immediate: true })
   letter-spacing: 0.05em;
   color: var(--el-text-muted);
   margin: var(--el-space-8) 0 var(--el-space-3);
+}
+
+.toggle-more-button {
+  background: none;
+  border: none;
+  color: var(--el-text-muted);
+  font-size: var(--el-text-xs);
+  cursor: pointer;
+  padding: 0;
+}
+
+.toggle-more-button:hover {
+  color: var(--el-copper);
 }
 
 @media (max-width: 640px) {

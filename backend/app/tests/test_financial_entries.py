@@ -78,6 +78,89 @@ async def test_create_entry_rejects_non_positive_amount(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_bulk_create_requires_auth(client: AsyncClient):
+    response = await client.post(
+        "/api/v1/financial-entries/bulk", json={"entries": [_base_entry_payload()]}
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_bulk_create_multiple_entries_in_one_request(client: AsyncClient):
+    headers = await _register_and_auth_headers(client)
+    response = await client.post(
+        "/api/v1/financial-entries/bulk",
+        headers=headers,
+        json={
+            "entries": [
+                _base_entry_payload(entry_type="income", category="payout", amount="450", date="2026-06-18"),
+                _base_entry_payload(entry_type="income", category="payout", amount="480", date="2026-06-12"),
+                _base_entry_payload(entry_type="income", category="payout", amount="295", date="2026-05-01"),
+            ]
+        },
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert len(data) == 3
+    assert [Decimal(row["amount"]) for row in data] == [Decimal("450.00"), Decimal("480.00"), Decimal("295.00")]
+    assert all(row["has_screenshot"] is False for row in data)
+
+    list_response = await client.get(
+        "/api/v1/financial-entries", headers=headers, params={"start": "2026-01-01", "end": "2026-12-31"}
+    )
+    assert len(list_response.json()) == 3
+
+
+@pytest.mark.asyncio
+async def test_bulk_create_rejects_empty_entries_list(client: AsyncClient):
+    headers = await _register_and_auth_headers(client)
+    response = await client.post("/api/v1/financial-entries/bulk", headers=headers, json={"entries": []})
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_bulk_create_rejects_more_than_max_entries(client: AsyncClient):
+    headers = await _register_and_auth_headers(client)
+    response = await client.post(
+        "/api/v1/financial-entries/bulk",
+        headers=headers,
+        json={"entries": [_base_entry_payload() for _ in range(101)]},
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_bulk_create_rejects_whole_batch_if_one_entry_invalid(client: AsyncClient):
+    headers = await _register_and_auth_headers(client)
+    response = await client.post(
+        "/api/v1/financial-entries/bulk",
+        headers=headers,
+        json={"entries": [_base_entry_payload(), _base_entry_payload(amount="-10")]},
+    )
+    assert response.status_code == 422
+
+    list_response = await client.get(
+        "/api/v1/financial-entries", headers=headers, params={"start": "2026-01-01", "end": "2026-12-31"}
+    )
+    assert list_response.json() == []
+
+
+@pytest.mark.asyncio
+async def test_bulk_create_scopes_entries_to_the_authenticated_user(client: AsyncClient):
+    headers_a = await _register_and_auth_headers(client, email="finance_bulk_a@example.com")
+    headers_b = await _register_and_auth_headers(client, email="finance_bulk_b@example.com")
+
+    await client.post(
+        "/api/v1/financial-entries/bulk", headers=headers_a, json={"entries": [_base_entry_payload()]}
+    )
+
+    response = await client.get(
+        "/api/v1/financial-entries", headers=headers_b, params={"start": "2026-01-01", "end": "2026-12-31"}
+    )
+    assert response.json() == []
+
+
+@pytest.mark.asyncio
 async def test_get_entry_not_found_returns_404(client: AsyncClient):
     headers = await _register_and_auth_headers(client)
     response = await client.get("/api/v1/financial-entries/999999", headers=headers)

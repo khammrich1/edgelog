@@ -13,7 +13,12 @@ from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.models.financial_entries import FinancialEntry
 from app.models.user import User
-from app.schemas.financial_entries import FinancialEntryCreate, FinancialEntryRead, FinancialEntryUpdate
+from app.schemas.financial_entries import (
+    FinancialEntryBulkCreate,
+    FinancialEntryCreate,
+    FinancialEntryRead,
+    FinancialEntryUpdate,
+)
 
 router = APIRouter()
 
@@ -90,6 +95,31 @@ async def create_financial_entry(
     await db.flush()
     await db.refresh(entry)
     return _serialize_entry(entry)
+
+
+@router.post("/financial-entries/bulk", response_model=list[FinancialEntryRead], status_code=status.HTTP_201_CREATED)
+async def bulk_create_financial_entries(
+    payload: FinancialEntryBulkCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    entries = [
+        FinancialEntry(
+            user_id=current_user.id,
+            entry_type=item.entry_type,
+            category=item.category,
+            amount=item.amount,
+            date=item.date,
+            firm=item.firm,
+            notes=item.notes,
+        )
+        for item in payload.entries
+    ]
+    db.add_all(entries)
+    await db.flush()
+    for entry in entries:
+        await db.refresh(entry)
+    return [_serialize_entry(entry) for entry in entries]
 
 
 @router.get("/financial-entries/{entry_id}", response_model=FinancialEntryRead)

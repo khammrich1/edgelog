@@ -37,6 +37,8 @@ async function mountFinancials(entriesByYear = {}) {
   store.deleteEntry = vi.fn()
   store.deleteEntryScreenshot = vi.fn()
   store.fetchEntryScreenshotObjectUrl = vi.fn()
+  store.parseFinancialScreenshotBulk = vi.fn()
+  store.bulkCreateEntries = vi.fn().mockResolvedValue([])
 
   const wrapper = mount(Financials)
   await flushPromises()
@@ -120,6 +122,18 @@ describe('Financials', () => {
 
     expect(replaceMock).toHaveBeenCalledWith('/financials/2030')
     expect(store.fetchEntriesForYear).toHaveBeenCalledWith(2030)
+  })
+
+  it('keeps the bulk import panel collapsed by default and reveals it via the toggle', async () => {
+    const { wrapper } = await mountFinancials()
+
+    expect(wrapper.text()).not.toContain('payout-history / expenses table screenshot')
+    expect(wrapper.text()).toContain('Import multiple from a screenshot')
+
+    await wrapper.find('.toggle-more-button').trigger('click')
+
+    expect(wrapper.text()).toContain('payout-history / expenses table screenshot')
+    expect(wrapper.text()).toContain('Hide bulk import')
   })
 
   it('computes income, expense, and net P&L summary tiles from the current year entries', async () => {
