@@ -180,7 +180,7 @@ Do not implement before VS3 provides real trade data.
 
 ## VS4.5 — Annual P&L / Financial Tracker
 
-**Accepted and built** (PR #20, extended by PR #21); pending the user's manual acceptance pass on a deployed environment. Not part of the original numbered roadmap -- added mid-stream at the user's explicit request, sequenced to come after VS4.
+**Accepted and built** (PR #20, extended by PR #21, #22, #23). Not part of the original numbered roadmap -- added mid-stream at the user's explicit request, sequenced to come after VS4. The user has since tested this live against the real Anthropic API (a real TopStep payout table) and reported two follow-up bugs, both fixed same-day: PR #22 (firm name vs. account ID) and PR #23 (duplicate-import detection + zero-amount entries for free resets).
 
 Goal: track the actual cash economics of the trader's prop-firm business, separate from trade performance.
 
