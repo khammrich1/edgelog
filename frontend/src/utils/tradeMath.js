@@ -101,3 +101,18 @@ export function computeRiskReward({ quantity, entryPrice, stopPrice, targetPrice
     multiplierKnown: mult !== null
   }
 }
+
+/**
+ * Realized R-multiple: how many multiples of planned dollar risk a trade's
+ * actual dollar P&L came out to (e.g. 2.3 means it made 2.3x what was risked).
+ * Both realizedPnl and plannedRiskDollars must be present -- there's no
+ * points-only fallback, since points and planned-risk-points aren't
+ * comparable across instruments the way their dollar figures are. Returns
+ * null when either is missing or planned risk is zero.
+ */
+export function computeRealizedR(realizedPnl, plannedRiskDollars) {
+  const pnl = toNumberOrNull(realizedPnl)
+  const risk = toNumberOrNull(plannedRiskDollars)
+  if (pnl === null || risk === null || risk === 0) return null
+  return roundPrice(pnl / Math.abs(risk))
+}

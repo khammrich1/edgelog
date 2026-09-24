@@ -6,6 +6,7 @@
       <div class="nav-links">
         <button class="nav-link" @click="goToToday">Today</button>
         <router-link to="/journal" class="nav-link">Calendar</router-link>
+        <router-link to="/trades" class="nav-link">Trades</router-link>
         <router-link to="/stats" class="nav-link">Stats</router-link>
       </div>
 

@@ -161,6 +161,10 @@ function backToCalendar() {
   router.push('/journal')
 }
 
+function viewTradesThisWeek() {
+  router.push(`/trades/${route.params.date}`)
+}
+
 watch(() => route.params.date, loadDay)
 loadDay()
 
@@ -173,6 +177,7 @@ onBeforeUnmount(revokeBiasChartPreview)
       <button class="back-link" @click="backToCalendar">&lsaquo; Back to Calendar</button>
       <h1>{{ formattedDate }}</h1>
       <div class="header-actions">
+        <button class="week-link" @click="viewTradesThisWeek">View trades this week</button>
         <span class="status-badge" :class="isLocked ? 'status-badge--locked' : 'status-badge--draft'">
           {{ isLocked ? 'Locked' : 'Draft' }}
         </span>
@@ -427,6 +432,19 @@ onBeforeUnmount(revokeBiasChartPreview)
 .status-badge--locked {
   color: var(--el-steel-light);
   border: 1px solid var(--el-steel);
+}
+
+.week-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--el-text-muted);
+  font-size: var(--el-text-sm);
+  cursor: pointer;
+}
+
+.week-link:hover {
+  color: var(--el-copper);
 }
 
 .lock-button {

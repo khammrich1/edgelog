@@ -1,5 +1,6 @@
 """Trade lifecycle endpoints (VS3): manually-logged trades and their exits."""
 import uuid
+from collections import defaultdict
 from decimal import Decimal
 from datetime import date as date_type, datetime, timezone
 from pathlib import Path
@@ -17,6 +18,7 @@ from app.models.journal import TradingDay
 from app.models.trades import Trade, TradeEntry, TradeExit, TradeSetup
 from app.models.user import User
 from app.schemas.trades import (
+    TradeCalendarDay,
     TradeCreate,
     TradeEntryCreate,
     TradeEntryRead,
@@ -690,3 +692,68 @@ async def delete_trade_screenshot(
     exits = await _get_exits(db, trade.id)
     entries = await _get_entries(db, trade.id)
     return _serialize_trade(trade, exits, entries)
+
+
+# ---- Trade Calendar range query (VS4) ----
+
+async def _get_trades_in_range(
+    db: AsyncSession, user_id: int, start: date_type, end: date_type
+) -> list[TradeCalendarDay]:
+    """Single JOIN plus two batched exit/entry queries, regardless of how
+    many trades fall in the range -- avoids the N+1 amplification the
+    per-day endpoint's per-trade loop would cause across a full week."""
+    result = await db.execute(
+        select(Trade, TradingDay.date)
+        .join(TradingDay, Trade.trading_day_id == TradingDay.id)
+        .where(
+            TradingDay.user_id == user_id,
+            TradingDay.date >= start,
+            TradingDay.date <= end,
+        )
+        .order_by(TradingDay.date, Trade.entry_time, Trade.id)
+    )
+    rows = result.all()
+    trade_ids = [trade.id for trade, _ in rows]
+
+    exits_by_trade: dict[int, list[TradeExit]] = defaultdict(list)
+    entries_by_trade: dict[int, list[TradeEntry]] = defaultdict(list)
+    if trade_ids:
+        exits_result = await db.execute(
+            select(TradeExit)
+            .where(TradeExit.trade_id.in_(trade_ids))
+            .order_by(TradeExit.exit_time, TradeExit.id)
+        )
+        for exit_row in exits_result.scalars().all():
+            exits_by_trade[exit_row.trade_id].append(exit_row)
+
+        entries_result = await db.execute(
+            select(TradeEntry)
+            .where(TradeEntry.trade_id.in_(trade_ids))
+            .order_by(TradeEntry.entry_time, TradeEntry.id)
+        )
+        for entry_row in entries_result.scalars().all():
+            entries_by_trade[entry_row.trade_id].append(entry_row)
+
+    days: dict[date_type, list[TradeRead]] = {}
+    for trade, day_date in rows:
+        serialized = _serialize_trade(trade, exits_by_trade[trade.id], entries_by_trade[trade.id])
+        days.setdefault(day_date, []).append(serialized)
+
+    return [TradeCalendarDay(date=day_date, trades=day_trades) for day_date, day_trades in days.items()]
+
+
+@router.get("/trades", response_model=list[TradeCalendarDay])
+async def list_trades_in_range(
+    start: date_type,
+    end: date_type,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Trades across a date range, grouped by the day they occurred --
+    backs the Trade Calendar (VS4). Unlike the single-day endpoint, this is
+    a pure read: it never creates a TradingDay row for a date that was
+    never opened, so browsing the calendar has no side effects."""
+    if end < start:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="end must not be before start")
+
+    return await _get_trades_in_range(db, current_user.id, start, end)

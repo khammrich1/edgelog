@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api from '@/services/api'
+import { eachDateKeyInRange } from '@/utils/date'
 
 export const useTradesStore = defineStore('trades', () => {
   // State: date (YYYY-MM-DD) -> array of TradeRead
@@ -25,6 +26,30 @@ export const useTradesStore = defineStore('trades', () => {
   async function fetchTrades(date) {
     const { data } = await api.get(`/journal/days/${date}/trades`)
     _setTrades(date, data)
+    return data
+  }
+
+  /**
+   * Trade Calendar (VS4): fetches every trade in [start, end] in one call
+   * and merges the result into tradesByDate -- unlike _setTrades's
+   * single-day replace, this must not clobber dates outside the requested
+   * range, since tradesByDate is shared with the single-day trade views.
+   * Every date in the range gets an explicit entry, including an empty
+   * array for a day with no trades, so the calendar can tell "empty" apart
+   * from "not yet loaded".
+   */
+  async function fetchTradesInWeek(start, end) {
+    const { data } = await api.get('/journal/trades', { params: { start, end } })
+    const tradesByDateKey = {}
+    for (const day of data) {
+      tradesByDateKey[day.date] = day.trades
+    }
+
+    const merged = { ...tradesByDate.value }
+    for (const dateKey of eachDateKeyInRange(start, end)) {
+      merged[dateKey] = tradesByDateKey[dateKey] ?? []
+    }
+    tradesByDate.value = merged
     return data
   }
 
@@ -146,6 +171,7 @@ export const useTradesStore = defineStore('trades', () => {
     tradesByDate,
     setups,
     fetchTrades,
+    fetchTradesInWeek,
     createTrade,
     updateTrade,
     deleteTrade,
