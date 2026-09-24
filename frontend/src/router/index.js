@@ -4,6 +4,7 @@ import Login from '@/views/Login.vue'
 import Register from '@/views/Register.vue'
 import Journal from '@/views/Journal.vue'
 import JournalDay from '@/views/JournalDay.vue'
+import TradeCalendar from '@/views/TradeCalendar.vue'
 import Settings from '@/views/Settings.vue'
 import Stats from '@/views/Stats.vue'
 import NotFound from '@/views/NotFound.vue'
@@ -38,6 +39,23 @@ export const routes = [
     path: '/journal/:date(\\d{4}-\\d{2}-\\d{2})',
     name: 'JournalDay',
     component: JournalDay,
+    meta: { requiresAuth: true }
+  },
+  {
+    // VS4 Trade Calendar -- deliberately not "/calendar" to avoid colliding
+    // with the existing "Calendar" nav label, which points at /journal.
+    path: '/trades',
+    name: 'TradeCalendar',
+    component: TradeCalendar,
+    meta: { requiresAuth: true }
+  },
+  {
+    // The :date param picks which week to display (any date within it),
+    // not a specific day -- gives the calendar deep-linkable week URLs and
+    // a link target for the Daily Journal to jump to a trade's week.
+    path: '/trades/:date(\\d{4}-\\d{2}-\\d{2})',
+    name: 'TradeCalendarWeek',
+    component: TradeCalendar,
     meta: { requiresAuth: true }
   },
   {

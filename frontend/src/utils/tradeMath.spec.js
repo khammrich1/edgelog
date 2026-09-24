@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeRiskReward, pointsToPrice, priceToPoints } from './tradeMath'
+import { computeRealizedR, computeRiskReward, pointsToPrice, priceToPoints } from './tradeMath'
 
 describe('pointsToPrice', () => {
   it('LONG: stop points sit below entry', () => {
@@ -128,5 +128,29 @@ describe('computeRiskReward', () => {
   it('returns null with no quantity or no entry price', () => {
     expect(computeRiskReward({ quantity: '', entryPrice: 100, direction: 'long' })).toBeNull()
     expect(computeRiskReward({ quantity: 1, entryPrice: '', direction: 'long' })).toBeNull()
+  })
+})
+
+describe('computeRealizedR', () => {
+  it('computes a positive R-multiple for a winning trade', () => {
+    expect(computeRealizedR(200, 100)).toBe(2)
+  })
+
+  it('computes a negative R-multiple for a losing trade', () => {
+    expect(computeRealizedR(-150, 100)).toBe(-1.5)
+  })
+
+  it('uses the absolute value of planned risk as the denominator', () => {
+    expect(computeRealizedR(200, -100)).toBe(2)
+  })
+
+  it('returns null when realized P&L is missing', () => {
+    expect(computeRealizedR(null, 100)).toBeNull()
+    expect(computeRealizedR(undefined, 100)).toBeNull()
+  })
+
+  it('returns null when planned risk is missing or zero', () => {
+    expect(computeRealizedR(200, null)).toBeNull()
+    expect(computeRealizedR(200, 0)).toBeNull()
   })
 })

@@ -78,4 +78,38 @@ describe('router auth guard', () => {
     expect(authStore.isAuthenticated).toBe(true)
     expect(router.currentRoute.value.name).toBe('NotFound')
   })
+
+  it('resolves /trades to the Trade Calendar and requires auth like other protected routes', async () => {
+    const { router, authStore } = setupRouter()
+    authStore.refreshAuth = vi.fn().mockResolvedValue(false)
+
+    await router.push('/trades')
+    expect(router.currentRoute.value.path).toBe('/login')
+
+    authStore.user = { id: 1, email: 'trader@edgelog.trade' }
+    authStore.accessToken = 'fake-access-token'
+    await router.push('/trades')
+    expect(router.currentRoute.value.name).toBe('TradeCalendar')
+  })
+
+  it('resolves /trades/:date to the Trade Calendar week view for a valid date', async () => {
+    const { router, authStore } = setupRouter()
+    authStore.user = { id: 1, email: 'trader@edgelog.trade' }
+    authStore.accessToken = 'fake-access-token'
+
+    await router.push('/trades/2026-02-02')
+
+    expect(router.currentRoute.value.name).toBe('TradeCalendarWeek')
+    expect(router.currentRoute.value.params.date).toBe('2026-02-02')
+  })
+
+  it('falls through to Not Found for a malformed /trades date', async () => {
+    const { router, authStore } = setupRouter()
+    authStore.user = { id: 1, email: 'trader@edgelog.trade' }
+    authStore.accessToken = 'fake-access-token'
+
+    await router.push('/trades/not-a-date')
+
+    expect(router.currentRoute.value.name).toBe('NotFound')
+  })
 })

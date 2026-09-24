@@ -1,5 +1,5 @@
 """Trade lifecycle schemas (VS3)."""
-from datetime import datetime
+from datetime import date as date_type, datetime
 from decimal import Decimal
 from typing import Literal, Optional
 
@@ -123,3 +123,13 @@ class TradeRead(BaseModel):
     has_screenshot: bool
     created_at: datetime
     updated_at: datetime
+
+
+class TradeCalendarDay(BaseModel):
+    """One day's trades for the Trade Calendar range endpoint (VS4). Only
+    dates with at least one trade appear in the response list -- the caller
+    already knows the full date range it asked for and treats an absent
+    date as an empty day."""
+
+    date: date_type
+    trades: list[TradeRead]
