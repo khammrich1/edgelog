@@ -180,7 +180,7 @@ Do not implement before VS3 provides real trade data.
 
 ## VS4.5 — Annual P&L / Financial Tracker
 
-**Accepted and built** (PR #20); pending the user's manual acceptance pass on a deployed environment. Not part of the original numbered roadmap -- added mid-stream at the user's explicit request, sequenced to come after VS4.
+**Accepted and built** (PR #20, extended by PR #21); pending the user's manual acceptance pass on a deployed environment. Not part of the original numbered roadmap -- added mid-stream at the user's explicit request, sequenced to come after VS4.
 
 Goal: track the actual cash economics of the trader's prop-firm business, separate from trade performance.
 
@@ -195,6 +195,8 @@ Includes:
 - year navigation (prev/next/jump/this year)
 
 Explicitly out of scope for v1 (per the requester's "get me something to work with and I will go from there"): configurable expense categories, multi-account/multi-currency support, recurring entries, budgets/tax handling, CSV import/export. The earlier idea of flagging/tracking strategies in Settings was raised in the same conversation but is a separate, not-yet-scoped idea -- not part of this slice.
+
+**PR #21 addition -- bulk screenshot import**: the user's real payout screenshots (e.g. a TopStep payout-history page) show several finalized payouts in one table, not a single entry. Added a separate, opt-in "Import multiple from a screenshot" panel (collapsed by default, does not change the single-entry dropzone above): the AI extraction endpoint returns a list of candidate rows instead of one, shown as an editable, per-row-includable review table before anything is saved -- same never-auto-save rule as single-entry capture. Deliberately does not attach the source screenshot to the created entries (attaching one whole-table image identically to N entries added complexity for unclear benefit); a user who wants a screenshot on a specific bulk-imported entry can still add one afterward from the entries table's existing per-row control.
 
 ## VS5 — Daily Debrief
 

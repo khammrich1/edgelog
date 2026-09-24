@@ -2,7 +2,7 @@
 
 Live status doc, kept up to date as work happens. Not a roadmap (see `ROADMAP.md`) and not a deploy how-to (see `DEPLOYMENT.md`) -- this is "what's actually true right now."
 
-_Last updated: 2026-09-24 (PR #20)_
+_Last updated: 2026-09-24 (PR #21)_
 
 ## Standing rules (do not violate)
 
@@ -13,7 +13,7 @@ _Last updated: 2026-09-24 (PR #20)_
 
 ## Where `main` is right now
 
-`main` @ `9aee8db` -- includes through PR #20. In order:
+`main` @ `6718954` -- includes through PR #21. In order:
 
 | PR | What it added |
 |---|---|
@@ -29,8 +29,9 @@ _Last updated: 2026-09-24 (PR #20)_
 | #18 | Fixed dated futures contracts (e.g. `MNQZ26`) falling back to points-only P&L/risk instead of resolving to their root's dollar multiplier (`MNQ`) |
 | #19 | **VS4 -- Trade Calendar**: new `/trades` weekly view, separate from the Daily Journal calendar. New `GET /journal/trades?start=&end=` range endpoint, collapsed/expanded trade cards, client-side R-multiple, mobile day-focused view. See "Vertical slices" below. |
 | #20 | **Annual P&L / Financial Tracker**: new standalone `/financials` + `/financials/:year` views -- a flat cash ledger of prop-firm business expenses (evals, deposits) vs. income (payouts), deliberately separate from Trade/TradingDay P&L. New `FinancialEntry` model/migration `007`, `/financial-entries` CRUD + range-query + screenshot API, `/financial-entries/parse-screenshot` AI-capture endpoint (same extraction-only-prefills pattern as trades). Monthly bar chart (green income / steel-gray expenses, not red), entries table, year navigation via `replace`. See "Vertical slices" below. |
+| #21 | **Bulk screenshot import for the Financial Tracker**: a real TopStep payout-history screenshot (multiple finalized payouts in one table) showed the single-entry AI capture can only extract one row per image. Added a separate, opt-in "Import multiple from a screenshot" panel (collapsed by default) -- new `/financial-entries/parse-screenshot-bulk` endpoint returns a list of candidate rows, new `/financial-entries/bulk` endpoint creates them all in one all-or-nothing request. Extraction results render as an editable, per-row-includable review table; nothing saves until the user reviews and submits, matching the single-entry flow's never-auto-save rule. No new migration. |
 
-Four Alembic migrations exist beyond what's confirmed live in production: `004_trade_setups`, `005_trade_entries_and_cancel`, `006_trade_screenshot`, `007_financial_entries`. PR #18/#19 are app logic only, no new migrations.
+Four Alembic migrations exist beyond what's confirmed live in production: `004_trade_setups`, `005_trade_entries_and_cancel`, `006_trade_screenshot`, `007_financial_entries`. PR #18/#19/#21 are app logic only, no new migrations.
 
 ## Vertical slices
 
@@ -38,19 +39,21 @@ Four Alembic migrations exist beyond what's confirmed live in production: `004_t
 - **VS3 gaps** (from the original spec, not blocking): no `Draft` trade state (trades go straight to `Open`); no `reasoning`/`emotional state` per-trade fields (explicitly deferred by the user, not an oversight). R-multiple, the other original VS3/VS4 gap, **is now implemented** (client-side, via PR #19) -- no longer a gap.
 - **VS4 -- Trade Calendar**: built in PR #19, per the user's explicit choice of "VS4 first" when a P&L/expenses dashboard was also requested. Verified end-to-end via Playwright in this session (multi-status trades, colors, R-multiple, drawer detail, both cross-links, week nav, mobile layout) but **not yet manually tested by the user in a live environment** -- treat as needing the same acceptance pass every prior slice got before calling it done.
 - **Annual P&L / Financial Tracker**: built in PR #20, the P&L/expenses dashboard sequenced after VS4. Scope was deliberately kept lean at the user's request ("get me something to work with and I will go from there"): single flat ledger, free-text category, both manual and AI-screenshot entry, no multi-account model/multi-currency/recurring entries/budgets/CSV import-export. Verified end-to-end via Playwright in this session (entry CRUD, year nav via `replace`, cross-year date edits, chart colors/tooltip, screenshot dropzone graceful fallback, 400px layout) but **not yet manually tested by the user in a live environment**.
+- **Bulk screenshot import**: built in PR #21, a follow-up the user asked for immediately after seeing PR #20 -- their real payout screenshots are multi-row tables, not single entries. See "Where `main` is right now" above for what it does. Verified via curl against both new endpoints (couldn't verify real multi-row AI extraction end-to-end -- no `ANTHROPIC_API_KEY` in this sandbox, only the graceful-503 fallback path) plus a live Playwright pass on the toggle/panel UI and 25 new frontend/12 new backend tests. **Not yet manually tested by the user in a live environment**, and specifically not yet tested with a real screenshot against the real Anthropic API.
 - **No further slice queued yet** -- pick up with the user next.
 
 ## Deployment status
 
-- **Dev (`d.edgelog.trade`)**: last confirmed deployed/tested through PR #15. **Not yet redeployed** with PR #16-#20 as of this update. (Note: the user was actively creating/editing trades including an `MNQZ26` one in a live environment earlier in this session -- unclear from this session whether that was dev or production, so don't assume either is caught up without checking.)
-- **Production (`edgelog.trade`)**: a full deploy checklist (DB backup -> `pip install` -> `alembic upgrade head` -> set `ANTHROPIC_API_KEY` -> `el-deploy`) was handed off for the user to run manually, for the state as of PR #14. **Completion not confirmed in this session** -- no verification output has come back. Treat production as *not* confirmed up to date until that's checked, and now further behind main (#15-#20 on top of whatever did or didn't get deployed).
+- **Dev (`d.edgelog.trade`)**: last confirmed deployed/tested through PR #15. **Not yet redeployed** with PR #16-#21 as of this update. (Note: the user was actively creating/editing trades including an `MNQZ26` one in a live environment earlier in this session -- unclear from this session whether that was dev or production, so don't assume either is caught up without checking.)
+- **Production (`edgelog.trade`)**: a full deploy checklist (DB backup -> `pip install` -> `alembic upgrade head` -> set `ANTHROPIC_API_KEY` -> `el-deploy`) was handed off for the user to run manually, for the state as of PR #14. **Completion not confirmed in this session** -- no verification output has come back. Treat production as *not* confirmed up to date until that's checked, and now further behind main (#15-#21 on top of whatever did or didn't get deployed).
 
 ## Known open items
 
 - Confirm whether the production deploy checklist was actually run, and if so, verify `edgelog.trade` matches `main`.
 - Confirm which live environment (dev or prod) the user has been testing MNQZ26 trades on, and get it redeployed with PR #18 so those existing trades pick up correct dollar P&L (no migration needed -- it's computed fresh on every read).
-- Deploy PR #16-#20 (collapsible add-contracts/add-trim; Target field move + trade screenshots; dated-contract multiplier fix; VS4 Trade Calendar; Financial Tracker) to dev, then production, once confirmed. PR #20 adds migration `007_financial_entries` -- back up the DB before running `alembic upgrade head` on either environment, per the standing rule above.
-- VS4 and the Financial Tracker both need the user's own manual acceptance pass on a real deployed environment -- this session's verification for both was Playwright-only, in a local sandbox.
+- Deploy PR #16-#21 (collapsible add-contracts/add-trim; Target field move + trade screenshots; dated-contract multiplier fix; VS4 Trade Calendar; Financial Tracker; bulk screenshot import) to dev, then production, once confirmed. PR #20 adds migration `007_financial_entries` -- back up the DB before running `alembic upgrade head` on either environment, per the standing rule above. PR #21 adds no migration.
+- Once deployed with a real `ANTHROPIC_API_KEY`, the bulk-import feature (PR #21) still needs its actual AI-extraction path tested against a real multi-row payout screenshot -- this session could only verify the graceful-failure path and the review-table UI with mocked/curl-created data.
+- VS4 and the Financial Tracker (including bulk import) both need the user's own manual acceptance pass on a real deployed environment -- this session's verification for both was Playwright-only, in a local sandbox.
 - `el-deploy` (a shell function on the prod server) covers pull/install/migrate/restart/build/rsync/nginx-reload but does **not** back up the DB or set new env vars -- both must be done manually before calling it.
 - Trade screenshot files are stored on local disk at `backend/uploads/trade_screenshots/` (gitignored, mirrors the existing bias-chart pattern) -- not included in the DB backup step, so a full disaster-recovery plan would need to back that directory up too if it matters long-term. The Financial Tracker's screenshots at `backend/uploads/financial_screenshots/` have the exact same gap.
 
