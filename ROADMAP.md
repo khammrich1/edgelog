@@ -178,6 +178,24 @@ A Trade Calendar day should eventually link to that day's Daily Journal, and the
 
 Do not implement before VS3 provides real trade data.
 
+## VS4.5 — Annual P&L / Financial Tracker
+
+**Accepted and built** (PR #20); pending the user's manual acceptance pass on a deployed environment. Not part of the original numbered roadmap -- added mid-stream at the user's explicit request, sequenced to come after VS4.
+
+Goal: track the actual cash economics of the trader's prop-firm business, separate from trade performance.
+
+This ledger is **deliberately independent of Trade/TradingDay data** -- a payout is a profit-split fraction of trading results, not the same number as realized trade P&L, and the two must never be summed or reconciled against each other.
+
+Includes:
+
+- flat cash ledger: expense or income entries, each with category (free text), amount, date, optional firm/account (free text), optional notes
+- both manual entry and AI screenshot capture (mirrors the trade-screenshot pattern: extraction only prefills the form, never auto-saves)
+- per-entry screenshot upload/view/remove
+- annual view with month-by-month income vs. expense bar chart, income/expense/net P&L summary tiles
+- year navigation (prev/next/jump/this year)
+
+Explicitly out of scope for v1 (per the requester's "get me something to work with and I will go from there"): configurable expense categories, multi-account/multi-currency support, recurring entries, budgets/tax handling, CSV import/export. The earlier idea of flagging/tracking strategies in Settings was raised in the same conversation but is a separate, not-yet-scoped idea -- not part of this slice.
+
 ## VS5 — Daily Debrief
 
 Goal: complete the daily loop: **Prepare → Trade → Review**.
