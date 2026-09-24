@@ -132,4 +132,43 @@ describe('FinancialBulkImport', () => {
 
     expect(wrapper.find('.import-button').attributes('disabled')).toBeDefined()
   })
+
+  it('starts a possible-duplicate row unchecked and flagged, but allows re-checking it', async () => {
+    const { wrapper, store } = mountPanel()
+    store.parseFinancialScreenshotBulk.mockResolvedValue([
+      { ...threeRowExtraction[0], possible_duplicate: true },
+      { ...threeRowExtraction[1], possible_duplicate: false }
+    ])
+    await pasteImage(wrapper, new File(['x'], 'payouts.png', { type: 'image/png' }))
+
+    const checkboxes = wrapper.findAll('input[type="checkbox"]')
+    expect(checkboxes[0].element.checked).toBe(false)
+    expect(checkboxes[1].element.checked).toBe(true)
+    expect(wrapper.find('.duplicate-flag').exists()).toBe(true)
+    expect(wrapper.text()).toContain('1 row matched an entry you already have')
+
+    await checkboxes[0].setValue(true)
+    await wrapper.find('.import-button').trigger('click')
+    await flushPromises()
+
+    expect(store.bulkCreateEntries).toHaveBeenCalledWith([
+      expect.objectContaining({ amount: threeRowExtraction[0].amount }),
+      expect.objectContaining({ amount: threeRowExtraction[1].amount })
+    ])
+  })
+
+  it('treats a zero amount as valid so free resets/comped entries can still be imported', async () => {
+    const { wrapper, store } = mountPanel()
+    store.parseFinancialScreenshotBulk.mockResolvedValue([
+      { entry_type: 'expense', category: 'reset', amount: '0.00', date: '2026-06-18', firm: null, notes: null }
+    ])
+    await pasteImage(wrapper, new File(['x'], 'payouts.png', { type: 'image/png' }))
+
+    expect(wrapper.find('.import-button').attributes('disabled')).toBeUndefined()
+
+    await wrapper.find('.import-button').trigger('click')
+    await flushPromises()
+
+    expect(store.bulkCreateEntries).toHaveBeenCalledWith([expect.objectContaining({ amount: '0.00' })])
+  })
 })

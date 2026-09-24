@@ -64,13 +64,20 @@ async def test_create_income_entry(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_create_entry_rejects_non_positive_amount(client: AsyncClient):
+async def test_create_entry_allows_zero_amount(client: AsyncClient):
+    # A free reset or comped item costs nothing but is still worth logging,
+    # to keep count of the event.
     headers = await _register_and_auth_headers(client)
     response = await client.post(
-        "/api/v1/financial-entries", headers=headers, json=_base_entry_payload(amount="0")
+        "/api/v1/financial-entries", headers=headers, json=_base_entry_payload(amount="0", category="reset")
     )
-    assert response.status_code == 422
+    assert response.status_code == 201
+    assert Decimal(response.json()["amount"]) == Decimal("0.00")
 
+
+@pytest.mark.asyncio
+async def test_create_entry_rejects_negative_amount(client: AsyncClient):
+    headers = await _register_and_auth_headers(client)
     response = await client.post(
         "/api/v1/financial-entries", headers=headers, json=_base_entry_payload(amount="-10")
     )
