@@ -50,8 +50,13 @@ reimbursement). Null if it can't be told from the image.
 - amount: the dollar amount as a plain decimal string with no currency \
 symbol, commas, or units (e.g. "149.00"). Null if not visible.
 - date: the date this occurred, as "YYYY-MM-DD", or null if no date is visible.
-- firm: the prop firm, broker, or account name shown, or null if none is \
-visible.
+- firm: the prop firm or broker's own name/brand (e.g. "TopStep", "Apex", \
+"MyFundedFutures") -- look at page branding, logos, or titles, not just the \
+row itself. This is NEVER an account number or account ID string (e.g. \
+"EXPRESS-V2-CT-22568-98480289" is an account ID, not a firm name) -- if the \
+only identifier visible is an account number, put it in notes instead and \
+return null for firm. Null if no firm/brand name is identifiable anywhere \
+in the image.
 - notes: a single short sentence noting anything ambiguous or worth the \
 user's attention. Null if nothing to flag.
 
@@ -94,8 +99,14 @@ symbol, commas, or units (e.g. "149.00"). Null if not visible. If a row \
 shows both a requested amount and a different finalized/paid amount, use \
 the finalized/paid amount.
 - date: the date this occurred, as "YYYY-MM-DD", or null if no date is visible.
-- firm: the prop firm, broker, or account name shown, or null if none is \
-visible.
+- firm: the prop firm or broker's own name/brand (e.g. "TopStep", "Apex", \
+"MyFundedFutures") -- look at page branding, logos, or titles, not just the \
+row itself. This is NEVER an account number or account ID string (e.g. \
+"EXPRESS-V2-CT-22568-98480289" is an account ID, not a firm name) -- if the \
+only identifier visible for a row is an account number, put it in that \
+row's notes instead and return null for firm. A single firm/brand shown \
+once in the page header applies to every row from that page. Null if no \
+firm/brand name is identifiable anywhere in the image.
 - notes: a single short sentence noting anything ambiguous or worth the \
 user's attention about that specific row. Null if nothing to flag.
 
