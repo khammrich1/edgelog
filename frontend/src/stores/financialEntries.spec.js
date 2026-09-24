@@ -84,6 +84,42 @@ describe('financialEntries store', () => {
     )
   })
 
+  it('parseFinancialScreenshotBulk posts multipart to the bulk-extraction endpoint', async () => {
+    api.post.mockResolvedValue({ data: [{ category: 'payout' }, { category: 'payout' }] })
+    const store = useFinancialEntriesStore()
+    const file = new File(['x'], 'payouts.png', { type: 'image/png' })
+
+    const result = await store.parseFinancialScreenshotBulk(file)
+
+    expect(api.post).toHaveBeenCalledWith(
+      '/financial-entries/parse-screenshot-bulk',
+      expect.any(FormData),
+      { headers: { 'Content-Type': undefined } }
+    )
+    expect(result).toHaveLength(2)
+  })
+
+  it('bulkCreateEntries posts the entries array and upserts each created entry into its own year bucket', async () => {
+    const created = [
+      { id: 20, date: '2026-06-18', entry_type: 'income' },
+      { id: 21, date: '2027-01-05', entry_type: 'income' }
+    ]
+    api.post.mockResolvedValue({ data: created })
+    const store = useFinancialEntriesStore()
+    store.entriesByYear = { 2026: [] }
+
+    const payload = [
+      { entry_type: 'income', category: 'payout', amount: '450', date: '2026-06-18' },
+      { entry_type: 'income', category: 'payout', amount: '300', date: '2027-01-05' }
+    ]
+    const result = await store.bulkCreateEntries(payload)
+
+    expect(api.post).toHaveBeenCalledWith('/financial-entries/bulk', { entries: payload })
+    expect(store.entriesByYear[2026]).toEqual([created[0]])
+    expect(store.entriesByYear[2027]).toEqual([created[1]])
+    expect(result).toEqual(created)
+  })
+
   it('uploadEntryScreenshot updates the entry in place', async () => {
     const entry = { id: 3, date: '2026-01-01', entry_type: 'expense', has_screenshot: true }
     api.post.mockResolvedValue({ data: entry })

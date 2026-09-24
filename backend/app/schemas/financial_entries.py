@@ -2,7 +2,7 @@
 of Trade/TradingDay -- see app/models/financial_entries.py."""
 from datetime import date as date_type, datetime
 from decimal import Decimal
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -16,6 +16,13 @@ class FinancialEntryCreate(BaseModel):
     date: date_type
     firm: Optional[str] = Field(default=None, max_length=200)
     notes: Optional[str] = Field(default=None, max_length=4000)
+
+
+class FinancialEntryBulkCreate(BaseModel):
+    """Payload for creating several entries in one request, e.g. after
+    reviewing AI-extracted rows from a multi-payout screenshot."""
+
+    entries: List[FinancialEntryCreate] = Field(min_length=1, max_length=100)
 
 
 class FinancialEntryUpdate(BaseModel):
