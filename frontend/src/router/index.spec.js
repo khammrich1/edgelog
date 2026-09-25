@@ -3,6 +3,13 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createAppRouter } from './index'
 import { useAuthStore } from '@/stores/auth'
+import api from '@/services/api'
+
+// Every navigation fires the tracking beacon (router.afterEach) -- mock it
+// so route tests don't make real network calls.
+vi.mock('@/services/api', () => ({
+  default: { post: vi.fn().mockResolvedValue({}) }
+}))
 
 function setupRouter() {
   setActivePinia(createPinia())
@@ -13,7 +20,8 @@ function setupRouter() {
 
 describe('router auth guard', () => {
   beforeEach(() => {
-    vi.restoreAllMocks()
+    vi.clearAllMocks()
+    api.post.mockResolvedValue({})
   })
 
   it('redirects an unauthenticated visitor away from a protected route to login', async () => {
@@ -145,5 +153,65 @@ describe('router auth guard', () => {
     await router.push('/financials/abc')
 
     expect(router.currentRoute.value.name).toBe('NotFound')
+  })
+
+  it('redirects a non-admin authenticated user away from /admin', async () => {
+    const { router, authStore } = setupRouter()
+    authStore.user = { id: 1, email: 'trader@edgelog.trade', is_admin: false }
+    authStore.accessToken = 'fake-access-token'
+
+    await router.push('/admin')
+
+    expect(router.currentRoute.value.name).toBe('Journal')
+  })
+
+  it('lets an admin user reach /admin', async () => {
+    const { router, authStore } = setupRouter()
+    authStore.user = { id: 1, email: 'admin@edgelog.trade', is_admin: true }
+    authStore.accessToken = 'fake-access-token'
+
+    await router.push('/admin')
+
+    expect(router.currentRoute.value.name).toBe('Admin')
+  })
+
+  it('redirects an unauthenticated visitor away from /admin to login rather than exposing the admin gate', async () => {
+    const { router, authStore } = setupRouter()
+    authStore.refreshAuth = vi.fn().mockResolvedValue(false)
+
+    await router.push('/admin')
+
+    expect(router.currentRoute.value.path).toBe('/login')
+  })
+
+  it('lets any authenticated user (not just admins) reach /feedback', async () => {
+    const { router, authStore } = setupRouter()
+    authStore.user = { id: 1, email: 'trader@edgelog.trade', is_admin: false }
+    authStore.accessToken = 'fake-access-token'
+
+    await router.push('/feedback')
+
+    expect(router.currentRoute.value.name).toBe('Feedback')
+  })
+
+  it('fires the page-view beacon with the destination path on every navigation', async () => {
+    const { router, authStore } = setupRouter()
+    authStore.user = { id: 1, email: 'trader@edgelog.trade' }
+    authStore.accessToken = 'fake-access-token'
+
+    await router.push('/journal')
+
+    expect(api.post).toHaveBeenCalledWith('/track/pageview', { path: '/journal' })
+  })
+
+  it('does not let a beacon failure block navigation', async () => {
+    const { router, authStore } = setupRouter()
+    authStore.user = { id: 1, email: 'trader@edgelog.trade' }
+    authStore.accessToken = 'fake-access-token'
+    api.post.mockRejectedValue(new Error('network down'))
+
+    await router.push('/journal')
+
+    expect(router.currentRoute.value.name).toBe('Journal')
   })
 })
