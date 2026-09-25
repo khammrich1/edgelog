@@ -198,6 +198,20 @@ Explicitly out of scope for v1 (per the requester's "get me something to work wi
 
 **PR #21 addition -- bulk screenshot import**: the user's real payout screenshots (e.g. a TopStep payout-history page) show several finalized payouts in one table, not a single entry. Added a separate, opt-in "Import multiple from a screenshot" panel (collapsed by default, does not change the single-entry dropzone above): the AI extraction endpoint returns a list of candidate rows instead of one, shown as an editable, per-row-includable review table before anything is saved -- same never-auto-save rule as single-entry capture. Deliberately does not attach the source screenshot to the created entries (attaching one whole-table image identically to N entries added complexity for unclear benefit); a user who wants a screenshot on a specific bulk-imported entry can still add one afterward from the entries table's existing per-row control.
 
+## VS4.6 — Admin Page (Account Roster, Traffic, Feedback)
+
+**Accepted and built** (PR #24). Not part of the original numbered roadmap -- requested directly ("I need an admin page... similar to fitretro"), pulling forward a slice of VS17's "admin/user management" and "system/usage statistics" items rather than waiting for that slice's turn.
+
+Goal: give the app owner visibility into who's using EdgeLog and what they think of it.
+
+Includes:
+
+- account roster: every registered user, when they signed up, whether they're an admin, and their most recent activity (date + page)
+- 7-day traffic table: hits, unique authenticated users, and the auth/unauthenticated split, per page path
+- a flat feedback list, fed by a new user-facing feedback form (nav-visible to everyone, not just admins)
+
+Explicitly out of scope for v1: no display-name field on registration (roster shows email only), no in-app admin-management UI (the first admin is granted via one manual SQL update after the migration ships), no custom traffic date-range picker (fixed at 7 days), no feedback reply/status workflow, no page-view retention/pruning job. Traffic and "last activity" data only exists from the moment this shipped forward -- there's no way to backfill history from before the tracking beacon existed.
+
 ## VS5 — Daily Debrief
 
 Goal: complete the daily loop: **Prepare → Trade → Review**.
@@ -393,8 +407,7 @@ Goal: mature EdgeLog into an operable commercial product.
 
 Planned as needed:
 
-- admin/user management
-- system/usage statistics
+- ~~admin/user management~~ / ~~system/usage statistics~~ -- a first slice (account roster, 7-day traffic, feedback) shipped early as VS4.6; still open here: in-app admin-management (promoting/demoting admins), broader usage stats beyond page-view traffic
 - feature flags
 - data export/deletion
 - backups

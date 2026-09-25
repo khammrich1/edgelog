@@ -2,7 +2,7 @@
 
 Live status doc, kept up to date as work happens. Not a roadmap (see `ROADMAP.md`) and not a deploy how-to (see `DEPLOYMENT.md`) -- this is "what's actually true right now."
 
-_Last updated: 2026-09-24 (PR #23)_
+_Last updated: 2026-09-25 (PR #24)_
 
 ## Standing rules (do not violate)
 
@@ -13,7 +13,7 @@ _Last updated: 2026-09-24 (PR #23)_
 
 ## Where `main` is right now
 
-`main` @ `3306212` -- includes through PR #23. In order:
+`main` @ `880284c` -- includes through PR #24. In order:
 
 | PR | What it added |
 |---|---|
@@ -32,8 +32,9 @@ _Last updated: 2026-09-24 (PR #23)_
 | #21 | **Bulk screenshot import for the Financial Tracker**: a real TopStep payout-history screenshot (multiple finalized payouts in one table) showed the single-entry AI capture can only extract one row per image. Added a separate, opt-in "Import multiple from a screenshot" panel (collapsed by default) -- new `/financial-entries/parse-screenshot-bulk` endpoint returns a list of candidate rows, new `/financial-entries/bulk` endpoint creates them all in one all-or-nothing request. Extraction results render as an editable, per-row-includable review table; nothing saves until the user reviews and submits, matching the single-entry flow's never-auto-save rule. No new migration. |
 | #22 | **Financial capture prompt fix**: first live test of PR #21 against the real Anthropic API (TopStep payout-history screenshot) correctly extracted all rows, but put the raw account ID (`EXPRESS-V2-CT-...`) in the `firm` field instead of the actual firm/brand name (`TopStep`) shown in the page header. Tightened both the single-entry and bulk extraction prompts: `firm` must be the firm's own brand name, never an account number -- an account ID goes to `notes` instead. Prompt-only change. |
 | #23 | **Bulk-import duplicate detection + zero-amount entries**: two follow-ups from continued live testing. (1) Re-importing a payout screenshot that overlaps with entries already in the ledger had no duplicate protection -- `parse-screenshot-bulk` now flags a row as `possible_duplicate` when an existing entry matches its date+amount+category, and the review table starts those rows unchecked (still re-checkable). (2) `amount` required a strictly-positive value, so a $0.00 row (e.g. a free reset) failed validation and broke the whole all-or-nothing batch -- relaxed to allow zero, rejecting only negative amounts, so resets/comped items can be logged and counted. |
+| #24 | **Admin page** (account roster, 7-day traffic, feedback), modeled after the same page in a sibling app (FitRetro). New `users.is_admin` (migration `008`), `page_views`/`feedback` tables, a public `/track/pageview` beacon the frontend fires on every route change (`router.afterEach`), a user-facing `/feedback` submission page, and three admin-gated `/admin/*` endpoints (`get_current_admin_user`, 403 for non-admins). First admin is granted via a manual SQL update -- no promote-to-admin UI in v1. See "Vertical slices" below. |
 
-Four Alembic migrations exist beyond what's confirmed live in production: `004_trade_setups`, `005_trade_entries_and_cancel`, `006_trade_screenshot`, `007_financial_entries`. PR #18/#19/#21/#22/#23 are app logic only, no new migrations.
+Five Alembic migrations exist beyond what's confirmed live in production: `004_trade_setups`, `005_trade_entries_and_cancel`, `006_trade_screenshot`, `007_financial_entries`, `008_admin_roster_traffic_feedback`. PR #18/#19/#21/#22/#23 are app logic only, no new migrations.
 
 ## Vertical slices
 
@@ -42,6 +43,7 @@ Four Alembic migrations exist beyond what's confirmed live in production: `004_t
 - **VS4 -- Trade Calendar**: built in PR #19, per the user's explicit choice of "VS4 first" when a P&L/expenses dashboard was also requested. Verified end-to-end via Playwright in this session (multi-status trades, colors, R-multiple, drawer detail, both cross-links, week nav, mobile layout) but **not yet manually tested by the user in a live environment** -- treat as needing the same acceptance pass every prior slice got before calling it done.
 - **Annual P&L / Financial Tracker**: built in PR #20, the P&L/expenses dashboard sequenced after VS4. Scope was deliberately kept lean at the user's request ("get me something to work with and I will go from there"): single flat ledger, free-text category, both manual and AI-screenshot entry, no multi-account model/multi-currency/recurring entries/budgets/CSV import-export. Verified end-to-end via Playwright in this session (entry CRUD, year nav via `replace`, cross-year date edits, chart colors/tooltip, screenshot dropzone graceful fallback, 400px layout) but **not yet manually tested by the user in a live environment**.
 - **Bulk screenshot import**: built in PR #21, a follow-up the user asked for immediately after seeing PR #20 -- their real payout screenshots are multi-row tables, not single entries. See "Where `main` is right now" above for what it does. Verified via curl against both new endpoints in this session (couldn't verify real multi-row AI extraction end-to-end here -- no `ANTHROPIC_API_KEY` in this sandbox, only the graceful-503 fallback path) plus a live Playwright pass on the toggle/panel UI. **The user then tested it live against the real Anthropic API once deployed** and it correctly extracted a real 6-row TopStep payout table -- confirmed working end-to-end. Two issues surfaced from that live use, both fixed same-day: the firm-name/account-ID mixup (PR #22) and duplicate-import risk + zero-amount rejection (PR #23, see above).
+- **Admin page**: built in PR #24, requested directly ("I need an admin page... similar to fitretro") with a reference screenshot from a sibling app. Not part of the original numbered roadmap. Verified end-to-end via Playwright in this session (non-admin nav/redirect behavior, feedback submission, full admin page rendering real roster/traffic/feedback after live navigation) but **not yet manually tested by the user in a live environment**.
 - **No further slice queued yet** -- pick up with the user next.
 
 ## Deployment status
@@ -51,12 +53,15 @@ Four Alembic migrations exist beyond what's confirmed live in production: `004_t
 
 ## Known open items
 
-- **Immediate**: get PR #22 and #23 deployed (firm-name fix + duplicate detection + zero-amount) to wherever the user is actively using the app -- these are live-bug fixes for a feature already in active use, not queued backlog.
+- **Immediate**: get PR #22/#23/#24 deployed to wherever the user is actively using the app. #22/#23 are live-bug fixes for a feature already in active use; #24 (admin page) additionally needs the one-time manual step below run on that environment before it's usable.
+- **After deploying PR #24**: run `UPDATE users SET is_admin = true WHERE email = '<the user's email>';` against that environment's DB -- there is no promote-to-admin UI, this is the only way to grant the first admin. Without it, `/admin` will 403/redirect for everyone, and the Admin nav link won't appear for anyone.
 - Confirm which environment(s) (dev, prod, or both) are actually running which PR -- this session can only infer from user reports, not check directly.
 - Confirm which live environment (dev or prod) the user has been testing MNQZ26 trades on, and get it redeployed with PR #18 so those existing trades pick up correct dollar P&L (no migration needed -- it's computed fresh on every read).
-- PR #20 adds migration `007_financial_entries` -- back up the DB before running `alembic upgrade head` on any environment not yet caught up to it, per the standing rule above. PRs #18/#19/#21/#22/#23 add no migrations.
-- VS4 (Trade Calendar) still needs the user's own manual acceptance pass on a real deployed environment -- unlike the Financial Tracker/bulk import, no live user feedback on it yet.
+- PR #20 adds migration `007_financial_entries`, PR #24 adds migration `008_admin_roster_traffic_feedback` -- back up the DB before running `alembic upgrade head` on any environment not yet caught up to either, per the standing rule above. PRs #18/#19/#21/#22/#23 add no migrations.
+- VS4 (Trade Calendar) and the new admin page both still need the user's own manual acceptance pass on a real deployed environment -- unlike the Financial Tracker/bulk import, no live user feedback on either yet.
 - The Trade Calendar has no per-day trade-count/total-P&L summary -- the user asked for one after mistaking the Daily Journal calendar's checklist-progress badge ("0/1") for a trade counter. Proposed fix (not yet built, not yet approved by the user): add a count + total P&L to each day column on `/trades`. Waiting on the user before starting.
+- The admin page's `page_views` table has no retention/pruning job -- it will grow unbounded. Not a problem yet at this traffic volume, but worth a follow-up once it matters.
+- Admin's "Last activity" and the traffic table only reflect navigation that happens *after* PR #24 is deployed -- there's no way to backfill history from before the tracking beacon existed.
 - `el-deploy` (a shell function on the prod server) covers pull/install/migrate/restart/build/rsync/nginx-reload but does **not** back up the DB or set new env vars -- both must be done manually before calling it.
 - Trade screenshot files are stored on local disk at `backend/uploads/trade_screenshots/` (gitignored, mirrors the existing bias-chart pattern) -- not included in the DB backup step, so a full disaster-recovery plan would need to back that directory up too if it matters long-term. The Financial Tracker's screenshots at `backend/uploads/financial_screenshots/` have the exact same gap.
 
@@ -67,3 +72,4 @@ Four Alembic migrations exist beyond what's confirmed live in production: `004_t
 - A symbol typed/extracted with a dated-contract suffix (e.g. `MNQZ26`, `ESH25`) needs `get_multiplier()`'s root-stripping fallback (PR #18) to price correctly -- an exact-match-only lookup silently degrades to points-only P&L with no error.
 - A vague extraction-prompt field description (e.g. "account name") will make Claude pick up the nearest matching row text (an account ID) instead of the actually-wanted value (the firm's brand name from page branding) -- be explicit about what a field is NOT, not just what it is (PR #22).
 - All-or-nothing batch validation (bulk-create) means a single edge-case row (e.g. a legitimate $0.00 entry that used to be rejected as non-positive) silently blocks the entire batch with no partial success -- worth remembering as a sharp edge any time a new bulk-anything endpoint is added (PR #23).
+- The admin page (PR #24) is useless immediately after deploy until someone is manually flipped to `is_admin = true` via SQL -- there's no bootstrapping path in the app itself. Don't forget this step on a fresh environment.
