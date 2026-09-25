@@ -13,6 +13,8 @@
 
       <div class="nav-spacer"></div>
 
+      <router-link to="/feedback" class="nav-settings">Feedback</router-link>
+      <router-link v-if="authStore.user?.is_admin" to="/admin" class="nav-settings">Admin</router-link>
       <router-link to="/settings" class="nav-settings">Settings</router-link>
       <button @click="handleLogout" class="nav-logout">
         Logout

@@ -31,6 +31,7 @@ class UserResponse(BaseModel):
     """User data response."""
     id: int
     email: str
+    is_admin: bool
     created_at: datetime
 
     model_config = {"from_attributes": True}

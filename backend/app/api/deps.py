@@ -1,4 +1,5 @@
 """API dependencies."""
+from typing import Optional
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +9,7 @@ from app.core.security import decode_token
 from app.models.user import User
 
 security = HTTPBearer()
+security_optional = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
@@ -51,3 +53,33 @@ async def get_current_user(
         )
 
     return user
+
+
+async def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_optional),
+    db: AsyncSession = Depends(get_db)
+) -> Optional[User]:
+    """Like get_current_user, but never raises -- returns None for a
+    missing, malformed, or expired token instead of a 401. Used by
+    endpoints (like the page-view beacon) that must work identically for
+    logged-in and anonymous visitors."""
+    if credentials is None:
+        return None
+
+    payload = decode_token(credentials.credentials)
+    if not payload or payload.get("type") != "access":
+        return None
+
+    user_id = payload.get("sub")
+    if not user_id:
+        return None
+
+    result = await db.execute(select(User).where(User.id == int(user_id)))
+    return result.scalar_one_or_none()
+
+
+async def get_current_admin_user(current_user: User = Depends(get_current_user)) -> User:
+    """Gate for every /admin/* route."""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+    return current_user

@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import api from '@/services/api'
 import Login from '@/views/Login.vue'
 import Register from '@/views/Register.vue'
 import Journal from '@/views/Journal.vue'
@@ -8,6 +9,8 @@ import TradeCalendar from '@/views/TradeCalendar.vue'
 import Financials from '@/views/Financials.vue'
 import Settings from '@/views/Settings.vue'
 import Stats from '@/views/Stats.vue'
+import Admin from '@/views/Admin.vue'
+import Feedback from '@/views/Feedback.vue'
 import NotFound from '@/views/NotFound.vue'
 
 export const routes = [
@@ -88,6 +91,18 @@ export const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/feedback',
+    name: 'Feedback',
+    component: Feedback,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/admin',
+    name: 'Admin',
+    component: Admin,
+    meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
     // Catch-all: any route that doesn't match one of the above. Kept behind
     // requiresAuth so an unauthenticated visitor to an unknown URL still
     // goes through the normal login redirect rather than seeing app
@@ -120,9 +135,19 @@ export function createAppRouter(history) {
     } else if (!requiresAuth && authStore.isAuthenticated) {
       // Redirect to journal if already authenticated
       next('/journal')
+    } else if (to.meta.requiresAdmin && !authStore.user?.is_admin) {
+      // Non-admin trying to reach an admin-only route
+      next('/journal')
     } else {
       next()
     }
+  })
+
+  // Site-traffic beacon for the admin page: fire-and-forget on every route
+  // change, for logged-in and anonymous visitors alike. A tracking failure
+  // must never surface to the user or block navigation.
+  router.afterEach((to) => {
+    api.post('/track/pageview', { path: to.path }).catch(() => {})
   })
 
   return router
