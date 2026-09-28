@@ -243,6 +243,105 @@ def test_non_2xx_response_raises_provider_response_error():
         client.search_accounts()
 
 
+def test_place_order_sends_the_documented_request_shape():
+    session = _FakeSession(
+        responses=[
+            _FakeResponse(json_body={"success": True, "token": "jwt-token"}),
+            _FakeResponse(json_body={"orderId": 9056, "success": True, "errorCode": 0, "errorMessage": None}),
+        ]
+    )
+    client = _client(session)
+    client.authenticate()
+
+    body = client.place_order(
+        account_id=123,
+        contract_id="CON.F.US.MNQ.Z25",
+        order_type=1,
+        side=0,
+        size=1,
+        limit_price=25000.0,
+        custom_tag="edgelog-abc123",
+    )
+
+    assert body == {"orderId": 9056, "success": True, "errorCode": 0, "errorMessage": None}
+    place_call = session.calls[1]
+    assert place_call["url"] == "https://api.topstepx.com/api/Order/place"
+    assert place_call["json"] == {
+        "accountId": 123,
+        "contractId": "CON.F.US.MNQ.Z25",
+        "type": 1,
+        "side": 0,
+        "size": 1,
+        "limitPrice": 25000.0,
+        "stopPrice": None,
+        "trailPrice": None,
+        "customTag": "edgelog-abc123",
+        "stopLossBracket": None,
+        "takeProfitBracket": None,
+    }
+
+
+def test_place_order_response_with_success_false_is_returned_not_raised():
+    # A rejected order can still be a normal 200 response -- the caller
+    # (TopstepXProvider) is responsible for checking `success`, not this
+    # client method.
+    session = _FakeSession(
+        responses=[
+            _FakeResponse(json_body={"success": True, "token": "jwt-token"}),
+            _FakeResponse(
+                json_body={"orderId": 9057, "success": False, "errorCode": 3, "errorMessage": "InsufficientFunds"}
+            ),
+        ]
+    )
+    client = _client(session)
+    client.authenticate()
+
+    body = client.place_order(account_id=123, contract_id="CON.F.US.MNQ.Z25", order_type=1, side=0, size=1)
+
+    assert body["success"] is False
+    assert body["errorMessage"] == "InsufficientFunds"
+
+
+def test_cancel_order_sends_account_and_order_id():
+    session = _FakeSession(
+        responses=[
+            _FakeResponse(json_body={"success": True, "token": "jwt-token"}),
+            _FakeResponse(json_body={"success": True, "errorCode": 0, "errorMessage": None}),
+        ]
+    )
+    client = _client(session)
+    client.authenticate()
+
+    body = client.cancel_order(account_id=123, order_id=9056)
+
+    assert body["success"] is True
+    cancel_call = session.calls[1]
+    assert cancel_call["url"] == "https://api.topstepx.com/api/Order/cancel"
+    assert cancel_call["json"] == {"accountId": 123, "orderId": 9056}
+
+
+def test_search_orders_sends_account_and_time_range_and_parses_list():
+    session = _FakeSession(
+        responses=[
+            _FakeResponse(json_body={"success": True, "token": "jwt-token"}),
+            _FakeResponse(json_body={"orders": [{"id": 9056, "accountId": 123, "size": 1, "fillVolume": 0}]}),
+        ]
+    )
+    client = _client(session)
+    client.authenticate()
+
+    orders = client.search_orders(account_id=123, start_timestamp="2026-09-01T00:00:00+00:00", end_timestamp=None)
+
+    assert orders == [{"id": 9056, "accountId": 123, "size": 1, "fillVolume": 0}]
+    search_call = session.calls[1]
+    assert search_call["url"] == "https://api.topstepx.com/api/Order/search"
+    assert search_call["json"] == {
+        "accountId": 123,
+        "startTimestamp": "2026-09-01T00:00:00+00:00",
+        "endTimestamp": None,
+    }
+
+
 def test_network_error_raises_provider_connection_error():
     session = _FakeSession(raise_exc=requests.ConnectionError("connection refused"))
     client = _client(session)

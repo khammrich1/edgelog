@@ -6,9 +6,9 @@ Convention: an **issue** is a backlog item/specification. A **PR** is the actual
 
 ## Active queue (Strategy Trader epic)
 
-- #25 — Strategy Trader ST0: Local TopstepX execution foundation -- **built, in PR #31**, stopped for owner acceptance testing before #26 begins
-- #26 — Strategy Trader ST1: Practice limit-order execution and kill controls -- blocked on #25 acceptance
-- #27 — Strategy Trader ST2: Strategy contract and observe-only engine -- blocked on #26
+- #25 — Strategy Trader ST0: Local TopstepX execution foundation -- **accepted and merged** via PR #31 (2026-09-28)
+- #26 — Strategy Trader ST1: Practice limit-order execution and kill controls -- **built, in PR #33**, stopped for owner acceptance testing before #27 begins
+- #27 — Strategy Trader ST2: Strategy contract and observe-only engine -- blocked on #26 acceptance
 - #28 — Strategy Trader ST3: Risk engine and Practice auto-execution -- blocked on #27
 - #29 — Strategy Trader ST4: EdgeLog strategy control panel and automatic journaling -- blocked on #28
 - #30 — Strategy analytics: win rate and per-day performance stats -- deliberately deferred until #29/ST4 lands canonical strategy ID/version/source + execution metadata
@@ -29,6 +29,7 @@ These are legitimate future specifications, not superseded or abandoned -- they 
 ## Closed
 
 - #8 — VS2: Daily Journal Core -- closed 2026-09-28, already implemented and accepted via PR #7 (merged 2026-09-11).
+- #25 — Strategy Trader ST0 -- accepted, merged to `main` via PR #31 (2026-09-28). Left listed under Active queue above (not moved to Closed) since it's the first issue of the still-open Strategy Trader epic and PR #33 (#26) explicitly builds on it.
 
 ## Delivery rules
 

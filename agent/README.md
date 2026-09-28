@@ -1,10 +1,14 @@
 # EdgeLog Trader Agent
 
-**Strategy Trader ST0** -- the local execution foundation. This is
-infrastructure only: it authenticates to TopstepX, discovers your
-accounts, resolves the active MNQ contract, and observes live market
-data. **It does not place, modify, or cancel orders, and it never will
-autonomously.** Order placement is explicitly out of scope until ST1.
+**Strategy Trader ST0 + ST1.** ST0 built the local execution foundation:
+authentication to TopstepX, account/contract discovery, and live market
+data. ST1 adds the ability to submit and manage exactly one kind of
+order -- a **manually reviewed, manually confirmed, Practice-account MNQ
+limit order** -- through this same local agent. **Nothing in this
+codebase places an order without an explicit human typing `CONFIRM` at a
+terminal prompt first.** There is no autonomous strategy, no automatic
+order authorization, and no path from EdgeLog cloud to an order -- see
+"Why this runs on your machine" below and `docs/ST1_SCOPE.md`.
 
 ## Why this runs on your machine, not the EdgeLog server
 
@@ -37,10 +41,12 @@ Concretely:
   EdgeLog cloud has no code path that can originate a TopstepX order --
   there is nothing in `backend/` that talks to TopstepX at all as of
   ST0.
-- Later Strategy Trader issues (ST1+) add order placement, but that logic
-  will live in this same local agent, gated behind explicit kill controls
-  and a risk engine. The trading decision and the order request will
-  always originate on your device.
+- ST1 (this version) adds order placement, but that logic lives in this
+  same local agent, gated behind a manual confirmation prompt, a hard
+  quantity cap, and a local kill switch -- see "Placing and managing
+  orders (ST1)" below. Later issues (ST2+) add a strategy engine and risk
+  engine, but the trading decision and the order request will always
+  originate on your device.
 
 If you ever see EdgeLog cloud asking you to paste in a TopstepX API key,
 that is not how this is designed to work -- don't do it.
@@ -122,6 +128,70 @@ connection=connected execution_capable=True account=123456 contract=CON.F.US.MNQ
   `TOPSTEPX_STALE_AFTER_SECONDS` (default 15s) -- check your network and
   that the market is open.
 
+## Placing and managing orders (ST1)
+
+Everything below is Practice-account, limit-order-only, and requires a
+human to type an exact confirmation string. There is no other way to
+submit an order from this codebase.
+
+```powershell
+python -m trader_agent order
+```
+
+This starts the agent, checks that it's execution-capable (authenticated,
+connected, market data fresh) and that the kill switch isn't engaged,
+then walks you through:
+
+1. Side (`buy`/`sell`)
+2. Quantity -- refused if it exceeds `TOPSTEPX_MAX_ORDER_QUANTITY`
+   (default 1) regardless of what you type
+3. Limit price
+4. A full review screen (account, contract, side, quantity, price)
+5. **`Type CONFIRM to submit this order, anything else cancels:`** --
+   anything other than the exact word `CONFIRM` cancels with no order sent
+
+If the account resolved isn't flagged as your Practice account, the order
+is refused before it ever reaches TopstepX -- there's no way to point this
+at a live account.
+
+```powershell
+python -m trader_agent orders          # list locally tracked orders + last known status
+python -m trader_agent cancel <tag>    # cancel a working order by its EdgeLog tag (from `orders`)
+```
+
+Canceling is **never** blocked by the kill switch below -- a kill switch
+should make it easier, not harder, to reduce risk that's already on.
+
+### Kill switch
+
+```powershell
+python -m trader_agent kill --reason "stepping away"   # engage -- blocks all new order submission
+python -m trader_agent kill --clear                    # clear it again
+```
+
+This is a plain local JSON file (`agent/.state/trading_control.json`), not
+a network call -- it works even if TopstepX or your internet connection is
+down, and it persists across restarts until you explicitly clear it. It
+blocks new order submission only; canceling an existing working order
+still works while it's engaged.
+
+There's also a separate, always-off `auto_trading_enabled` flag in that
+same file. Nothing in ST0/ST1 can set it to `true` -- it exists now so
+ST3's risk engine has one settled flag to check later, and it's forced
+back to `false` on every agent start regardless of what's on disk, so a
+restart can never silently resume automated trading once that exists.
+
+### Duplicate protection and reconciliation
+
+Every order gets a unique `edgelog-<random>` tag; submitting an order
+with the exact same account/contract/side/quantity/price as one that's
+still open (working, partially filled, or mid-submission) is refused --
+cancel the existing one first if you meant to replace it. On every
+`start`/`status`/`order`/`cancel`/`orders` invocation, the agent also
+pulls your Practice account's order history from TopstepX and reconciles
+fill state into its local records, so a crash or restart between
+submitting an order and seeing its result doesn't lose track of it.
+
 ## Logs
 
 Structured (JSON-line) logs go to `agent/logs/agent-<date>.log` and to
@@ -137,16 +207,18 @@ pip install -r requirements.txt
 pytest
 ```
 
-All 54 tests run against fakes/mocks -- no network access and no
+All 114 tests run against fakes/mocks -- no network access and no
 TopstepX credentials required. The one piece that is *not* covered by
 this suite is `SignalRTransport` (`trader_agent/providers/topstepx/realtime.py`),
 the thin adapter onto the real `signalrcore` SignalR client library --
 everything that actually has logic in it (subscription bookkeeping,
-reconnect handling, health/staleness tracking) is factored out into
-`RealtimeHub`, which is fully tested against a fake transport. Verifying
-`SignalRTransport` itself requires a real connection, which is why `python
--m trader_agent status` against your own Practice account is part of the
-acceptance pass for this issue, not just the test suite.
+reconnect handling, health/staleness tracking, order safety gating,
+duplicate protection, reconciliation, the kill switch) is factored out
+into classes tested against fakes. Verifying `SignalRTransport` itself,
+and whether a real order actually reaches TopstepX and behaves as this
+code expects, requires a real Practice-account connection -- which is why
+`python -m trader_agent order` against your own Practice account is part
+of the acceptance pass for this issue, not just the test suite.
 
 ## What's verified vs. inferred
 
@@ -190,17 +262,48 @@ codebase is written defensively rather than guessing -- notably:
   Your `python -m trader_agent status` run is the real test of these.
 
 If anything above turns out to not match TopstepX's real behavior, that's
-expected -- report it and it gets fixed before ST1 builds order placement
-on top of this foundation.
+expected -- report it and it gets fixed.
 
-## Not yet built (intentionally out of scope for ST0)
+**ST1 additions**, now that the reference doc documents the Order
+endpoints (section 6):
+
+- **Order status is derived, not trusted from a provider enum.** The
+  reference explicitly flags the full order-status enum as unverified
+  (section 12). Rather than guess what a numeric status code means,
+  `OrderManager`/`TopstepXProvider` derive EdgeLog's own
+  working/partially_filled/filled state from `fillVolume` vs. `size`, and
+  set canceled/rejected only from EdgeLog's own place/cancel call
+  outcomes -- never from a reconciled search result. Your `python -m
+  trader_agent order` run against a real Practice order is the real test
+  of whether this derivation matches reality.
+- **The realtime `GatewayUserOrder` payload shape is cross-referenced,
+  not confirmed**, same caveat as the SignalR method/event names above.
+  `OrderManager.apply_realtime_update` is deliberately defensive: it only
+  acts when it can positively match a `customTag` it generated itself,
+  and never raises on a payload shape it doesn't recognize.
+- **`AccountViolation`/`OutsideTradingHours`/other place-order error
+  codes are logged verbatim from `errorMessage`, not translated** into
+  friendlier text -- the exact wording TopstepX returns for each isn't
+  independently confirmed, so this code surfaces it as-is rather than
+  guessing a mapping.
+
+## Not yet built (intentionally out of scope for ST0/ST1)
 
 - Running as an actual Windows Service (this is a foreground console
   process for now).
-- Order placement/cancellation, kill controls, risk engine (ST1+).
+- Any order type other than a Practice-account limit order (market,
+  stop, trailing-stop, bracket orders) -- `place_limit_order` is the only
+  submission method that exists; there is no generic "place order with a
+  type parameter" anywhere in this codebase.
+- Any strategy, signal, or automated decision-making of any kind. Every
+  order requires a human to construct it via `order` and type `CONFIRM`.
+  ST2 (issue #27) adds an observe-only strategy engine with no execution
+  capability; ST3 (issue #28) is the first issue that connects a strategy
+  to execution, and only through an independent risk engine.
 - Any code path that lets EdgeLog cloud influence trading (by design,
   permanently -- not just "not yet").
 - Reading/writing EdgeLog cloud data at all. This agent is fully
   standalone; a read-only status sync to EdgeLog cloud is a reasonable
-  future addition but wasn't required by ST0's acceptance criteria and
-  would mean touching `backend/`, which this issue deliberately does not.
+  future addition but wasn't required by ST0/ST1's acceptance criteria
+  and would mean touching `backend/`, which these issues deliberately do
+  not.

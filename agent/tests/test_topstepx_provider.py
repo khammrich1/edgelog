@@ -1,17 +1,30 @@
+from datetime import datetime, timezone
+
 import pytest
 
-from trader_agent.providers.base import Account, Contract
+from trader_agent.providers.base import Account, Contract, OrderSide, OrderStatus
 from trader_agent.providers.topstepx.errors import TopstepXError
 from trader_agent.providers.topstepx.provider import NoActiveContractError, TopstepXProvider
 from trader_agent.state import ConnectionStatus
 
 
 class _FakeRestClient:
-    def __init__(self, accounts=None, contracts=None):
+    def __init__(self, accounts=None, contracts=None, place_order_response=None, cancel_order_response=None, search_orders_response=None):
         self.token = None
         self._accounts = accounts or []
         self._contracts = contracts or []
         self.authenticate_called = False
+        self._place_order_response = place_order_response or {
+            "orderId": 9056,
+            "success": True,
+            "errorCode": 0,
+            "errorMessage": None,
+        }
+        self._cancel_order_response = cancel_order_response or {"success": True, "errorCode": 0, "errorMessage": None}
+        self._search_orders_response = search_orders_response if search_orders_response is not None else []
+        self.place_order_calls = []
+        self.cancel_order_calls = []
+        self.search_orders_calls = []
 
     def authenticate(self):
         self.authenticate_called = True
@@ -23,6 +36,18 @@ class _FakeRestClient:
 
     def list_available_contracts(self, live=False):
         return self._contracts
+
+    def place_order(self, **kwargs):
+        self.place_order_calls.append(kwargs)
+        return self._place_order_response
+
+    def cancel_order(self, account_id, order_id):
+        self.cancel_order_calls.append((account_id, order_id))
+        return self._cancel_order_response
+
+    def search_orders(self, account_id, start_timestamp, end_timestamp=None):
+        self.search_orders_calls.append((account_id, start_timestamp, end_timestamp))
+        return self._search_orders_response
 
 
 class _FakeTransport:
@@ -240,3 +265,99 @@ def test_disconnect_tears_down_both_hubs():
     provider.disconnect()
 
     assert provider.connection_status == ConnectionStatus.RECONNECTING
+
+
+def test_place_limit_order_sends_type_1_and_the_mapped_side():
+    provider, rest, _t = _provider()
+
+    provider.place_limit_order(
+        account_id=123, contract_id="CON.F.US.MNQ.Z25", side=OrderSide.BUY, size=1, limit_price=21000.0,
+        custom_tag="edgelog-abc",
+    )
+
+    call = rest.place_order_calls[0]
+    assert call["order_type"] == 1  # Limit
+    assert call["side"] == 0  # Bid/buy
+    assert call["custom_tag"] == "edgelog-abc"
+
+
+def test_place_limit_order_maps_sell_to_the_ask_side_code():
+    provider, rest, _t = _provider()
+
+    provider.place_limit_order(
+        account_id=123, contract_id="CON.F.US.MNQ.Z25", side=OrderSide.SELL, size=1, limit_price=21000.0,
+        custom_tag="edgelog-abc",
+    )
+
+    assert rest.place_order_calls[0]["side"] == 1  # Ask/sell
+
+
+def test_place_limit_order_reports_success_and_order_id_from_the_response():
+    provider, _rest, _t = _provider()
+
+    result = provider.place_limit_order(
+        account_id=123, contract_id="CON.F.US.MNQ.Z25", side=OrderSide.BUY, size=1, limit_price=21000.0,
+        custom_tag="edgelog-abc",
+    )
+
+    assert result.success is True
+    assert result.provider_order_id == "9056"
+    assert result.error_code == 0
+
+
+def test_place_limit_order_reports_failure_even_when_an_order_id_is_present():
+    rest = _FakeRestClient(
+        place_order_response={"orderId": 9057, "success": False, "errorCode": 2, "errorMessage": "OrderRejected"}
+    )
+    provider = TopstepXProvider(rest_client=rest, rtc_base_url="https://rtc.topstepx.com", stale_after_seconds=10.0)
+
+    result = provider.place_limit_order(
+        account_id=123, contract_id="CON.F.US.MNQ.Z25", side=OrderSide.BUY, size=1, limit_price=21000.0,
+        custom_tag="edgelog-abc",
+    )
+
+    assert result.success is False
+    assert result.provider_order_id == "9057"
+    assert result.error_message == "OrderRejected"
+
+
+def test_cancel_order_delegates_to_rest_client_with_integer_order_id():
+    provider, rest, _t = _provider()
+
+    result = provider.cancel_order(account_id=123, provider_order_id="9056")
+
+    assert result.success is True
+    assert rest.cancel_order_calls == [(123, 9056)]
+
+
+def test_search_orders_derives_working_status_from_zero_fill_volume():
+    rest = _FakeRestClient(
+        search_orders_response=[
+            {"id": 9056, "contractId": "CON.F.US.MNQ.Z25", "side": 0, "size": 1, "fillVolume": 0, "limitPrice": 21000.0}
+        ]
+    )
+    provider = TopstepXProvider(rest_client=rest, rtc_base_url="https://rtc.topstepx.com", stale_after_seconds=10.0)
+
+    orders = provider.search_orders(123, datetime.now(timezone.utc))
+
+    assert orders[0].status == OrderStatus.WORKING
+    assert orders[0].side == OrderSide.BUY
+
+
+def test_search_orders_derives_filled_status_when_fill_volume_matches_size():
+    rest = _FakeRestClient(search_orders_response=[{"id": 9056, "side": 1, "size": 1, "fillVolume": 1}])
+    provider = TopstepXProvider(rest_client=rest, rtc_base_url="https://rtc.topstepx.com", stale_after_seconds=10.0)
+
+    orders = provider.search_orders(123, datetime.now(timezone.utc))
+
+    assert orders[0].status == OrderStatus.FILLED
+    assert orders[0].side == OrderSide.SELL
+
+
+def test_search_orders_derives_partially_filled_status():
+    rest = _FakeRestClient(search_orders_response=[{"id": 9056, "side": 0, "size": 3, "fillVolume": 1}])
+    provider = TopstepXProvider(rest_client=rest, rtc_base_url="https://rtc.topstepx.com", stale_after_seconds=10.0)
+
+    orders = provider.search_orders(123, datetime.now(timezone.utc))
+
+    assert orders[0].status == OrderStatus.PARTIALLY_FILLED
