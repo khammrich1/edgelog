@@ -70,3 +70,16 @@ alembic/versions/__pycache__/
 
 # User-uploaded content
 backend/uploads/
+
+# Strategy Trader local agent -- credentials and local state must never be
+# committed. The agent runs on the trader's own machine, never on the
+# EdgeLog server, so none of this should ever reach the repo.
+agent/.env
+agent/.env.*
+!agent/.env.example
+agent/local_config*.json
+agent/local_config*.yaml
+agent/local_config*.yml
+agent/*.log
+agent/logs/
+agent/.state/
