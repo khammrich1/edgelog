@@ -151,9 +151,18 @@ acceptance pass for this issue, not just the test suite.
 ## What's verified vs. inferred
 
 This agent was built without live network access to
-`gateway.docs.projectx.com` (the primary ProjectX API docs). The
-following were confirmed from multiple independent public sources
-(cross-referenced third-party SDKs and documentation excerpts):
+`gateway.docs.projectx.com` (the primary ProjectX API docs) -- blocked by
+this sandbox's network egress policy for the entire build. Confirmed
+directly from the docs by the repo owner (matches this code exactly, no
+changes needed):
+
+- REST base URL: `https://api.topstepx.com`
+- User real-time hub: `https://rtc.topstepx.com/hubs/user`
+- Market real-time hub: `https://rtc.topstepx.com/hubs/market`
+
+The following were confirmed from multiple independent public sources
+(cross-referenced third-party SDKs and documentation excerpts) rather
+than the primary docs directly:
 
 - `POST https://api.topstepx.com/api/Auth/loginKey` with
   `{"userName", "apiKey"}`, returning `{"token", "success", "errorCode",
@@ -163,8 +172,8 @@ following were confirmed from multiple independent public sources
 - Contract objects have `id` (format `CON.F.US.<SYMBOL>.<expiry>`),
   `name`, `description`, `tickSize`, `tickValue`, `activeContract`,
   `symbolId`.
-- SignalR hubs at `{rtc_base_url}/hubs/user` and `{rtc_base_url}/hubs/market`,
-  authenticated via `?access_token=<jwt>` in the connection URL.
+- The real-time hubs above are authenticated via `?access_token=<jwt>` in
+  the connection URL.
 - User hub subscribe methods `SubscribeAccounts`, `SubscribeOrders`,
   `SubscribePositions`, `SubscribeTrades`; market hub subscribe methods
   `SubscribeContractQuotes`, `SubscribeContractTrades`.
