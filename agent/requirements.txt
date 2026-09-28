@@ -1,0 +1,11 @@
+# HTTP (REST calls to the ProjectX Gateway API)
+requests==2.32.3
+
+# Real-time (SignalR hubs for market/account/order/position updates)
+signalrcore==0.9.5
+
+# Local configuration (.env loading only -- never used to talk to EdgeLog cloud)
+python-dotenv==1.0.1
+
+# Testing
+pytest==8.3.4
