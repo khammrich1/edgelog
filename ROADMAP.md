@@ -212,6 +212,34 @@ Includes:
 
 Explicitly out of scope for v1: no display-name field on registration (roster shows email only), no in-app admin-management UI (the first admin is granted via one manual SQL update after the migration ships), no custom traffic date-range picker (fixed at 7 days), no feedback reply/status workflow, no page-view retention/pruning job. Traffic and "last activity" data only exists from the moment this shipped forward -- there's no way to backfill history from before the tracking beacon existed.
 
+## VS4.7 — Strategy Trader (Local Execution Agent)
+
+**In progress.** ST0 built, unmerged, awaiting owner acceptance testing (tracked via PR #31 on `coord/claude-open-issue-queue`, not part of the original numbered roadmap). Spans issues #25–#29 as one epic; each issue is gated on acceptance of the one before it.
+
+Goal: let the trader eventually run assisted/automated strategies against TopstepX/ProjectX, with all order origination happening on the trader's own device. EdgeLog's cloud server is a journal/configuration/analytics tool -- it is never part of the trading path and must never place, modify, cancel, trigger, or relay trading orders.
+
+- **#25 — ST0: Local execution foundation.** Authentication, account/contract discovery, live market data, all via a local agent (`agent/`) that runs on the trader's own machine. No order placement anywhere. Built; stopped for owner testing before #26 begins.
+- **#26 — ST1: Practice limit-order execution and kill controls.**
+- **#27 — ST2: Strategy contract and observe-only engine.**
+- **#28 — ST3: Risk engine and Practice auto-execution.**
+- **#29 — ST4: EdgeLog strategy control panel and automatic journaling.** Must record strategy ID/version/source and execution metadata on every automated trade -- this is what VS4.8 (Strategy Analytics) and VS4.9 (Trade Ranker's `STRATEGY` assessment source) both need downstream.
+
+Automated executions must reconcile into EdgeLog's canonical Trade/TradeEntry/TradeExit model, never a parallel store. See `agent/README.md` and `docs/integrations/projectx/PROJECTX_API_REFERENCE.md` for the local agent and its API reference.
+
+## VS4.8 — Strategy Analytics
+
+**Backlog, deferred.** Issue #30. Win rate and per-day/per-strategy performance stats.
+
+Deliberately deferred until VS4.7/ST4 lands canonical strategy ID/version/source metadata on executed trades -- building this earlier would mean re-deriving or backfilling that metadata later. Once unblocked, should share its grading/analytics substrate with VS4.9 (Trade Ranker) rather than standing up two parallel stats systems.
+
+## VS4.9 — Trade Ranker (Personal A+ Setup Grading)
+
+**Backlog, scoped, not yet authorized for implementation.** Issue #32.
+
+Goal: let a trader define their own personal "A+ setup" -- not a universal EdgeLog-defined standard -- as a named, versioned list of confluences, and grade trades against it manually or with AI-screenshot assistance (advisory only; the trader always confirms/rejects/corrects). See the issue for the full data model: setups, setup versions, confluence definitions, an assessment-source enum (`USER`/`AI_SCREENSHOT`/`STRATEGY`), AI confidence/evidence kept separate from the user's confirmed assessment, and per-grade/per-confluence analytics that report correlation without implying causation.
+
+Builds on canonical Trade/TradeEntry/TradeExit (already exists, VS3) and is designed to connect to VS4.8's analytics scope and VS13 Edge Discovery once both exist. The setup/grading/versioning core can be built and used standalone before that analytics integration exists. Independent of VS4.7 Strategy Trader except for the later `STRATEGY` assessment-source connection point -- does not block, and is not blocked by, VS4.7's ST0–ST4 issues.
+
 ## VS5 — Daily Debrief
 
 Goal: complete the daily loop: **Prepare → Trade → Review**.
@@ -359,6 +387,8 @@ Potential analysis:
 - rule adherence
 
 Sample size and uncertainty must be communicated rather than presenting weak patterns as facts.
+
+Once VS4.9 (Trade Ranker) exists, its per-setup/per-confluence grading data is a natural input here -- e.g. does this trader's own A+ definition actually correlate with better outcomes -- subject to the same correlation-not-causation discipline.
 
 ## VS14 — AI Coach
 
