@@ -21,7 +21,7 @@ class _FakeRestClient:
     def search_accounts(self):
         return self._accounts
 
-    def search_contracts(self, search_text, live=False):
+    def list_available_contracts(self, live=False):
         return self._contracts
 
 
@@ -82,8 +82,8 @@ def _account(id_, name, is_practice):
     return Account(id=id_, name=name, is_practice=is_practice, balance=100000)
 
 
-def _contract(id_, active):
-    return Contract(id=id_, name="MNQZ5", description="Micro E-mini Nasdaq-100", symbol_id="F.US.MNQ", active=active)
+def _contract(id_, active, symbol_id="F.US.MNQ", name="MNQZ5"):
+    return Contract(id=id_, name=name, description="Micro E-mini Nasdaq-100", symbol_id=symbol_id, active=active)
 
 
 def test_authenticate_delegates_to_rest_client_and_marks_health_authenticated():
@@ -138,6 +138,18 @@ def test_resolve_contract_raises_when_none_active():
         provider.resolve_contract("MNQ")
 
 
+def test_resolve_contract_ignores_active_contracts_for_a_different_symbol():
+    contracts = [
+        _contract("CON.F.US.MES.Z25", active=True, symbol_id="F.US.MES", name="MESZ5"),
+        _contract("CON.F.US.MNQ.Z25", active=True, symbol_id="F.US.MNQ", name="MNQZ5"),
+    ]
+    provider, _rest, _t = _provider(contracts=contracts)
+
+    resolved = provider.resolve_contract("MNQ")
+
+    assert resolved.id == "CON.F.US.MNQ.Z25"
+
+
 def test_connect_realtime_requires_prior_authentication():
     provider, _rest, _t = _provider()
 
@@ -170,6 +182,11 @@ def test_subscribe_account_updates_sends_all_four_user_hub_subscriptions():
 
 
 def test_gateway_quote_event_updates_current_price_and_notifies_handler():
+    # The API reference's documented quote fields (symbol, symbolName,
+    # lastPrice, bestBid, bestAsk, ...) don't include a contract ID -- the
+    # provider attributes quotes to whichever contract_id was subscribed,
+    # not to anything parsed out of the payload. This payload deliberately
+    # omits any contract/symbol identifier to prove that.
     contracts = [_contract("CON.F.US.MNQ.Z25", active=True)]
     provider, _rest, transports = _provider(contracts=contracts)
     provider.authenticate()
@@ -180,12 +197,14 @@ def test_gateway_quote_event_updates_current_price_and_notifies_handler():
 
     market_transport = next(t for t in transports if t.url.endswith("/hubs/market"))
     market_transport.emit(
-        "GatewayQuote", [{"contractId": "CON.F.US.MNQ.Z25", "lastPrice": 21005.5, "bestBid": 21005.25, "bestAsk": 21005.75}]
+        "GatewayQuote", [{"symbol": "MNQZ5", "lastPrice": 21005.5, "bestBid": 21005.25, "bestAsk": 21005.75}]
     )
 
     quote = provider.get_current_price("CON.F.US.MNQ.Z25")
     assert quote is not None
     assert quote.last_price == 21005.5
+    assert quote.bid == 21005.25
+    assert quote.ask == 21005.75
     assert received[0].last_price == 21005.5
 
 

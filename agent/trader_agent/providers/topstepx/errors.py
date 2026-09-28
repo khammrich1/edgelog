@@ -21,3 +21,10 @@ class ProviderConnectionError(TopstepXError):
 class ProviderResponseError(TopstepXError):
     """Raised when the API responds but signals failure (non-2xx status,
     or a body with success=false)."""
+
+
+class RateLimitError(TopstepXError):
+    """Raised on HTTP 429. Per the API reference: back off rather than
+    retrying aggressively. ST0 does not implement retry/backoff itself --
+    callers should catch this and decide (a later issue's concern once
+    the agent makes requests frequently enough for this to matter)."""

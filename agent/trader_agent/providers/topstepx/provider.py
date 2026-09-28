@@ -59,6 +59,15 @@ class TopstepXProvider(ExecutionProvider):
         )
 
         self._latest_quotes: dict[str, Quote] = {}
+        # The reference doc's documented quote fields (symbol, symbolName,
+        # lastPrice, bestBid, bestAsk, ...) don't include contractId --
+        # unlike an order/position update, a quote payload apparently
+        # doesn't self-identify which contract it's for by ID. ST0 only
+        # ever subscribes to one contract at a time, so quotes are
+        # attributed to whichever contract_id was last subscribed rather
+        # than parsed out of the payload. Revisit if a future issue needs
+        # multiple simultaneous contract subscriptions.
+        self._market_contract_id: Optional[str] = None
         self._user_hub.on("GatewayUserAccount", self._make_forwarder("account"))
         self._user_hub.on("GatewayUserOrder", self._make_forwarder("order"))
         self._user_hub.on("GatewayUserPosition", self._make_forwarder("position"))
@@ -97,8 +106,19 @@ class TopstepXProvider(ExecutionProvider):
         return next((a for a in accounts if a.is_practice), None)
 
     def resolve_contract(self, symbol: str) -> Contract:
-        contracts = self._rest.search_contracts(symbol, live=False)
-        active = [c for c in contracts if c.active]
+        """Lists every available contract and filters client-side for the
+        requested root symbol's active month. Uses /api/Contract/available
+        rather than /api/Contract/search -- the latter's request schema
+        isn't documented in the API reference (flagged as a gap), while
+        /available's full request/response shape is confirmed."""
+        contracts = self._rest.list_available_contracts(live=False)
+        symbol_upper = symbol.upper()
+        matching = [
+            c
+            for c in contracts
+            if symbol_upper in (c.symbol_id or "").upper() or symbol_upper in (c.name or "").upper()
+        ]
+        active = [c for c in matching if c.active]
         if not active:
             raise NoActiveContractError(f"No active contract found for symbol '{symbol}'")
         if len(active) > 1:
@@ -135,6 +155,7 @@ class TopstepXProvider(ExecutionProvider):
             self._quote_handlers.append(on_quote)
         if on_trade is not None:
             self._trade_handlers.append(on_trade)
+        self._market_contract_id = contract_id
         self._market_hub.subscribe("SubscribeContractQuotes", contract_id)
         self._market_hub.subscribe("SubscribeContractTrades", contract_id)
 
@@ -170,7 +191,7 @@ class TopstepXProvider(ExecutionProvider):
 
     def _on_gateway_quote(self, payload: object) -> None:
         self._market_hub.note_market_data_received()
-        quote = self._parse_quote(payload)
+        quote = self._parse_quote(payload, self._market_contract_id)
         if quote is not None:
             self._latest_quotes[quote.contract_id] = quote
             for handler in self._quote_handlers:
@@ -182,19 +203,16 @@ class TopstepXProvider(ExecutionProvider):
             handler(payload if isinstance(payload, dict) else {"raw": payload})
 
     @staticmethod
-    def _parse_quote(payload: object) -> Optional[Quote]:
+    def _parse_quote(payload: object, contract_id: Optional[str]) -> Optional[Quote]:
         # SignalR client libraries typically deliver hub arguments as a
         # list; ProjectX's own payload is the first (and only) element.
         item = payload[0] if isinstance(payload, list) and payload else payload
-        if not isinstance(item, dict):
-            return None
-        contract_id = item.get("contractId") or item.get("symbolId")
-        if not contract_id:
+        if not isinstance(item, dict) or contract_id is None:
             return None
         return Quote(
             contract_id=contract_id,
-            last_price=item.get("lastPrice") or item.get("last"),
-            bid=item.get("bestBid") or item.get("bid"),
-            ask=item.get("bestAsk") or item.get("ask"),
+            last_price=item.get("lastPrice"),
+            bid=item.get("bestBid"),
+            ask=item.get("bestAsk"),
             raw=item,
         )

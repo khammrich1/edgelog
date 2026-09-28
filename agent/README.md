@@ -152,43 +152,42 @@ acceptance pass for this issue, not just the test suite.
 
 This agent was built without live network access to
 `gateway.docs.projectx.com` (the primary ProjectX API docs) -- blocked by
-this sandbox's network egress policy for the entire build. Confirmed
-directly from the docs by the repo owner (matches this code exactly, no
-changes needed):
+this sandbox's network egress policy for the entire build. The
+authoritative reference is now
+[`docs/integrations/projectx/PROJECTX_API_REFERENCE.md`](../docs/integrations/projectx/PROJECTX_API_REFERENCE.md),
+an EdgeLog-owned distillation of the official docs (reviewed 2026-09-28);
+this code follows it, including its own explicit "Gaps / do not guess"
+list. Where that reference itself doesn't confirm something, this
+codebase is written defensively rather than guessing -- notably:
 
-- REST base URL: `https://api.topstepx.com`
-- User real-time hub: `https://rtc.topstepx.com/hubs/user`
-- Market real-time hub: `https://rtc.topstepx.com/hubs/market`
-
-The following were confirmed from multiple independent public sources
-(cross-referenced third-party SDKs and documentation excerpts) rather
-than the primary docs directly:
-
-- `POST https://api.topstepx.com/api/Auth/loginKey` with
-  `{"userName", "apiKey"}`, returning `{"token", "success", "errorCode",
-  "errorMessage"}`.
-- `POST /api/Account/search`, `POST /api/Contract/search` exist as POST
-  endpoints under the same base URL.
-- Contract objects have `id` (format `CON.F.US.<SYMBOL>.<expiry>`),
-  `name`, `description`, `tickSize`, `tickValue`, `activeContract`,
-  `symbolId`.
-- The real-time hubs above are authenticated via `?access_token=<jwt>` in
-  the connection URL.
-- User hub subscribe methods `SubscribeAccounts`, `SubscribeOrders`,
-  `SubscribePositions`, `SubscribeTrades`; market hub subscribe methods
-  `SubscribeContractQuotes`, `SubscribeContractTrades`.
-- User hub events `GatewayUserAccount`, `GatewayUserOrder`,
-  `GatewayUserPosition`, `GatewayUserTrade`; market hub events
-  `GatewayQuote`, `GatewayTrade` (and `GatewayDepth`, not yet wired up).
-
-**Not independently confirmed** -- verify these against your own account
-on first run:
-
-- The exact field names TopstepX uses to mark an account as Practice vs.
-  other account types (see `TOPSTEPX_PRACTICE_ACCOUNT_ID` above).
-- The exact shape of the SignalR user-hub event payloads (order/position
-  fields). ST0 only logs that an update was received; parsing individual
-  fields out of it is ST4's job (automatic journaling), not this issue's.
+- **Contract resolution uses `/api/Contract/available`, not
+  `/api/Contract/search`.** The reference explicitly flags the search
+  endpoint's request schema as unverified; `/available`'s is fully
+  documented, and filtering its full contract list client-side for the
+  target symbol's active month is sufficient for ST0.
+- **Quotes are attributed by subscription, not by a field in the
+  payload.** The reference's documented quote fields (`symbol`,
+  `symbolName`, `lastPrice`, `bestBid`, `bestAsk`, ...) don't include a
+  contract ID, so `TopstepXProvider` tracks "the contract_id I last
+  subscribed to" itself rather than trying to parse one out of each
+  quote. This only works because ST0 subscribes to one contract at a
+  time -- revisit if a later issue needs multiple simultaneous contracts.
+- **Practice-account detection remains a name-based heuristic.** The
+  reference's documented `/api/Account/search` fields
+  (`id`/`name`/`balance`/`canTrade`/`isVisible`) don't include anything
+  that distinguishes a Practice account; it only notes that *realtime*
+  payloads may expose `simulated`. This is exactly why
+  `TOPSTEPX_PRACTICE_ACCOUNT_ID` exists -- pin it after your first run
+  rather than trusting the heuristic.
+- **Exact SignalR subscribe-method and event names are still
+  unconfirmed even by the new reference** -- it explicitly lists this as
+  a gap ("should be captured from the official realtime pages or
+  verified experimentally"). `SubscribeAccounts`/`SubscribeOrders`/
+  `SubscribePositions`/`SubscribeTrades`/`SubscribeContractQuotes`/
+  `SubscribeContractTrades` and the `GatewayUser*`/`GatewayQuote`/
+  `GatewayTrade` event names come from independent third-party sources
+  cross-referenced during the initial build, not from the reference doc.
+  Your `python -m trader_agent status` run is the real test of these.
 
 If anything above turns out to not match TopstepX's real behavior, that's
 expected -- report it and it gets fixed before ST1 builds order placement

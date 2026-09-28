@@ -1,19 +1,23 @@
 """REST client for the ProjectX Gateway API (TopstepX).
 
-Endpoint paths and payload shapes below are taken from the publicly
-documented ProjectX Gateway API (gateway.docs.projectx.com) and
-cross-referenced against independent third-party client implementations,
-since this agent was built without live network access to the primary
-docs site. The auth endpoint and its request/response shape, and the
-contract-search response shape, were confirmed from multiple independent
-sources. Account-search response field names beyond `id`/`name` were not
-independently confirmed -- `_parse_account` below reads several plausible
-field names defensively and falls back to `None`/a name-based guess
-rather than raising, and `TOPSTEPX_PRACTICE_ACCOUNT_ID` (see config.py)
-exists specifically so a trader can pin the correct account once they've
-seen their own real account list rather than trust the heuristic blindly.
-Verify against your own account's actual response before relying on
-Practice-account auto-detection.
+Endpoint paths and payload shapes below follow
+docs/integrations/projectx/PROJECTX_API_REFERENCE.md (an EdgeLog-owned
+reference distilled from the official ProjectX Gateway docs). Where that
+reference explicitly flags something as unverified (see its "Gaps / do
+not guess" section), this client is written defensively rather than
+guessing: `/api/Contract/search`'s schema is one such gap, which is why
+contract resolution below uses `/api/Contract/available` instead -- that
+one is fully documented, and it's sufficient to find MNQ's active
+contract.
+
+Account-search does not document any field that distinguishes a Practice
+account from other account types (the reference explicitly says realtime
+payloads *may* expose `simulated`, but the REST search response's
+documented fields are just id/name/balance/canTrade/isVisible). Practice
+detection here is therefore still a best-effort, name-based heuristic --
+`TOPSTEPX_PRACTICE_ACCOUNT_ID` (see config.py) exists specifically so a
+trader can pin the correct account once they've seen their own real
+account list rather than trust the heuristic blindly.
 """
 from __future__ import annotations
 
@@ -26,6 +30,7 @@ from trader_agent.providers.topstepx.errors import (
     AuthenticationError,
     ProviderConnectionError,
     ProviderResponseError,
+    RateLimitError,
 )
 
 DEFAULT_TIMEOUT_SECONDS = 10
@@ -49,8 +54,9 @@ class TopstepXRestClient:
 
     def authenticate(self) -> str:
         """POST /api/Auth/loginKey with {userName, apiKey}. Returns and
-        caches the session token (valid ~24h per ProjectX docs). Never
-        logs the API key or the token."""
+        caches the session token (valid 24h per the reference doc). Never
+        logs the API key or the token. A failed login can still return
+        HTTP 200 -- always check `success`, not just the status code."""
         body = self._post(
             "/api/Auth/loginKey",
             json={"userName": self._username, "apiKey": self._api_key},
@@ -64,13 +70,32 @@ class TopstepXRestClient:
         self._token = token
         return token
 
-    def search_accounts(self) -> list[Account]:
-        body = self._post("/api/Account/search", json={})
+    def validate_session(self) -> str:
+        """POST /api/Auth/validate. Tokens last 24h; a long-running agent
+        should call this well before then and adopt the returned
+        `newToken`. Not yet wired into the service's run loop (ST0 is a
+        short-lived foreground process today) -- see agent/README.md."""
+        body = self._post("/api/Auth/validate", json={})
+        new_token = body.get("newToken")
+        if not body.get("success") or not new_token:
+            raise AuthenticationError(
+                f"TopstepX session validation failed (errorCode={body.get('errorCode')}): {body.get('errorMessage')}"
+            )
+        self._token = new_token
+        return new_token
+
+    def search_accounts(self, only_active: bool = True) -> list[Account]:
+        body = self._post("/api/Account/search", json={"onlyActiveAccounts": only_active})
         raw_accounts = body.get("accounts") if isinstance(body.get("accounts"), list) else body.get("data") or []
         return [self._parse_account(item) for item in raw_accounts]
 
-    def search_contracts(self, search_text: str, live: bool = False) -> list[Contract]:
-        body = self._post("/api/Contract/search", json={"searchText": search_text, "live": live})
+    def list_available_contracts(self, live: bool = False) -> list[Contract]:
+        """POST /api/Contract/available -- the one contract-discovery
+        endpoint whose request/response shape is fully documented.
+        Returns every available contract; callers filter client-side for
+        the symbol/active-month they want (see
+        TopstepXProvider.resolve_contract)."""
+        body = self._post("/api/Contract/available", json={"live": live})
         raw_contracts = body.get("contracts") if isinstance(body.get("contracts"), list) else body.get("data") or []
         return [self._parse_contract(item) for item in raw_contracts]
 
@@ -90,6 +115,10 @@ class TopstepXRestClient:
 
         if response.status_code == 401:
             raise AuthenticationError(f"TopstepX rejected the request to {path} as unauthorized")
+        if response.status_code == 429:
+            raise RateLimitError(
+                f"TopstepX rate-limited {path} (429) -- back off rather than retrying immediately"
+            )
         if not response.ok:
             raise ProviderResponseError(f"TopstepX returned {response.status_code} for {path}: {response.text[:500]}")
 
@@ -101,21 +130,21 @@ class TopstepXRestClient:
     @staticmethod
     def _parse_account(item: dict) -> Account:
         account_id = item.get("id")
-        name = item.get("name") or item.get("accountName") or f"account-{account_id}"
-        balance = item.get("balance")
-        if balance is None:
-            balance = item.get("startingBalance")
-
+        name = item.get("name") or f"account-{account_id}"
         is_practice = TopstepXRestClient._infer_is_practice(item, name)
 
-        return Account(id=account_id, name=name, is_practice=is_practice, balance=balance, raw=item)
+        return Account(id=account_id, name=name, is_practice=is_practice, balance=item.get("balance"), raw=item)
 
     @staticmethod
     def _infer_is_practice(item: dict, name: str) -> bool:
-        for flag_field in ("simulated", "isDemo", "isPractice", "practice"):
-            value = item.get(flag_field)
-            if isinstance(value, bool):
-                return value
+        # `simulated` is documented as sometimes present on *realtime*
+        # payloads, not the REST search response -- checked here too in
+        # case a future API revision adds it, but the name-based fallback
+        # is what actually carries this today. Never trust this alone;
+        # see TOPSTEPX_PRACTICE_ACCOUNT_ID.
+        value = item.get("simulated")
+        if isinstance(value, bool):
+            return value
         return "practice" in name.lower() or "demo" in name.lower() or "sim" in name.lower()
 
     @staticmethod
