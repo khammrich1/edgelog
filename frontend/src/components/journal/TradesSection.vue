@@ -941,13 +941,27 @@ onUnmounted(revokeAllTradeScreenshots)
   margin: 0 0 var(--el-space-3);
 }
 
+/* A responsive multi-column grid, not a single full-width column -- at
+   the wider desktop width the journal workspace now uses (P3), a lone
+   column of cards left a large dead gap between each card's left-side
+   identity (symbol/direction/status) and its right-side result. Capping
+   each card's width via minmax and letting several sit side by side uses
+   the space intentionally instead. align-items: start keeps one expanded
+   card's height from stretching its shorter row-mates. */
 .trade-list {
   list-style: none;
   margin: 0 0 var(--el-space-4);
   padding: 0;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  align-items: start;
   gap: var(--el-space-3);
+}
+
+@media (max-width: 820px) {
+  .trade-list {
+    grid-template-columns: 1fr;
+  }
 }
 
 .trade-card {

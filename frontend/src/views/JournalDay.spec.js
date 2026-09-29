@@ -49,11 +49,13 @@ describe('JournalDay tab navigation', () => {
     vi.restoreAllMocks()
   })
 
-  it('defaults to the Mood & Bias tab, hiding Trades and Overview', async () => {
+  it('defaults to the Mood & Bias tab, showing prep content', async () => {
     const wrapper = await mountJournalDay()
 
     expect(wrapper.find('.day-tab--active').text()).toBe('Mood & Bias')
-    expect(wrapper.find('h2').text()).toBe('Sleep quality')
+    expect(wrapper.text()).toContain('Readiness')
+    expect(wrapper.text()).toContain('Sleep Quality')
+    expect(wrapper.text()).toContain('Morning Checklist')
   })
 
   it('switches to the Trades tab when clicked', async () => {
@@ -78,7 +80,7 @@ describe('JournalDay tab navigation', () => {
 
     expect(wrapper.find('.day-tab--active').text()).toBe('Overview')
     expect(wrapper.find('.day-overview').isVisible()).toBe(true)
-    expect(wrapper.text()).toContain('Day Overview')
+    expect(wrapper.text()).toContain('Day Summary')
   })
 
   it('still disables trade mutation on a locked day inside the Trades tab', async () => {
@@ -134,14 +136,93 @@ describe('JournalDay tab navigation', () => {
     await flushPromises()
     await wrapper.findAll('.day-tab').find((t) => t.text() === 'Overview').trigger('click')
 
-    const overview = wrapper.find('.day-overview')
-    // First grid is Mood/Sleep/Bias, second is Trades/Wins/Losses/Day P&L --
-    // the canceled trade (id 4) must not appear anywhere in these counts.
-    const values = overview.findAll('.overview-value').map((v) => v.text())
-    const [, , , tradeCount, wins, losses, dayPnl] = values
-    expect(tradeCount).toBe('3')
-    expect(wins).toBe('1')
-    expect(losses).toBe('1')
-    expect(dayPnl).toContain('+$80.00')
+    // Read the Day Summary panel's fields by label rather than position, so
+    // this doesn't silently break if panel order changes -- the canceled
+    // trade (id 4) must not appear anywhere in these counts.
+    const panel = wrapper
+      .findAll('.el-workstation')
+      .find((p) => p.find('.el-workstation-title').text() === 'Day Summary')
+    const fields = {}
+    for (const field of panel.findAll('.el-field')) {
+      fields[field.find('.el-field-label').text()] = field.find('.overview-value').text()
+    }
+
+    expect(fields['Trades']).toBe('3')
+    expect(fields['Wins']).toBe('1')
+    expect(fields['Losses']).toBe('1')
+    expect(fields['Day P&L']).toContain('+$80.00')
+  })
+
+  it('shows an empty state for the Overview trade recap when nothing was logged', async () => {
+    const wrapper = await mountJournalDay()
+    await wrapper.findAll('.day-tab').find((t) => t.text() === 'Overview').trigger('click')
+
+    expect(wrapper.find('.overview-trades-panel').text()).toContain('No trades logged today.')
+    expect(wrapper.find('.overview-trade-list').exists()).toBe(false)
+  })
+
+  it('lists each logged trade in the Overview recap with its setup and result, excluding canceled trades', async () => {
+    setActivePinia(createPinia())
+    const journalStore = useJournalStore()
+    journalStore.fetchChecklistItems = vi.fn().mockResolvedValue([])
+    journalStore.fetchDay = vi.fn().mockImplementation(async () => {
+      journalStore.currentDay = FAKE_DAY
+      return FAKE_DAY
+    })
+
+    const tradesStore = useTradesStore()
+    tradesStore.fetchTrades = vi.fn().mockResolvedValue([])
+    tradesStore.fetchSetups = vi.fn().mockResolvedValue([])
+    tradesStore.tradesByDate = {
+      '2026-01-01': [
+        {
+          id: 1,
+          symbol: 'MNQ',
+          direction: 'long',
+          status: 'closed',
+          setup: 'ORB Retest',
+          multiplier_known: true,
+          realized_pnl: 100,
+          realized_points: 10
+        },
+        {
+          id: 2,
+          symbol: 'MES',
+          direction: 'short',
+          status: 'open',
+          setup: null,
+          multiplier_known: true,
+          realized_pnl: 0,
+          realized_points: 0
+        },
+        {
+          id: 3,
+          symbol: 'MGC',
+          direction: 'long',
+          status: 'canceled',
+          setup: 'Breakout',
+          multiplier_known: true,
+          realized_pnl: 0,
+          realized_points: 0
+        }
+      ]
+    }
+
+    const instrumentsStore = useInstrumentsStore()
+    instrumentsStore.fetchMultipliers = vi.fn().mockResolvedValue({})
+
+    const wrapper = mount(JournalDay)
+    await flushPromises()
+    await wrapper.findAll('.day-tab').find((t) => t.text() === 'Overview').trigger('click')
+
+    const rows = wrapper.findAll('.overview-trade-row')
+    expect(rows).toHaveLength(2)
+    expect(rows[0].text()).toContain('MNQ')
+    expect(rows[0].text()).toContain('ORB Retest')
+    expect(rows[0].text()).toContain('+$100.00')
+    expect(rows[1].text()).toContain('MES')
+    expect(rows[1].text()).toContain('OPEN')
+    // The canceled MGC trade must not appear in the recap at all.
+    expect(wrapper.find('.overview-trades-panel').text()).not.toContain('MGC')
   })
 })
