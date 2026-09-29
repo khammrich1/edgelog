@@ -89,6 +89,54 @@ class TopstepXRestClient:
         raw_accounts = body.get("accounts") if isinstance(body.get("accounts"), list) else body.get("data") or []
         return [self._parse_account(item) for item in raw_accounts]
 
+    def place_order(
+        self,
+        account_id: int,
+        contract_id: str,
+        order_type: int,
+        side: int,
+        size: int,
+        limit_price: Optional[float] = None,
+        stop_price: Optional[float] = None,
+        trail_price: Optional[float] = None,
+        custom_tag: Optional[str] = None,
+    ) -> dict:
+        """POST /api/Order/place. Returns the raw response body -- the
+        caller (TopstepXProvider) is responsible for checking `success`
+        rather than trusting the presence of `orderId` alone; a rejected
+        order can still come back with one (per the reference doc)."""
+        return self._post(
+            "/api/Order/place",
+            json={
+                "accountId": account_id,
+                "contractId": contract_id,
+                "type": order_type,
+                "side": side,
+                "size": size,
+                "limitPrice": limit_price,
+                "stopPrice": stop_price,
+                "trailPrice": trail_price,
+                "customTag": custom_tag,
+                "stopLossBracket": None,
+                "takeProfitBracket": None,
+            },
+        )
+
+    def cancel_order(self, account_id: int, order_id: int) -> dict:
+        """POST /api/Order/cancel."""
+        return self._post("/api/Order/cancel", json={"accountId": account_id, "orderId": order_id})
+
+    def search_orders(self, account_id: int, start_timestamp: str, end_timestamp: Optional[str] = None) -> list[dict]:
+        """POST /api/Order/search. Returns the raw order dicts; parsing
+        into the provider-agnostic Order dataclass happens in
+        TopstepXProvider, since the exact meaning of the provider's status
+        enum isn't confirmed (see the reference doc's "Gaps" section)."""
+        body = self._post(
+            "/api/Order/search",
+            json={"accountId": account_id, "startTimestamp": start_timestamp, "endTimestamp": end_timestamp},
+        )
+        return body.get("orders") if isinstance(body.get("orders"), list) else body.get("data") or []
+
     def list_available_contracts(self, live: bool = False) -> list[Contract]:
         """POST /api/Contract/available -- the one contract-discovery
         endpoint whose request/response shape is fully documented.

@@ -4,13 +4,19 @@ provider-agnostic interface in providers/base.py."""
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Optional
 
 from trader_agent.providers.base import (
     Account,
     AccountUpdateHandler,
+    CancelOrderResult,
     Contract,
     ExecutionProvider,
+    Order,
+    OrderSide,
+    OrderStatus,
+    PlaceOrderResult,
     Quote,
     QuoteHandler,
     TradeHandler,
@@ -32,6 +38,14 @@ logger = logging.getLogger("trader_agent.provider.topstepx")
 
 class NoActiveContractError(TopstepXError):
     """Raised when a symbol search returns no contract flagged active."""
+
+
+# Per the reference doc's Order type/side enums (section 6). ST1 only ever
+# sends type 1 (Limit) -- place_limit_order() doesn't expose a type
+# parameter at all, so nothing else is reachable from this provider.
+_ORDER_TYPE_LIMIT = 1
+_SIDE_TO_PROVIDER = {OrderSide.BUY: 0, OrderSide.SELL: 1}
+_PROVIDER_SIDE_TO_ORDER_SIDE = {0: OrderSide.BUY, 1: OrderSide.SELL}
 
 
 def _default_transport_factory(url: str, token: str) -> Transport:
@@ -162,6 +176,82 @@ class TopstepXProvider(ExecutionProvider):
     def disconnect(self) -> None:
         self._user_hub.disconnect()
         self._market_hub.disconnect()
+
+    def place_limit_order(
+        self,
+        account_id: int,
+        contract_id: str,
+        side: OrderSide,
+        size: int,
+        limit_price: float,
+        custom_tag: str,
+    ) -> PlaceOrderResult:
+        body = self._rest.place_order(
+            account_id=account_id,
+            contract_id=contract_id,
+            order_type=_ORDER_TYPE_LIMIT,
+            side=_SIDE_TO_PROVIDER[side],
+            size=size,
+            limit_price=limit_price,
+            custom_tag=custom_tag,
+        )
+        order_id = body.get("orderId")
+        return PlaceOrderResult(
+            success=bool(body.get("success")),
+            provider_order_id=str(order_id) if order_id is not None else None,
+            error_code=body.get("errorCode"),
+            error_message=body.get("errorMessage"),
+            raw=body,
+        )
+
+    def cancel_order(self, account_id: int, provider_order_id: str) -> CancelOrderResult:
+        body = self._rest.cancel_order(account_id=account_id, order_id=int(provider_order_id))
+        return CancelOrderResult(
+            success=bool(body.get("success")),
+            error_code=body.get("errorCode"),
+            error_message=body.get("errorMessage"),
+            raw=body,
+        )
+
+    def search_orders(self, account_id: int, start: datetime, end: Optional[datetime] = None) -> list[Order]:
+        raw_orders = self._rest.search_orders(
+            account_id, start.isoformat(), end.isoformat() if end is not None else None
+        )
+        return [self._parse_order(account_id, item) for item in raw_orders]
+
+    @staticmethod
+    def _parse_order(account_id: int, item: dict) -> Order:
+        order_id = item.get("id")
+        size = item.get("size") or 0
+        fill_volume = item.get("fillVolume") or 0
+        return Order(
+            provider_order_id=str(order_id) if order_id is not None else "",
+            account_id=account_id,
+            contract_id=item.get("contractId") or "",
+            status=TopstepXProvider._derive_order_status(size, fill_volume),
+            side=_PROVIDER_SIDE_TO_ORDER_SIDE.get(item.get("side")),
+            size=size,
+            limit_price=item.get("limitPrice"),
+            fill_volume=fill_volume,
+            filled_price=item.get("filledPrice"),
+            custom_tag=item.get("customTag"),
+            raw=item,
+        )
+
+    @staticmethod
+    def _derive_order_status(size: int, fill_volume: int) -> OrderStatus:
+        # The provider's own numeric order-status enum isn't fully
+        # documented (see the reference doc's "Gaps / do not guess"
+        # section) -- reconciliation derives status from fillVolume vs.
+        # size instead of trusting an unverified status code. This can
+        # only ever report WORKING/PARTIALLY_FILLED/FILLED; CANCELED and
+        # REJECTED are set locally by OrderManager from EdgeLog's own
+        # place/cancel responses, never inferred from a search result.
+        if fill_volume <= 0:
+            return OrderStatus.WORKING
+        if fill_volume >= size:
+            return OrderStatus.FILLED
+        return OrderStatus.PARTIALLY_FILLED
 
     @property
     def connection_status(self) -> ConnectionStatus:

@@ -222,12 +222,12 @@ Explicitly out of scope for v1: no display-name field on registration (roster sh
 
 ## VS4.7 — Strategy Trader (Local Execution Agent)
 
-**In progress.** ST0 built, unmerged, awaiting owner acceptance testing (tracked via PR #31 on `coord/claude-open-issue-queue`, not part of the original numbered roadmap). Spans issues #25–#29 as one epic; each issue is gated on acceptance of the one before it.
+**In progress.** Not part of the original numbered roadmap. Spans issues #25–#29 as one epic; each issue is gated on the owner's explicit acceptance of the one before it.
 
 Goal: let the trader eventually run assisted/automated strategies against TopstepX/ProjectX, with all order origination happening on the trader's own device. EdgeLog's cloud server is a journal/configuration/analytics tool -- it is never part of the trading path and must never place, modify, cancel, trigger, or relay trading orders.
 
-- **#25 — ST0: Local execution foundation.** Authentication, account/contract discovery, live market data, all via a local agent (`agent/`) that runs on the trader's own machine. No order placement anywhere. Built; stopped for owner testing before #26 begins.
-- **#26 — ST1: Practice limit-order execution and kill controls.**
+- **#25 — ST0: Local execution foundation.** Authentication, account/contract discovery, live market data, all via a local agent (`agent/`) that runs on the trader's own machine. No order placement anywhere. **Accepted and merged to `main`** via PR #31 (2026-09-28).
+- **#26 — ST1: Practice limit-order execution and kill controls.** Adds `place_limit_order`/`cancel_order`/order reconciliation to the same local agent: a manually-reviewed, manually-confirmed Practice-account MNQ limit order only, gated by a hard quantity cap, an execution-capable check (not disconnected/not stale), and a local, network-independent kill switch. No autonomous decision-making of any kind. Built, in PR #33; stopped for owner acceptance testing before #27 begins.
 - **#27 — ST2: Strategy contract and observe-only engine.**
 - **#28 — ST3: Risk engine and Practice auto-execution.**
 - **#29 — ST4: EdgeLog strategy control panel and automatic journaling.** Must record strategy ID/version/source and execution metadata on every automated trade -- this is what VS4.8 (Strategy Analytics) and VS4.9 (Trade Ranker's `STRATEGY` assessment source) both need downstream.

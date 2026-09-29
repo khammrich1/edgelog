@@ -29,6 +29,7 @@ class AgentConfig:
     rtc_base_url: str
     stale_after_seconds: float
     practice_account_id: Optional[int] = None
+    max_order_quantity: int = 1
 
     def masked_api_key(self) -> str:
         """Safe-to-log representation: never the real value, only enough to
@@ -70,4 +71,5 @@ def load_config(env_file: Optional[Path] = None) -> AgentConfig:
         rtc_base_url=os.environ.get("TOPSTEPX_RTC_BASE_URL", "https://rtc.topstepx.com").rstrip("/"),
         stale_after_seconds=float(os.environ.get("TOPSTEPX_STALE_AFTER_SECONDS", "15")),
         practice_account_id=practice_account_id,
+        max_order_quantity=int(os.environ.get("TOPSTEPX_MAX_ORDER_QUANTITY", "1")),
     )
