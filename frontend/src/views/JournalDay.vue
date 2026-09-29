@@ -173,10 +173,7 @@ onBeforeUnmount(revokeBiasChartPreview)
 
 <template>
   <div v-if="day" class="journal-day">
-    <div class="workspace-nav">
-      <button class="back-link" @click="backToCalendar">&lsaquo; Back to Calendar</button>
-      <button class="week-link" @click="viewTradesThisWeek">View trades this week &rsaquo;</button>
-    </div>
+    <button class="back-link" @click="backToCalendar">&lsaquo; Back to Calendar</button>
 
     <div class="workspace-header">
       <div class="workspace-title-group">
@@ -185,9 +182,12 @@ onBeforeUnmount(revokeBiasChartPreview)
           {{ isLocked ? 'Locked' : 'Draft' }}
         </span>
       </div>
-      <button class="lock-button" :class="{ 'lock-button--locked': isLocked }" @click="toggleLock">
-        {{ isLocked ? 'Unlock' : 'Lock' }}
-      </button>
+      <div class="workspace-header-actions">
+        <button class="week-link" @click="viewTradesThisWeek">View trades this week &rsaquo;</button>
+        <button class="lock-button" :class="{ 'lock-button--locked': isLocked }" @click="toggleLock">
+          {{ isLocked ? 'Unlock' : 'Lock' }}
+        </button>
+      </div>
     </div>
 
     <p v-if="isLocked" class="locked-hint">This day is locked. Unlock it to make changes.</p>
@@ -387,25 +387,18 @@ onBeforeUnmount(revokeBiasChartPreview)
   margin: 0 auto;
 }
 
-.workspace-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--el-space-4);
-}
-
-.back-link,
-.week-link {
+.back-link {
+  display: inline-block;
   background: none;
   border: none;
   color: var(--el-text-muted);
   font-size: var(--el-text-sm);
   cursor: pointer;
   padding: 0;
+  margin-bottom: var(--el-space-4);
 }
 
-.back-link:hover,
-.week-link:hover {
+.back-link:hover {
   color: var(--el-copper);
 }
 
@@ -416,6 +409,25 @@ onBeforeUnmount(revokeBiasChartPreview)
   flex-wrap: wrap;
   gap: var(--el-space-3);
   margin-bottom: var(--el-space-2);
+}
+
+.workspace-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--el-space-4);
+}
+
+.week-link {
+  background: none;
+  border: none;
+  color: var(--el-text-muted);
+  font-size: var(--el-text-sm);
+  cursor: pointer;
+  padding: 0;
+}
+
+.week-link:hover {
+  color: var(--el-copper);
 }
 
 .workspace-title-group {
@@ -480,17 +492,17 @@ onBeforeUnmount(revokeBiasChartPreview)
 
 .day-tabs {
   display: flex;
-  gap: var(--el-space-1);
+  gap: var(--el-space-2);
   background-color: var(--el-surface);
   border: 1px solid var(--el-border);
   border-radius: var(--el-radius-md);
-  padding: var(--el-space-1);
+  padding: var(--el-space-2);
   margin: var(--el-space-5) 0 var(--el-space-6);
   width: fit-content;
 }
 
 .day-tab {
-  padding: var(--el-space-2) var(--el-space-5);
+  padding: var(--el-space-2) var(--el-space-6);
   background: none;
   border: none;
   border-radius: var(--el-radius-sm);
@@ -498,6 +510,7 @@ onBeforeUnmount(revokeBiasChartPreview)
   font-size: var(--el-text-sm);
   font-weight: 500;
   font-family: inherit;
+  letter-spacing: 0.01em;
   cursor: pointer;
   transition: all var(--el-transition-fast);
 }

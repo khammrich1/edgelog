@@ -1353,24 +1353,43 @@ onUnmounted(revokeAllTradeScreenshots)
   border-left-color: var(--el-negative);
 }
 
+/* A compact, clearly-joined 2-segment control -- deliberately styled
+   like a miniature of .direction-toggle so it reads as "one control
+   choosing a unit," not two loose buttons, and sits right next to the
+   Stop/Target label it belongs to. */
 .price-points-toggle {
   display: flex;
-  gap: 2px;
+  height: 20px;
+  border: 1px solid var(--el-border);
+  border-radius: var(--el-radius-sm);
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .price-points-toggle button {
-  padding: 1px var(--el-space-1);
-  background: none;
+  padding: 0 var(--el-space-2);
+  background-color: var(--el-surface);
   color: var(--el-text-subtle);
-  border: 1px solid var(--el-border);
-  border-radius: var(--el-radius-sm);
+  border: none;
   font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
   cursor: pointer;
+  transition: all var(--el-transition-fast);
+}
+
+.price-points-toggle button + button {
+  border-left: 1px solid var(--el-border);
+}
+
+.price-points-toggle button:hover:not(.active) {
+  color: var(--el-text);
+  background-color: var(--el-surface-raised);
 }
 
 .price-points-toggle button.active {
-  color: var(--el-copper);
-  border-color: var(--el-copper);
+  background-color: var(--el-copper);
+  color: var(--el-bg);
 }
 
 .conversion-hint {
