@@ -26,6 +26,7 @@ def _base_trade_payload(**overrides):
         "entry_price": "24500",
         "initial_quantity": 5,
         "entry_time": "2026-02-02T09:30:00Z",
+        "setup": "Breakout",
     }
     payload.update(overrides)
     return payload

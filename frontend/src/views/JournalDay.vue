@@ -411,23 +411,34 @@ onBeforeUnmount(revokeBiasChartPreview)
   margin-bottom: var(--el-space-2);
 }
 
+/* One joined action pill (same construction as the tabs/toggles
+   elsewhere) rather than two independently-floating controls -- reads as
+   a single "workspace actions" area with a divider between its two
+   actions, not two unrelated buttons that happen to be near each other. */
 .workspace-header-actions {
   display: flex;
-  align-items: center;
-  gap: var(--el-space-4);
+  align-items: stretch;
+  background-color: var(--el-surface);
+  border: 1px solid var(--el-border);
+  border-radius: var(--el-radius-md);
+  overflow: hidden;
 }
 
 .week-link {
+  display: flex;
+  align-items: center;
   background: none;
   border: none;
   color: var(--el-text-muted);
   font-size: var(--el-text-sm);
   cursor: pointer;
-  padding: 0;
+  padding: var(--el-space-2) var(--el-space-4);
+  transition: all var(--el-transition-fast);
 }
 
 .week-link:hover {
   color: var(--el-copper);
+  background-color: var(--el-surface-raised);
 }
 
 .workspace-title-group {
@@ -466,8 +477,8 @@ onBeforeUnmount(revokeBiasChartPreview)
   padding: var(--el-space-2) var(--el-space-4);
   background-color: transparent;
   color: var(--el-text);
-  border: 1px solid var(--el-border);
-  border-radius: var(--el-radius-sm);
+  border: none;
+  border-left: 1px solid var(--el-border);
   font-size: var(--el-text-sm);
   font-weight: 500;
   cursor: pointer;
@@ -475,12 +486,11 @@ onBeforeUnmount(revokeBiasChartPreview)
 }
 
 .lock-button:hover {
-  border-color: var(--el-copper);
   color: var(--el-copper);
+  background-color: var(--el-surface-raised);
 }
 
 .lock-button--locked {
-  border-color: var(--el-steel);
   color: var(--el-steel-light);
 }
 

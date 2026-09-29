@@ -17,7 +17,6 @@ const trades = computed(() => tradesStore.tradesByDate[props.date] || [])
 const expandedTradeId = ref(null)
 const editingTradeId = ref(null)
 const editingExitId = ref(null)
-const showMoreFields = ref(false)
 const submitError = ref(null)
 // 'preset' shows the symbol dropdown; 'custom' shows a free-text field for
 // any symbol not in SYMBOL_PRESETS -- the backend accepts either.
@@ -112,7 +111,6 @@ function applyExtraction(extracted) {
   if (extracted.target_price != null) {
     tradeForm.target_price = String(extracted.target_price)
     targetMode.value = 'price'
-    showMoreFields.value = true
   }
   extractionHint.value = extracted.notes || null
 }
@@ -356,6 +354,15 @@ async function loadTrades() {
 
 async function submitNewTrade() {
   submitError.value = null
+  // Belt-and-suspenders alongside the required select/input in the
+  // template (and the backend's own required-field validation): a setup
+  // is mandatory for every newly logged trade now that trades are
+  // eventually graded against the trader's defined setups (see Trade
+  // Ranker, issue #32).
+  if (!tradeForm.setup.trim()) {
+    submitError.value = 'Select or enter a setup before adding this trade.'
+    return
+  }
   const payload = {
     symbol: tradeForm.symbol.trim(),
     direction: tradeForm.direction,
@@ -364,7 +371,7 @@ async function submitNewTrade() {
     entry_time: new Date(tradeForm.entry_time).toISOString(),
     stop_price: effectiveStopPrice.value,
     target_price: effectiveTargetPrice.value,
-    setup: tradeForm.setup || null,
+    setup: tradeForm.setup.trim(),
     notes: tradeForm.notes || null
   }
   try {
@@ -384,7 +391,6 @@ async function submitNewTrade() {
     resetSetupEntryMode()
     stopMode.value = 'price'
     targetMode.value = 'price'
-    showMoreFields.value = false
     extractionHint.value = null
     screenshotError.value = null
     screenshotFile.value = null
@@ -627,6 +633,41 @@ onUnmounted(revokeAllTradeScreenshots)
           <input v-else v-model="tradeForm.target_points" type="number" step="any" placeholder="Target pts" />
           <span v-if="targetConversionHint" class="conversion-hint">{{ targetConversionHint }}</span>
         </div>
+
+        <div class="el-field ticket-field--setup">
+          <label class="el-field-label">Setup *</label>
+          <select
+            v-if="setupEntryMode === 'preset'"
+            :value="tradeForm.setup"
+            required
+            @change="handleSetupPresetChange($event.target.value)"
+          >
+            <option value="" disabled>Select setup…</option>
+            <option v-for="setup in tradesStore.setups" :key="setup.id" :value="setup.name">{{ setup.name }}</option>
+            <option value="__custom__">Other…</option>
+          </select>
+          <span v-else class="custom-symbol">
+            <input v-model="tradeForm.setup" type="text" placeholder="Setup" maxlength="200" required />
+            <button
+              v-if="tradesStore.setups.length > 0"
+              type="button"
+              class="toggle-more-button"
+              @click="switchToSetupPresetList"
+            >
+              Use list
+            </button>
+          </span>
+        </div>
+
+        <div class="el-field ticket-field--entry-time">
+          <label class="el-field-label">Entry time</label>
+          <input v-model="tradeForm.entry_time" type="datetime-local" required />
+        </div>
+
+        <div class="el-field ticket-field--notes">
+          <label class="el-field-label">Notes</label>
+          <textarea v-model="tradeForm.notes" rows="1" placeholder="Notes"></textarea>
+        </div>
       </div>
 
       <div class="el-ticket-footer">
@@ -645,41 +686,8 @@ onUnmounted(revokeAllTradeScreenshots)
           <template v-if="riskRewardPreview.rrRatio !== null"> | R:R {{ riskRewardPreview.rrRatio.toFixed(1) }}</template>
         </p>
         <div class="el-ticket-footer-actions">
-          <button
-            type="button"
-            class="el-disclosure"
-            :class="{ 'el-disclosure--open': showMoreFields }"
-            @click="showMoreFields = !showMoreFields"
-          >
-            {{ showMoreFields ? 'Fewer fields' : 'More fields' }}
-          </button>
           <button type="submit" class="el-btn-primary">Add Trade</button>
         </div>
-      </div>
-
-      <div v-if="showMoreFields" class="trade-form-secondary">
-        <input v-model="tradeForm.entry_time" type="datetime-local" />
-        <select
-          v-if="setupEntryMode === 'preset'"
-          :value="tradeForm.setup"
-          @change="handleSetupPresetChange($event.target.value)"
-        >
-          <option value="">No setup</option>
-          <option v-for="setup in tradesStore.setups" :key="setup.id" :value="setup.name">{{ setup.name }}</option>
-          <option value="__custom__">Other…</option>
-        </select>
-        <span v-else class="custom-symbol">
-          <input v-model="tradeForm.setup" type="text" placeholder="Setup" maxlength="200" />
-          <button
-            v-if="tradesStore.setups.length > 0"
-            type="button"
-            class="toggle-more-button"
-            @click="switchToSetupPresetList"
-          >
-            Use list
-          </button>
-        </span>
-        <textarea v-model="tradeForm.notes" rows="2" placeholder="Notes"></textarea>
       </div>
 
       <p v-if="submitError" class="submit-error">{{ submitError }}</p>
@@ -1284,13 +1292,22 @@ onUnmounted(revokeAllTradeScreenshots)
    flex-wrap row of unlabeled, arbitrarily-sized inputs. */
 .ticket-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: var(--el-space-3);
   margin-bottom: var(--el-space-4);
 }
 
 .ticket-field--symbol {
   grid-column: span 1;
+}
+
+.ticket-field--notes {
+  grid-column: 1 / -1;
+}
+
+.ticket-field--notes textarea {
+  width: 100%;
+  resize: vertical;
 }
 
 .custom-symbol {

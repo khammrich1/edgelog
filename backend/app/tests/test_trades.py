@@ -1,8 +1,14 @@
 """Trade lifecycle endpoint tests (VS3)."""
+from datetime import date as date_type, datetime, timezone
 from decimal import Decimal
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.journal import TradingDay
+from app.models.trades import Trade
 
 
 async def _register_and_auth_headers(client: AsyncClient, email: str = "trader@example.com") -> dict:
@@ -26,6 +32,7 @@ def _base_trade_payload(**overrides):
         "entry_price": "24500",
         "initial_quantity": 5,
         "entry_time": "2026-02-01T09:30:00Z",
+        "setup": "Breakout",
     }
     payload.update(overrides)
     return payload
@@ -68,6 +75,61 @@ async def test_create_short_trade(client: AsyncClient):
 
     assert response.status_code == 201
     assert response.json()["direction"] == "short"
+
+
+@pytest.mark.asyncio
+async def test_create_trade_requires_setup(client: AsyncClient):
+    headers = await _register_and_auth_headers(client)
+    day = await _open_day(client, headers)
+    payload = _base_trade_payload()
+    del payload["setup"]
+
+    response = await client.post(f"/api/v1/journal/days/{day}/trades", headers=headers, json=payload)
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_trade_rejects_empty_setup(client: AsyncClient):
+    headers = await _register_and_auth_headers(client)
+    day = await _open_day(client, headers)
+
+    response = await client.post(
+        f"/api/v1/journal/days/{day}/trades", headers=headers, json=_base_trade_payload(setup="")
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_historical_trade_without_setup_still_loads(client: AsyncClient, db_session: AsyncSession):
+    # Setup became required only for *new* trade submissions -- a trade
+    # logged before that requirement (setup is still nullable at the DB
+    # layer) must keep loading and rendering correctly.
+    headers = await _register_and_auth_headers(client)
+    day = await _open_day(client, headers)
+
+    trading_day = (
+        await db_session.execute(select(TradingDay).where(TradingDay.date == date_type.fromisoformat(day)))
+    ).scalar_one()
+    historical_trade = Trade(
+        user_id=trading_day.user_id,
+        trading_day_id=trading_day.id,
+        symbol="MNQ",
+        direction="long",
+        entry_price=Decimal("24500"),
+        initial_quantity=5,
+        entry_time=datetime(2025, 1, 15, 9, 30, tzinfo=timezone.utc),
+        setup=None,
+    )
+    db_session.add(historical_trade)
+    await db_session.commit()
+    await db_session.refresh(historical_trade)
+
+    response = await client.get(f"/api/v1/journal/days/{day}/trades/{historical_trade.id}", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["setup"] is None
 
 
 @pytest.mark.asyncio

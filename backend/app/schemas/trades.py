@@ -57,7 +57,14 @@ class TradeCreate(BaseModel):
     entry_time: datetime
     stop_price: Optional[Decimal] = Field(default=None, gt=0)
     target_price: Optional[Decimal] = Field(default=None, gt=0)
-    setup: Optional[str] = Field(default=None, max_length=200)
+    # Required as of the P1 refinement: a trade must be classified against
+    # a setup at the moment it's logged, since setups are becoming a
+    # first-class concept trades will eventually be graded against (Trade
+    # Ranker, issue #32). TradeUpdate.setup stays optional -- editing an
+    # existing trade must not force a re-classification -- and TradeRead
+    # keeps setup Optional so trades logged before this requirement still
+    # load and render.
+    setup: str = Field(min_length=1, max_length=200)
     notes: Optional[str] = Field(default=None, max_length=4000)
 
 
