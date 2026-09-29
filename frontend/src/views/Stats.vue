@@ -1,7 +1,10 @@
 <template>
   <div class="stats-page">
     <h1>Stats</h1>
-    <p class="coming-soon">Coming soon.</p>
+    <div class="el-empty-state stats-placeholder">
+      <p class="stats-placeholder-title">Edge analytics are on the way.</p>
+      <p>Win rate, expectancy, and per-setup performance will live here once enough trades are logged.</p>
+    </div>
   </div>
 </template>
 
@@ -17,8 +20,15 @@
   margin: 0 0 var(--el-space-3);
 }
 
-.coming-soon {
-  color: var(--el-text-muted);
-  font-size: var(--el-text-sm);
+.stats-placeholder {
+  border: 1px solid var(--el-border);
+  border-radius: var(--el-radius-lg);
+  background-color: var(--el-surface);
+}
+
+.stats-placeholder-title {
+  color: var(--el-text);
+  font-weight: 500;
+  margin-bottom: var(--el-space-1);
 }
 </style>

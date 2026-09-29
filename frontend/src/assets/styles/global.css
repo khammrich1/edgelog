@@ -64,11 +64,346 @@ button {
   background: none;
 }
 
+/* Baseline chrome for every native input/select/textarea in the app --
+   this is a default, not a cap: any component's own scoped styles (Vue
+   scoped attribute selectors) still win over these plain tag selectors.
+   It exists so a control nobody has explicitly restyled still looks like
+   EdgeLog instead of the browser's stock UI -- most visibly, native
+   <select> elements, which otherwise render with an unstyled system
+   dropdown arrow that reads as "default/scaffold." */
 input,
 textarea,
 select {
   font-family: inherit;
-  font-size: inherit;
+  font-size: var(--el-text-sm);
+  color: var(--el-text);
+  background-color: var(--el-surface);
+  border: 1px solid var(--el-border);
+  border-radius: var(--el-radius-sm);
+  padding: var(--el-space-2) var(--el-space-3);
+  transition: border-color var(--el-transition-fast), box-shadow var(--el-transition-fast);
+}
+
+input:hover:not(:disabled, :focus),
+textarea:hover:not(:disabled, :focus),
+select:hover:not(:disabled) {
+  border-color: var(--el-steel);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--el-copper);
+  box-shadow: 0 0 0 1px var(--el-copper);
+}
+
+input:disabled,
+textarea:disabled,
+select:disabled {
+  opacity: var(--el-disabled-opacity);
+  cursor: not-allowed;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--el-text-subtle);
+}
+
+select {
+  appearance: none;
+  padding-right: var(--el-space-8);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23A0A0A0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--el-space-3) center;
+  cursor: pointer;
+}
+
+select:disabled {
+  cursor: not-allowed;
+}
+
+textarea {
+  font-size: var(--el-text-base);
+  line-height: 1.5;
+}
+
+/* Number inputs everywhere lose the browser's default increment
+   spinner -- it's rendered in whatever the OS/browser's own light-mode
+   widget style is, which reads as a stray "default" control against a
+   custom dark instrument panel. A typed value is the expected
+   interaction here, not click-to-increment. */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+/* Same reasoning for the date picker's calendar glyph -- WebKit renders
+   it dark-on-transparent by default, which is nearly invisible against
+   var(--el-surface). Inverting brings it in line with the rest of the
+   muted-steel iconography instead of looking unstyled. */
+input[type='date']::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+  opacity: 0.7;
+  cursor: pointer;
+}
+
+input[type='date']::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+/* Condensed uppercase label -- section headings, nav items, table headers,
+   the "instrument panel" texture. Drop-in replacement for the several
+   near-identical text-transform/letter-spacing blocks that were
+   previously duplicated per-component. */
+.el-label {
+  font-size: var(--el-text-xs);
+  font-weight: var(--el-label-weight);
+  text-transform: uppercase;
+  letter-spacing: var(--el-label-tracking);
+  color: var(--el-text-subtle);
+}
+
+/* Status badge -- small outlined pill, used for trade/day/order state. */
+.el-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--el-space-1);
+  padding: 2px var(--el-space-2);
+  border-radius: var(--el-radius-sm);
+  font-size: var(--el-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.el-badge--neutral {
+  color: var(--el-text-muted);
+  border: 1px solid var(--el-border);
+}
+
+.el-badge--accent {
+  color: var(--el-copper);
+  border: 1px solid var(--el-copper);
+}
+
+.el-badge--positive {
+  color: var(--el-positive);
+  border: 1px solid var(--el-positive);
+}
+
+.el-badge--negative {
+  color: var(--el-negative);
+  border: 1px solid var(--el-negative);
+}
+
+.el-badge--warning {
+  color: var(--el-warning);
+  border: 1px solid var(--el-warning);
+}
+
+/* Workstation panel -- the defined graphite surface a data-entry ticket
+   (a new trade, a new financial entry) lives inside, instead of floating
+   directly on the onyx background. Gives the primary workflow the "one
+   intentional workspace" framing the visual direction calls for. */
+.el-workstation {
+  background-color: var(--el-surface);
+  border: 1px solid var(--el-border);
+  border-radius: var(--el-radius-lg);
+  padding: var(--el-space-6) var(--el-space-5) var(--el-space-5);
+  margin-bottom: var(--el-space-6);
+}
+
+.el-workstation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--el-space-3);
+  margin-bottom: var(--el-space-5);
+}
+
+.el-workstation-title {
+  font-size: var(--el-text-xs);
+  font-weight: var(--el-label-weight);
+  text-transform: uppercase;
+  letter-spacing: var(--el-label-tracking);
+  line-height: 1.4;
+  color: var(--el-text-muted);
+}
+
+/* A labeled field inside a workstation grid -- pairs a small condensed
+   label with whatever control it owns, so a ticket reads as a composed
+   form instead of a row of unlabeled placeholder inputs. */
+.el-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--el-space-1);
+  min-width: 0;
+}
+
+.el-field-label {
+  font-size: 11px;
+  font-weight: var(--el-label-weight);
+  text-transform: uppercase;
+  letter-spacing: var(--el-label-tracking);
+  color: var(--el-text-subtle);
+}
+
+.el-field input,
+.el-field select,
+.el-field .direction-toggle {
+  width: 100%;
+}
+
+/* Compact attach-a-screenshot control -- deliberately low visual weight
+   (a thin dashed bar, not a large centered box) so it never competes with
+   the actual data-entry fields it's attached to. */
+.el-dropzone {
+  display: flex;
+  align-items: center;
+  gap: var(--el-space-2);
+  padding: var(--el-space-2) var(--el-space-3);
+  margin-bottom: var(--el-space-4);
+  background-color: var(--el-bg);
+  border: 1px dashed var(--el-border);
+  border-radius: var(--el-radius-sm);
+  color: var(--el-text-subtle);
+  font-size: var(--el-text-xs);
+  cursor: pointer;
+}
+
+.el-dropzone::before {
+  content: '';
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23707070' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+.el-dropzone:hover,
+.el-dropzone:focus-visible {
+  border-color: var(--el-copper);
+  background-color: var(--el-surface-raised);
+  color: var(--el-text-muted);
+  outline: none;
+}
+
+.el-dropzone--active {
+  border-color: var(--el-copper);
+  background-color: var(--el-surface-raised);
+}
+
+.el-dropzone--loading {
+  color: var(--el-copper);
+}
+
+/* Disclosure toggle -- a deliberate secondary/expand control ("More
+   fields", "Attach chart"), distinct from a plain text link. */
+.el-disclosure {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--el-space-2);
+  background: none;
+  border: none;
+  padding: var(--el-space-1) 0;
+  color: var(--el-text-muted);
+  font-size: var(--el-text-xs);
+  font-weight: var(--el-label-weight);
+  text-transform: uppercase;
+  letter-spacing: var(--el-label-tracking);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.el-disclosure:hover {
+  color: var(--el-copper);
+}
+
+.el-disclosure::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10' fill='none'%3E%3Cpath d='M3 1L7 5L3 9' stroke='%23A0A0A0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: contain;
+  transition: transform var(--el-transition-fast);
+}
+
+.el-disclosure--open::before {
+  transform: rotate(90deg);
+}
+
+/* Footer row inside a workstation -- an optional hint/preview on the left,
+   the disclosure + primary action grouped and pinned to the right. */
+.el-ticket-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--el-space-3);
+  padding-top: var(--el-space-3);
+  border-top: 1px solid var(--el-border);
+}
+
+.el-ticket-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--el-space-5);
+  margin-left: auto;
+}
+
+/* Primary action inside a workstation -- larger and more isolated than a
+   .btn-chip, so it reads as the obvious next step. */
+.el-btn-primary {
+  padding: var(--el-space-3) var(--el-space-6);
+  background-color: var(--el-copper);
+  color: var(--el-bg);
+  border: none;
+  border-radius: var(--el-radius-md);
+  font-weight: 600;
+  font-size: var(--el-text-sm);
+  cursor: pointer;
+  transition: background-color var(--el-transition-fast);
+}
+
+.el-btn-primary:hover:not(:disabled) {
+  background-color: var(--el-copper-hover);
+}
+
+.el-btn-primary:disabled {
+  opacity: var(--el-disabled-opacity);
+  cursor: not-allowed;
+}
+
+/* Empty / error state -- centered hint text for a list/table with nothing
+   in it, or a request that failed. Not a loading spinner (most fetches in
+   this app resolve fast enough that a global one adds more flicker than
+   it's worth); it standardizes what was already several near-identical
+   "no X yet" hints. */
+.el-empty-state {
+  padding: var(--el-space-8) var(--el-space-4);
+  text-align: center;
+  color: var(--el-text-subtle);
+  font-size: var(--el-text-sm);
+}
+
+.el-error-state {
+  padding: var(--el-space-4);
+  border: 1px solid var(--el-negative);
+  border-radius: var(--el-radius-md);
+  background-color: rgba(248, 113, 113, 0.08);
+  color: var(--el-negative);
+  font-size: var(--el-text-sm);
 }
 
 /* Focus styles */

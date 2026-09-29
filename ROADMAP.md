@@ -79,8 +79,16 @@ Built in this slice, ahead of its original roadmap position:
   owns.
 - **Configurable trade setups** -- a Settings page lets the trader maintain
   their own list of setup/strategy labels, offered as a dropdown on the
-  trade form (with free-text fallback), the same shortcut-not-restriction
-  relationship the symbol dropdown has to `Trade.symbol`.
+  trade form (with free-text fallback) -- the same list-vs-free-text
+  relationship the symbol dropdown has to `Trade.symbol`, though unlike
+  symbol, a setup value itself is no longer optional (see below).
+- **Setup is required for new trades** (added during the P1 product-shell
+  refinement, issue #35/PR #36) -- `Trade.setup` stays nullable at the DB
+  layer so trades logged before this requirement keep loading/rendering
+  correctly, but the create-trade API and the trade-entry form both now
+  require a non-empty setup going forward. This is deliberately scoped as
+  "always classify a trade," not the full setup-versioning/grading model --
+  see VS4.9 (Trade Ranker) below for where that's headed.
 
 ## VS4 — Trade Calendar
 
@@ -237,6 +245,8 @@ Deliberately deferred until VS4.7/ST4 lands canonical strategy ID/version/source
 **Backlog, scoped, not yet authorized for implementation.** Issue #32.
 
 Goal: let a trader define their own personal "A+ setup" -- not a universal EdgeLog-defined standard -- as a named, versioned list of confluences, and grade trades against it manually or with AI-screenshot assistance (advisory only; the trader always confirms/rejects/corrects). See the issue for the full data model: setups, setup versions, confluence definitions, an assessment-source enum (`USER`/`AI_SCREENSHOT`/`STRATEGY`), AI confidence/evidence kept separate from the user's confirmed assessment, and per-grade/per-confluence analytics that report correlation without implying causation.
+
+VS3 now requires every new trade to carry a (free-text, unversioned) setup value -- see VS3 above. That's the "always classify a trade" precondition this slice's actual grading model builds on; VS4.9 itself still owns turning that free-text value into a versioned, gradeable setup definition. Setup/version-at-trade-time preservation (so editing a setup definition later never rewrites a historical trade's grade) is this slice's job, not something to partially bolt onto VS3.
 
 Builds on canonical Trade/TradeEntry/TradeExit (already exists, VS3) and is designed to connect to VS4.8's analytics scope and VS13 Edge Discovery once both exist. The setup/grading/versioning core can be built and used standalone before that analytics integration exists. Independent of VS4.7 Strategy Trader except for the later `STRATEGY` assessment-source connection point -- does not block, and is not blocked by, VS4.7's ST0–ST4 issues.
 

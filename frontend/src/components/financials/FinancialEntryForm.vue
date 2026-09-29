@@ -143,10 +143,14 @@ function cancelEdit() {
 </script>
 
 <template>
-  <form class="entry-form" @submit.prevent="submitForm">
+  <form class="entry-form el-workstation" @submit.prevent="submitForm">
+    <div class="el-workstation-header">
+      <span class="el-workstation-title">{{ entry ? 'Edit Entry' : 'New Entry' }}</span>
+    </div>
+
     <div
-      class="screenshot-dropzone"
-      :class="{ 'screenshot-dropzone--active': dragActive, 'screenshot-dropzone--loading': screenshotState === 'loading' }"
+      class="el-dropzone screenshot-dropzone"
+      :class="{ 'el-dropzone--active': dragActive, 'el-dropzone--loading': screenshotState === 'loading' }"
       tabindex="0"
       @dragover.prevent="dragActive = true"
       @dragleave.prevent="dragActive = false"
@@ -167,75 +171,66 @@ function cancelEdit() {
       <button type="button" class="toggle-more-button" @click="screenshotFile = null">Remove</button>
     </p>
 
-    <div class="entry-form-primary">
-      <div class="type-toggle" role="group" aria-label="Entry type">
-        <button
-          type="button"
-          class="type-toggle-btn type-toggle-btn--expense"
-          :class="{ 'type-toggle-btn--active': form.entry_type === 'expense' }"
-          @click="form.entry_type = 'expense'"
-        >
-          EXPENSE
-        </button>
-        <button
-          type="button"
-          class="type-toggle-btn type-toggle-btn--income"
-          :class="{ 'type-toggle-btn--active': form.entry_type === 'income' }"
-          @click="form.entry_type = 'income'"
-        >
-          INCOME
-        </button>
+    <div class="entry-form-grid">
+      <div class="el-field entry-field--type">
+        <label class="el-field-label">Type</label>
+        <div class="type-toggle" role="group" aria-label="Entry type">
+          <button
+            type="button"
+            class="type-toggle-btn type-toggle-btn--expense"
+            :class="{ 'type-toggle-btn--active': form.entry_type === 'expense' }"
+            @click="form.entry_type = 'expense'"
+          >
+            EXPENSE
+          </button>
+          <button
+            type="button"
+            class="type-toggle-btn type-toggle-btn--income"
+            :class="{ 'type-toggle-btn--active': form.entry_type === 'income' }"
+            @click="form.entry_type = 'income'"
+          >
+            INCOME
+          </button>
+        </div>
       </div>
-      <input v-model="form.category" type="text" placeholder="Category (e.g. Payout, Evaluation fee)" maxlength="200" required />
-      <input v-model="form.amount" type="number" step="any" min="0" placeholder="Amount" required />
-      <input v-model="form.date" type="date" required />
-      <button type="submit">{{ entry ? 'Save changes' : 'Add entry' }}</button>
+      <div class="el-field entry-field--category">
+        <label class="el-field-label">Category</label>
+        <input v-model="form.category" type="text" placeholder="Category (e.g. Payout, Evaluation fee)" maxlength="200" required />
+      </div>
+      <div class="el-field">
+        <label class="el-field-label">Amount</label>
+        <input v-model="form.amount" type="number" step="any" min="0" placeholder="Amount" required />
+      </div>
+      <div class="el-field">
+        <label class="el-field-label">Date</label>
+        <input v-model="form.date" type="date" required />
+      </div>
     </div>
 
-    <div class="entry-form-secondary">
-      <input v-model="form.firm" type="text" placeholder="Firm / account (optional)" maxlength="200" />
-      <textarea v-model="form.notes" rows="2" placeholder="Notes"></textarea>
+    <div class="entry-form-grid entry-form-grid--secondary">
+      <div class="el-field entry-field--firm">
+        <label class="el-field-label">Firm / account</label>
+        <input v-model="form.firm" type="text" placeholder="Firm / account (optional)" maxlength="200" />
+      </div>
+      <div class="el-field entry-field--notes">
+        <label class="el-field-label">Notes</label>
+        <textarea v-model="form.notes" rows="2" placeholder="Notes"></textarea>
+      </div>
     </div>
 
-    <button v-if="entry" type="button" class="toggle-more-button" @click="cancelEdit">Cancel</button>
-    <p v-if="submitError" class="submit-error">{{ submitError }}</p>
+    <div class="el-ticket-footer">
+      <p v-if="submitError" class="submit-error">{{ submitError }}</p>
+      <div class="el-ticket-footer-actions">
+        <button v-if="entry" type="button" class="el-disclosure toggle-more-button" @click="cancelEdit">Cancel</button>
+        <button type="submit" class="el-btn-primary">{{ entry ? 'Save Changes' : 'Add Entry' }}</button>
+      </div>
+    </div>
   </form>
 </template>
 
 <style scoped>
 .entry-form {
   margin-bottom: var(--el-space-6);
-}
-
-.screenshot-dropzone {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--el-space-2);
-  padding: var(--el-space-4);
-  margin-bottom: var(--el-space-3);
-  border: 1px dashed var(--el-border);
-  border-radius: var(--el-radius-md);
-  color: var(--el-text-muted);
-  font-size: var(--el-text-sm);
-  cursor: pointer;
-  text-align: center;
-}
-
-.screenshot-dropzone:hover,
-.screenshot-dropzone:focus-visible {
-  border-color: var(--el-copper);
-  color: var(--el-text);
-  outline: none;
-}
-
-.screenshot-dropzone--active {
-  border-color: var(--el-copper);
-  background-color: var(--el-surface);
-}
-
-.screenshot-dropzone--loading {
-  color: var(--el-copper);
 }
 
 .screenshot-input {
@@ -258,121 +253,70 @@ function cancelEdit() {
   margin: 0 0 var(--el-space-3);
 }
 
-.entry-form-primary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--el-space-2);
+.entry-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: var(--el-space-3);
 }
 
-.entry-form-primary input {
-  padding: var(--el-space-2) var(--el-space-3);
-  background-color: var(--el-surface);
-  border: 1px solid var(--el-border);
-  border-radius: var(--el-radius-sm);
-  color: var(--el-text);
-  font-size: var(--el-text-sm);
+.entry-form-grid--secondary {
+  margin-top: var(--el-space-3);
 }
 
-.entry-form-primary input[type='text'] {
-  width: 200px;
+.entry-field--category {
+  grid-column: span 2;
 }
 
-.entry-form-primary input[type='number'] {
-  width: 110px;
+.entry-field--firm {
+  grid-column: span 1;
 }
 
-.entry-form-primary button[type='submit'] {
-  padding: var(--el-space-2) var(--el-space-5);
-  background-color: var(--el-copper);
-  color: var(--el-bg);
-  border: none;
-  border-radius: var(--el-radius-sm);
-  font-weight: 500;
-  cursor: pointer;
+.entry-field--notes {
+  grid-column: span 3;
+}
+
+.entry-field--notes textarea {
+  resize: vertical;
 }
 
 .type-toggle {
   display: flex;
+  height: 38px;
+  border: 1px solid var(--el-border);
+  border-radius: var(--el-radius-sm);
+  overflow: hidden;
 }
 
 .type-toggle-btn {
-  padding: var(--el-space-2) var(--el-space-3);
+  flex: 1;
+  padding: 0 var(--el-space-2);
   background-color: var(--el-surface);
-  border: 1px solid var(--el-border);
+  color: var(--el-text-muted);
+  border: none;
   font-weight: 600;
   font-size: var(--el-text-xs);
   letter-spacing: 0.05em;
   cursor: pointer;
+  transition: all var(--el-transition-fast);
 }
 
-.type-toggle .type-toggle-btn:first-child {
-  border-radius: var(--el-radius-sm) 0 0 var(--el-radius-sm);
+.type-toggle-btn + .type-toggle-btn {
+  border-left: 1px solid var(--el-border);
 }
 
-.type-toggle .type-toggle-btn:last-child {
-  border-radius: 0 var(--el-radius-sm) var(--el-radius-sm) 0;
-  border-left: none;
-}
-
-.type-toggle-btn--expense {
-  color: var(--el-steel-light);
-}
-
-.type-toggle-btn--income {
-  color: var(--el-positive);
+.type-toggle-btn:hover:not(.type-toggle-btn--active) {
+  color: var(--el-text);
+  background-color: var(--el-surface-raised);
 }
 
 .type-toggle-btn--expense.type-toggle-btn--active {
   background-color: var(--el-steel);
   color: var(--el-bg);
-  border-color: var(--el-steel);
 }
 
 .type-toggle-btn--income.type-toggle-btn--active {
   background-color: var(--el-positive);
   color: var(--el-bg);
-  border-color: var(--el-positive);
-}
-
-.entry-form-secondary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--el-space-2);
-  margin-top: var(--el-space-2);
-}
-
-.entry-form-secondary input,
-.entry-form-secondary textarea {
-  padding: var(--el-space-2) var(--el-space-3);
-  background-color: var(--el-surface);
-  border: 1px solid var(--el-border);
-  border-radius: var(--el-radius-sm);
-  color: var(--el-text);
-  font-size: var(--el-text-sm);
-  font-family: inherit;
-}
-
-.entry-form-secondary input {
-  width: 220px;
-}
-
-.entry-form-secondary textarea {
-  flex: 1 0 100%;
-  resize: vertical;
-}
-
-.toggle-more-button {
-  background: none;
-  border: none;
-  color: var(--el-text-muted);
-  font-size: var(--el-text-xs);
-  cursor: pointer;
-  margin-top: var(--el-space-2);
-  padding: 0;
-}
-
-.toggle-more-button:hover {
-  color: var(--el-copper);
 }
 
 .submit-error {

@@ -106,8 +106,8 @@ async function submitImport() {
 <template>
   <div class="bulk-import">
     <div
-      class="screenshot-dropzone"
-      :class="{ 'screenshot-dropzone--active': dragActive, 'screenshot-dropzone--loading': screenshotState === 'loading' }"
+      class="el-dropzone screenshot-dropzone"
+      :class="{ 'el-dropzone--active': dragActive, 'el-dropzone--loading': screenshotState === 'loading' }"
       tabindex="0"
       @dragover.prevent="dragActive = true"
       @dragleave.prevent="dragActive = false"
@@ -191,37 +191,6 @@ async function submitImport() {
 <style scoped>
 .bulk-import {
   margin-top: var(--el-space-3);
-}
-
-.screenshot-dropzone {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--el-space-2);
-  padding: var(--el-space-4);
-  margin-bottom: var(--el-space-3);
-  border: 1px dashed var(--el-border);
-  border-radius: var(--el-radius-md);
-  color: var(--el-text-muted);
-  font-size: var(--el-text-sm);
-  cursor: pointer;
-  text-align: center;
-}
-
-.screenshot-dropzone:hover,
-.screenshot-dropzone:focus-visible {
-  border-color: var(--el-copper);
-  color: var(--el-text);
-  outline: none;
-}
-
-.screenshot-dropzone--active {
-  border-color: var(--el-copper);
-  background-color: var(--el-surface);
-}
-
-.screenshot-dropzone--loading {
-  color: var(--el-copper);
 }
 
 .screenshot-input {

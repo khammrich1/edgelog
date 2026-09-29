@@ -173,15 +173,20 @@ onBeforeUnmount(revokeBiasChartPreview)
 
 <template>
   <div v-if="day" class="journal-day">
-    <div class="day-header">
-      <button class="back-link" @click="backToCalendar">&lsaquo; Back to Calendar</button>
-      <h1>{{ formattedDate }}</h1>
-      <div class="header-actions">
-        <button class="week-link" @click="viewTradesThisWeek">View trades this week</button>
+    <button class="back-link" @click="backToCalendar">&lsaquo; Back to Calendar</button>
+
+    <div class="workspace-header">
+      <div class="workspace-title-group">
+        <h1>{{ formattedDate }}</h1>
         <span class="status-badge" :class="isLocked ? 'status-badge--locked' : 'status-badge--draft'">
           {{ isLocked ? 'Locked' : 'Draft' }}
         </span>
-        <button class="lock-button" @click="toggleLock">{{ isLocked ? 'Unlock' : 'Lock' }}</button>
+      </div>
+      <div class="workspace-header-actions">
+        <button class="week-link" @click="viewTradesThisWeek">View trades this week &rsaquo;</button>
+        <button class="lock-button" :class="{ 'lock-button--locked': isLocked }" @click="toggleLock">
+          {{ isLocked ? 'Unlock' : 'Lock' }}
+        </button>
       </div>
     </div>
 
@@ -383,6 +388,7 @@ onBeforeUnmount(revokeBiasChartPreview)
 }
 
 .back-link {
+  display: inline-block;
   background: none;
   border: none;
   color: var(--el-text-muted);
@@ -396,7 +402,7 @@ onBeforeUnmount(revokeBiasChartPreview)
   color: var(--el-copper);
 }
 
-.day-header {
+.workspace-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -405,21 +411,52 @@ onBeforeUnmount(revokeBiasChartPreview)
   margin-bottom: var(--el-space-2);
 }
 
-.day-header h1 {
-  font-size: var(--el-text-xl);
-  margin: 0;
+/* One joined action pill (same construction as the tabs/toggles
+   elsewhere) rather than two independently-floating controls -- reads as
+   a single "workspace actions" area with a divider between its two
+   actions, not two unrelated buttons that happen to be near each other. */
+.workspace-header-actions {
+  display: flex;
+  align-items: stretch;
+  background-color: var(--el-surface);
+  border: 1px solid var(--el-border);
+  border-radius: var(--el-radius-md);
+  overflow: hidden;
 }
 
-.header-actions {
+.week-link {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  color: var(--el-text-muted);
+  font-size: var(--el-text-sm);
+  cursor: pointer;
+  padding: var(--el-space-2) var(--el-space-4);
+  transition: all var(--el-transition-fast);
+}
+
+.week-link:hover {
+  color: var(--el-copper);
+  background-color: var(--el-surface-raised);
+}
+
+.workspace-title-group {
   display: flex;
   align-items: center;
   gap: var(--el-space-3);
 }
 
+.workspace-header h1 {
+  font-size: var(--el-text-2xl);
+  margin: 0;
+}
+
 .status-badge {
   font-size: var(--el-text-xs);
+  font-weight: var(--el-label-weight);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: var(--el-label-tracking);
   padding: var(--el-space-1) var(--el-space-3);
   border-radius: var(--el-radius-sm);
 }
@@ -427,39 +464,34 @@ onBeforeUnmount(revokeBiasChartPreview)
 .status-badge--draft {
   color: var(--el-copper);
   border: 1px solid var(--el-copper);
+  background-color: rgba(184, 115, 51, 0.1);
 }
 
 .status-badge--locked {
   color: var(--el-steel-light);
   border: 1px solid var(--el-steel);
-}
-
-.week-link {
-  background: none;
-  border: none;
-  padding: 0;
-  color: var(--el-text-muted);
-  font-size: var(--el-text-sm);
-  cursor: pointer;
-}
-
-.week-link:hover {
-  color: var(--el-copper);
+  background-color: var(--el-surface-raised);
 }
 
 .lock-button {
   padding: var(--el-space-2) var(--el-space-4);
   background-color: transparent;
   color: var(--el-text);
-  border: 1px solid var(--el-border);
-  border-radius: var(--el-radius-sm);
+  border: none;
+  border-left: 1px solid var(--el-border);
   font-size: var(--el-text-sm);
+  font-weight: 500;
   cursor: pointer;
+  transition: all var(--el-transition-fast);
 }
 
 .lock-button:hover {
-  border-color: var(--el-copper);
   color: var(--el-copper);
+  background-color: var(--el-surface-raised);
+}
+
+.lock-button--locked {
+  color: var(--el-steel-light);
 }
 
 .locked-hint {
@@ -471,21 +503,26 @@ onBeforeUnmount(revokeBiasChartPreview)
 .day-tabs {
   display: flex;
   gap: var(--el-space-2);
-  border-bottom: 1px solid var(--el-border);
-  margin-bottom: var(--el-space-6);
+  background-color: var(--el-surface);
+  border: 1px solid var(--el-border);
+  border-radius: var(--el-radius-md);
+  padding: var(--el-space-2);
+  margin: var(--el-space-5) 0 var(--el-space-6);
+  width: fit-content;
 }
 
 .day-tab {
-  padding: var(--el-space-3) var(--el-space-4);
+  padding: var(--el-space-2) var(--el-space-6);
   background: none;
   border: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
+  border-radius: var(--el-radius-sm);
   color: var(--el-text-muted);
   font-size: var(--el-text-sm);
   font-weight: 500;
   font-family: inherit;
+  letter-spacing: 0.01em;
   cursor: pointer;
+  transition: all var(--el-transition-fast);
 }
 
 .day-tab:hover {
@@ -493,8 +530,9 @@ onBeforeUnmount(revokeBiasChartPreview)
 }
 
 .day-tab--active {
-  color: var(--el-copper);
-  border-bottom-color: var(--el-copper);
+  color: var(--el-bg);
+  background-color: var(--el-copper);
+  font-weight: 600;
 }
 
 .day-overview h2 {
