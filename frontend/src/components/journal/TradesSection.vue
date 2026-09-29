@@ -953,7 +953,11 @@ onUnmounted(revokeAllTradeScreenshots)
   margin: 0 0 var(--el-space-4);
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  /* auto-fit (not auto-fill): a day with fewer cards than columns must let
+     the existing card(s) stretch to fill the row -- auto-fill would keep
+     the extra track(s) reserved-but-empty, recreating the exact "content
+     floating in dead space" problem this width change is meant to fix. */
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
   align-items: start;
   gap: var(--el-space-3);
 }
