@@ -511,8 +511,182 @@ onUnmounted(revokeAllTradeScreenshots)
 
 <template>
   <section class="trades-section">
-    <h2>Trades</h2>
+    <form v-if="!locked" class="trade-form el-workstation" @submit.prevent="submitNewTrade">
+      <div class="el-workstation-header">
+        <span class="el-workstation-title">New Trade</span>
+      </div>
 
+      <div
+        class="el-dropzone screenshot-dropzone"
+        :class="{ 'el-dropzone--active': dragActive, 'el-dropzone--loading': screenshotState === 'loading' }"
+        tabindex="0"
+        @dragover.prevent="dragActive = true"
+        @dragleave.prevent="dragActive = false"
+        @drop.prevent="onDrop"
+        @paste="onPaste"
+      >
+        <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/webp" class="screenshot-input" @change="onFilePicked" />
+        <span v-if="screenshotState === 'loading'">Reading screenshot…</span>
+        <span v-else>
+          Drop or paste a trade screenshot, or
+          <button type="button" class="screenshot-browse-button" @click="fileInput.click()">browse a file</button>
+        </span>
+      </div>
+      <p v-if="screenshotError" class="submit-error">{{ screenshotError }}</p>
+      <p v-if="extractionHint" class="extraction-hint">Note: {{ extractionHint }}</p>
+      <p v-if="screenshotFile && screenshotState !== 'loading'" class="extraction-hint">
+        Screenshot attached -- will be saved with this trade.
+        <button type="button" class="toggle-more-button" @click="screenshotFile = null">Remove</button>
+      </p>
+
+      <div class="ticket-grid">
+        <div class="el-field ticket-field--symbol">
+          <label class="el-field-label">Symbol</label>
+          <select
+            v-if="symbolEntryMode === 'preset'"
+            :value="tradeForm.symbol"
+            required
+            @change="handleSymbolPresetChange($event.target.value)"
+          >
+            <option value="" disabled>Symbol</option>
+            <option v-for="symbol in SYMBOL_PRESETS" :key="symbol" :value="symbol">{{ symbol }}</option>
+            <option value="__custom__">Other…</option>
+          </select>
+          <span v-else class="custom-symbol">
+            <input v-model="tradeForm.symbol" type="text" placeholder="Symbol" maxlength="20" required />
+            <button type="button" class="toggle-more-button" @click="switchToPresetList">Use list</button>
+          </span>
+        </div>
+
+        <div class="el-field ticket-field--direction">
+          <label class="el-field-label">Direction</label>
+          <div class="direction-toggle" role="group" aria-label="Direction">
+            <button
+              type="button"
+              class="direction-toggle-btn direction-toggle-btn--long"
+              :class="{ 'direction-toggle-btn--active': tradeForm.direction === 'long' }"
+              @click="tradeForm.direction = 'long'"
+            >
+              LONG
+            </button>
+            <button
+              type="button"
+              class="direction-toggle-btn direction-toggle-btn--short"
+              :class="{ 'direction-toggle-btn--active': tradeForm.direction === 'short' }"
+              @click="tradeForm.direction = 'short'"
+            >
+              SHORT
+            </button>
+          </div>
+        </div>
+
+        <div class="el-field ticket-field--qty">
+          <label class="el-field-label">Qty</label>
+          <input v-model="tradeForm.initial_quantity" type="number" min="1" placeholder="Qty" required />
+        </div>
+
+        <div class="el-field ticket-field--entry">
+          <label class="el-field-label">Entry</label>
+          <input v-model="tradeForm.entry_price" type="number" step="any" placeholder="Entry" required />
+        </div>
+
+        <div class="el-field ticket-field--stop">
+          <div class="el-field-label-row">
+            <label class="el-field-label">Stop</label>
+            <span class="price-points-toggle">
+              <button type="button" :class="{ active: stopMode === 'price' }" @click="stopMode = 'price'">Price</button>
+              <button type="button" :class="{ active: stopMode === 'points' }" @click="stopMode = 'points'">Points</button>
+            </span>
+          </div>
+          <input
+            v-if="stopMode === 'price'"
+            v-model="tradeForm.stop_price"
+            type="number"
+            step="any"
+            placeholder="Stop"
+          />
+          <input v-else v-model="tradeForm.stop_points" type="number" step="any" placeholder="Stop pts" />
+          <span v-if="stopConversionHint" class="conversion-hint">{{ stopConversionHint }}</span>
+        </div>
+
+        <div class="el-field ticket-field--target">
+          <div class="el-field-label-row">
+            <label class="el-field-label">Target</label>
+            <span class="price-points-toggle">
+              <button type="button" :class="{ active: targetMode === 'price' }" @click="targetMode = 'price'">Price</button>
+              <button type="button" :class="{ active: targetMode === 'points' }" @click="targetMode = 'points'">Points</button>
+            </span>
+          </div>
+          <input
+            v-if="targetMode === 'price'"
+            v-model="tradeForm.target_price"
+            type="number"
+            step="any"
+            placeholder="Target"
+          />
+          <input v-else v-model="tradeForm.target_points" type="number" step="any" placeholder="Target pts" />
+          <span v-if="targetConversionHint" class="conversion-hint">{{ targetConversionHint }}</span>
+        </div>
+      </div>
+
+      <div class="el-ticket-footer">
+        <p v-if="riskRewardPreview" class="rr-preview">
+          {{ riskRewardPreview.quantity }} {{ tradeForm.symbol || 'contracts' }}
+          <template v-if="riskRewardPreview.riskPoints !== null">
+            | Risk: {{ riskRewardPreview.riskPoints }} pts<template v-if="riskRewardPreview.riskDollars !== null">
+              / ${{ formatPrice(riskRewardPreview.riskDollars) }}</template
+            >
+          </template>
+          <template v-if="riskRewardPreview.rewardPoints !== null">
+            | Reward: {{ riskRewardPreview.rewardPoints }} pts<template v-if="riskRewardPreview.rewardDollars !== null">
+              / ${{ formatPrice(riskRewardPreview.rewardDollars) }}</template
+            >
+          </template>
+          <template v-if="riskRewardPreview.rrRatio !== null"> | R:R {{ riskRewardPreview.rrRatio.toFixed(1) }}</template>
+        </p>
+        <div class="el-ticket-footer-actions">
+          <button
+            type="button"
+            class="el-disclosure"
+            :class="{ 'el-disclosure--open': showMoreFields }"
+            @click="showMoreFields = !showMoreFields"
+          >
+            {{ showMoreFields ? 'Fewer fields' : 'More fields' }}
+          </button>
+          <button type="submit" class="el-btn-primary">Add Trade</button>
+        </div>
+      </div>
+
+      <div v-if="showMoreFields" class="trade-form-secondary">
+        <input v-model="tradeForm.entry_time" type="datetime-local" />
+        <select
+          v-if="setupEntryMode === 'preset'"
+          :value="tradeForm.setup"
+          @change="handleSetupPresetChange($event.target.value)"
+        >
+          <option value="">No setup</option>
+          <option v-for="setup in tradesStore.setups" :key="setup.id" :value="setup.name">{{ setup.name }}</option>
+          <option value="__custom__">Other…</option>
+        </select>
+        <span v-else class="custom-symbol">
+          <input v-model="tradeForm.setup" type="text" placeholder="Setup" maxlength="200" />
+          <button
+            v-if="tradesStore.setups.length > 0"
+            type="button"
+            class="toggle-more-button"
+            @click="switchToSetupPresetList"
+          >
+            Use list
+          </button>
+        </span>
+        <textarea v-model="tradeForm.notes" rows="2" placeholder="Notes"></textarea>
+      </div>
+
+      <p v-if="submitError" class="submit-error">{{ submitError }}</p>
+    </form>
+    <p v-else-if="trades.length === 0" class="locked-hint">This day is locked. Unlock it to log trades.</p>
+
+    <h2 v-if="trades.length" class="trades-list-title">Today's Trades</h2>
     <ul class="trade-list">
       <li v-for="trade in trades" :key="trade.id" class="trade-card" :class="`trade-card--${trade.status}`">
         <div class="trade-card__header" @click="toggleExpand(trade.id)">
@@ -743,154 +917,6 @@ onUnmounted(revokeAllTradeScreenshots)
         </div>
       </li>
     </ul>
-
-    <form v-if="!locked" class="trade-form" @submit.prevent="submitNewTrade">
-      <div
-        class="screenshot-dropzone"
-        :class="{ 'screenshot-dropzone--active': dragActive, 'screenshot-dropzone--loading': screenshotState === 'loading' }"
-        tabindex="0"
-        @dragover.prevent="dragActive = true"
-        @dragleave.prevent="dragActive = false"
-        @drop.prevent="onDrop"
-        @paste="onPaste"
-      >
-        <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/webp" class="screenshot-input" @change="onFilePicked" />
-        <span v-if="screenshotState === 'loading'">Reading screenshot…</span>
-        <span v-else>
-          Drop or paste a trade screenshot, or
-          <button type="button" class="screenshot-browse-button" @click="fileInput.click()">browse a file</button>
-        </span>
-      </div>
-      <p v-if="screenshotError" class="submit-error">{{ screenshotError }}</p>
-      <p v-if="extractionHint" class="extraction-hint">Note: {{ extractionHint }}</p>
-      <p v-if="screenshotFile && screenshotState !== 'loading'" class="extraction-hint">
-        Screenshot attached -- will be saved with this trade.
-        <button type="button" class="toggle-more-button" @click="screenshotFile = null">Remove</button>
-      </p>
-
-      <div class="trade-form-primary">
-        <select
-          v-if="symbolEntryMode === 'preset'"
-          :value="tradeForm.symbol"
-          required
-          @change="handleSymbolPresetChange($event.target.value)"
-        >
-          <option value="" disabled>Symbol</option>
-          <option v-for="symbol in SYMBOL_PRESETS" :key="symbol" :value="symbol">{{ symbol }}</option>
-          <option value="__custom__">Other…</option>
-        </select>
-        <span v-else class="custom-symbol">
-          <input v-model="tradeForm.symbol" type="text" placeholder="Symbol" maxlength="20" required />
-          <button type="button" class="toggle-more-button" @click="switchToPresetList">Use list</button>
-        </span>
-        <div class="direction-toggle" role="group" aria-label="Direction">
-          <button
-            type="button"
-            class="direction-toggle-btn direction-toggle-btn--long"
-            :class="{ 'direction-toggle-btn--active': tradeForm.direction === 'long' }"
-            @click="tradeForm.direction = 'long'"
-          >
-            LONG
-          </button>
-          <button
-            type="button"
-            class="direction-toggle-btn direction-toggle-btn--short"
-            :class="{ 'direction-toggle-btn--active': tradeForm.direction === 'short' }"
-            @click="tradeForm.direction = 'short'"
-          >
-            SHORT
-          </button>
-        </div>
-        <input v-model="tradeForm.initial_quantity" type="number" min="1" placeholder="Qty" required />
-        <input v-model="tradeForm.entry_price" type="number" step="any" placeholder="Entry" required />
-        <span class="price-points-field">
-          <input
-            v-if="stopMode === 'price'"
-            v-model="tradeForm.stop_price"
-            type="number"
-            step="any"
-            placeholder="Stop"
-          />
-          <input v-else v-model="tradeForm.stop_points" type="number" step="any" placeholder="Stop pts" />
-          <span class="price-points-toggle">
-            <button type="button" :class="{ active: stopMode === 'price' }" @click="stopMode = 'price'">
-              Price
-            </button>
-            <button type="button" :class="{ active: stopMode === 'points' }" @click="stopMode = 'points'">
-              Points
-            </button>
-          </span>
-          <span v-if="stopConversionHint" class="conversion-hint">{{ stopConversionHint }}</span>
-        </span>
-        <span class="price-points-field">
-          <input
-            v-if="targetMode === 'price'"
-            v-model="tradeForm.target_price"
-            type="number"
-            step="any"
-            placeholder="Target"
-          />
-          <input v-else v-model="tradeForm.target_points" type="number" step="any" placeholder="Target pts" />
-          <span class="price-points-toggle">
-            <button type="button" :class="{ active: targetMode === 'price' }" @click="targetMode = 'price'">
-              Price
-            </button>
-            <button type="button" :class="{ active: targetMode === 'points' }" @click="targetMode = 'points'">
-              Points
-            </button>
-          </span>
-          <span v-if="targetConversionHint" class="conversion-hint">{{ targetConversionHint }}</span>
-        </span>
-        <button type="submit">Add trade</button>
-      </div>
-
-      <p v-if="riskRewardPreview" class="rr-preview">
-        {{ riskRewardPreview.quantity }} {{ tradeForm.symbol || 'contracts' }}
-        <template v-if="riskRewardPreview.riskPoints !== null">
-          | Risk: {{ riskRewardPreview.riskPoints }} pts<template v-if="riskRewardPreview.riskDollars !== null">
-            / ${{ formatPrice(riskRewardPreview.riskDollars) }}</template
-          >
-        </template>
-        <template v-if="riskRewardPreview.rewardPoints !== null">
-          | Reward: {{ riskRewardPreview.rewardPoints }} pts<template v-if="riskRewardPreview.rewardDollars !== null">
-            / ${{ formatPrice(riskRewardPreview.rewardDollars) }}</template
-          >
-        </template>
-        <template v-if="riskRewardPreview.rrRatio !== null"> | R:R {{ riskRewardPreview.rrRatio.toFixed(1) }}</template>
-      </p>
-
-      <button type="button" class="toggle-more-button" @click="showMoreFields = !showMoreFields">
-        {{ showMoreFields ? 'Fewer fields' : 'More fields' }}
-      </button>
-
-      <div v-if="showMoreFields" class="trade-form-secondary">
-        <input v-model="tradeForm.entry_time" type="datetime-local" />
-        <select
-          v-if="setupEntryMode === 'preset'"
-          :value="tradeForm.setup"
-          @change="handleSetupPresetChange($event.target.value)"
-        >
-          <option value="">No setup</option>
-          <option v-for="setup in tradesStore.setups" :key="setup.id" :value="setup.name">{{ setup.name }}</option>
-          <option value="__custom__">Other…</option>
-        </select>
-        <span v-else class="custom-symbol">
-          <input v-model="tradeForm.setup" type="text" placeholder="Setup" maxlength="200" />
-          <button
-            v-if="tradesStore.setups.length > 0"
-            type="button"
-            class="toggle-more-button"
-            @click="switchToSetupPresetList"
-          >
-            Use list
-          </button>
-        </span>
-        <textarea v-model="tradeForm.notes" rows="2" placeholder="Notes"></textarea>
-      </div>
-
-      <p v-if="submitError" class="submit-error">{{ submitError }}</p>
-    </form>
-    <p v-else-if="trades.length === 0" class="locked-hint">This day is locked. Unlock it to log trades.</p>
   </section>
 </template>
 
@@ -1228,37 +1254,6 @@ onUnmounted(revokeAllTradeScreenshots)
   cursor: pointer;
 }
 
-.screenshot-dropzone {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--el-space-2);
-  padding: var(--el-space-4);
-  margin-bottom: var(--el-space-3);
-  border: 1px dashed var(--el-border);
-  border-radius: var(--el-radius-md);
-  color: var(--el-text-muted);
-  font-size: var(--el-text-sm);
-  cursor: text;
-  text-align: center;
-}
-
-.screenshot-dropzone:hover,
-.screenshot-dropzone:focus-visible {
-  border-color: var(--el-copper);
-  color: var(--el-text);
-  outline: none;
-}
-
-.screenshot-dropzone--active {
-  border-color: var(--el-copper);
-  background-color: var(--el-surface);
-}
-
-.screenshot-dropzone--loading {
-  color: var(--el-copper);
-}
-
 .screenshot-browse-button {
   background: none;
   border: none;
@@ -1284,24 +1279,18 @@ onUnmounted(revokeAllTradeScreenshots)
   margin: 0 0 var(--el-space-3);
 }
 
-.trade-form-primary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--el-space-2);
+/* New-trade ticket grid -- six labeled fields (symbol/direction/qty/
+   entry/stop/target) laid out with equal rhythm, replacing the old
+   flex-wrap row of unlabeled, arbitrarily-sized inputs. */
+.ticket-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: var(--el-space-3);
+  margin-bottom: var(--el-space-4);
 }
 
-.trade-form-primary input,
-.trade-form-primary select {
-  padding: var(--el-space-2) var(--el-space-3);
-  background-color: var(--el-surface);
-  border: 1px solid var(--el-border);
-  border-radius: var(--el-radius-sm);
-  color: var(--el-text);
-  font-size: var(--el-text-sm);
-}
-
-.trade-form-primary input[type='text'] {
-  width: 90px;
+.ticket-field--symbol {
+  grid-column: span 1;
 }
 
 .custom-symbol {
@@ -1310,68 +1299,58 @@ onUnmounted(revokeAllTradeScreenshots)
   gap: var(--el-space-2);
 }
 
-.trade-form-primary input[type='number'] {
-  width: 100px;
+.custom-symbol input {
+  flex: 1;
+  min-width: 0;
 }
 
-.trade-form-primary button {
-  padding: var(--el-space-2) var(--el-space-6);
-  background-color: var(--el-copper);
-  color: var(--el-bg);
-  border: none;
-  border-radius: var(--el-radius-sm);
-  font-weight: 500;
-  cursor: pointer;
+.el-field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--el-space-2);
 }
 
 .direction-toggle {
   display: flex;
+  height: 38px;
+  border: 1px solid var(--el-border);
+  border-radius: var(--el-radius-sm);
+  overflow: hidden;
 }
 
-.trade-form-primary .direction-toggle-btn {
-  padding: var(--el-space-2) var(--el-space-3);
+.direction-toggle-btn {
+  flex: 1;
+  padding: 0 var(--el-space-2);
   background-color: var(--el-surface);
   color: var(--el-text-muted);
-  border: 1px solid var(--el-border);
+  border: none;
   font-weight: 600;
   font-size: var(--el-text-xs);
   letter-spacing: 0.05em;
   cursor: pointer;
+  transition: all var(--el-transition-fast);
 }
 
-.direction-toggle .direction-toggle-btn:first-child {
-  border-radius: var(--el-radius-sm) 0 0 var(--el-radius-sm);
+.direction-toggle-btn + .direction-toggle-btn {
+  border-left: 1px solid var(--el-border);
 }
 
-.direction-toggle .direction-toggle-btn:last-child {
-  border-radius: 0 var(--el-radius-sm) var(--el-radius-sm) 0;
+.direction-toggle-btn:hover:not(.direction-toggle-btn--active) {
+  color: var(--el-text);
+  background-color: var(--el-surface-raised);
 }
 
-.trade-form-primary .direction-toggle-btn--long {
-  color: var(--el-positive);
-  border-color: var(--el-positive);
-}
-
-.trade-form-primary .direction-toggle-btn--short {
-  color: var(--el-negative);
-  border-color: var(--el-negative);
-}
-
-.trade-form-primary .direction-toggle-btn--long.direction-toggle-btn--active {
+.direction-toggle-btn--long.direction-toggle-btn--active {
   background-color: var(--el-positive);
   color: var(--el-bg);
+  border-left-color: var(--el-positive);
 }
 
-.trade-form-primary .direction-toggle-btn--short.direction-toggle-btn--active {
+.direction-toggle-btn--short.direction-toggle-btn--active {
   background-color: var(--el-negative);
   color: var(--el-bg);
-}
-
-.price-points-field {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--el-space-1);
+  border-left-color: var(--el-negative);
 }
 
 .price-points-toggle {
@@ -1379,9 +1358,8 @@ onUnmounted(revokeAllTradeScreenshots)
   gap: 2px;
 }
 
-.trade-form-primary .price-points-toggle button,
-.trade-form-secondary .price-points-toggle button {
-  padding: 2px var(--el-space-2);
+.price-points-toggle button {
+  padding: 1px var(--el-space-1);
   background: none;
   color: var(--el-text-subtle);
   border: 1px solid var(--el-border);
@@ -1390,8 +1368,7 @@ onUnmounted(revokeAllTradeScreenshots)
   cursor: pointer;
 }
 
-.trade-form-primary .price-points-toggle button.active,
-.trade-form-secondary .price-points-toggle button.active {
+.price-points-toggle button.active {
   color: var(--el-copper);
   border-color: var(--el-copper);
 }
@@ -1404,7 +1381,11 @@ onUnmounted(revokeAllTradeScreenshots)
 .rr-preview {
   color: var(--el-text-muted);
   font-size: var(--el-text-sm);
-  margin: var(--el-space-2) 0 0;
+  margin: 0;
+}
+
+.trades-list-title {
+  margin-top: 0;
 }
 
 .toggle-more-button {
