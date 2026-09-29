@@ -257,8 +257,11 @@ const recentDays = computed(() => {
 
 <style scoped>
 .dashboard {
-  padding: var(--el-space-8);
-  max-width: var(--el-content-max);
+  /* Narrower than the shared content-max and with a deliberately generous
+     side gutter -- at typical desktop widths this reads as a composed
+     workspace instead of stretching edge-to-edge against the rail. */
+  padding: var(--el-space-8) var(--el-space-12);
+  max-width: 1100px;
   margin: 0 auto;
 }
 
@@ -267,7 +270,7 @@ const recentDays = computed(() => {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--el-space-3);
-  margin-bottom: var(--el-space-6);
+  margin-bottom: var(--el-space-8);
 }
 
 .dashboard-header h1 {
@@ -279,18 +282,37 @@ const recentDays = computed(() => {
   color: var(--el-text-subtle);
 }
 
+/* The shared .el-workstation padding is tuned for compact data-entry
+   tickets; the Dashboard's panels are read-heavy, not entry forms, so they
+   get noticeably more interior breathing room. Scoped to this component
+   only -- other .el-workstation usages (trade/financial tickets) are
+   untouched. */
+.el-workstation {
+  padding: var(--el-space-8) var(--el-space-6) var(--el-space-6);
+}
+
 .dashboard-top-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: var(--el-space-4);
+  gap: var(--el-space-6);
   margin-bottom: var(--el-space-6);
 }
 
+/* Deliberately not a stretching grid -- with a stat or two per panel,
+   forcing them to fill the row just spreads each value out into its own
+   awkward pocket of whitespace. Left-aligned, content-sized fields read as
+   one composed row with a single intentional margin at the end, not a
+   spreadsheet. */
 .dashboard-stat-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: var(--el-space-4);
-  margin-bottom: var(--el-space-4);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--el-space-6) var(--el-space-8);
+  margin-bottom: var(--el-space-5);
+}
+
+.dashboard-stat-row .el-field {
+  flex: 0 0 auto;
+  min-width: 80px;
 }
 
 .dashboard-stat {
@@ -394,8 +416,8 @@ const recentDays = computed(() => {
   display: grid;
   grid-template-columns: 140px 90px 90px 1fr auto;
   align-items: center;
-  gap: var(--el-space-3);
-  padding: var(--el-space-3) var(--el-space-2);
+  gap: var(--el-space-4);
+  padding: var(--el-space-4) var(--el-space-3);
   border-bottom: 1px solid var(--el-border);
   cursor: pointer;
   transition: background-color var(--el-transition-fast);
@@ -451,6 +473,10 @@ const recentDays = computed(() => {
 @media (max-width: 640px) {
   .dashboard {
     padding: var(--el-space-4);
+  }
+
+  .el-workstation {
+    padding: var(--el-space-5) var(--el-space-4) var(--el-space-4);
   }
 
   .dashboard-activity-row {
