@@ -74,16 +74,17 @@ const overviewStats = computed(() => {
 // Per-row result for the Overview trade recap -- only a closed trade has a
 // realized result to show; open/canceled-excluded trades show their state
 // instead of a fabricated number.
-function overviewTradeResultLabel(trade) {
-  if (trade.status !== 'closed') return 'OPEN'
-  return trade.multiplier_known
+// Single source of the status/multiplier-known branching so the label and
+// its color class can never drift out of sync with each other.
+function overviewTradeResult(trade) {
+  if (trade.status !== 'closed') {
+    return { label: 'OPEN', resultClass: '' }
+  }
+  const value = trade.multiplier_known ? Number(trade.realized_pnl) : Number(trade.realized_points)
+  const label = trade.multiplier_known
     ? formatSignedDollars(trade.realized_pnl)
     : `${formatSignedPoints(trade.realized_points)} pts`
-}
-
-function overviewTradeResultClass(trade) {
-  if (trade.status !== 'closed') return ''
-  return resultClass(trade.multiplier_known ? trade.realized_pnl : trade.realized_points)
+  return { label, resultClass: resultClass(value) }
 }
 
 const formattedDate = computed(() => {
@@ -441,8 +442,8 @@ onBeforeUnmount(revokeBiasChartPreview)
               {{ trade.direction === 'long' ? 'LONG' : 'SHORT' }}
             </span>
             <span class="overview-trade-setup">{{ trade.setup || '—' }}</span>
-            <span class="overview-trade-result" :class="overviewTradeResultClass(trade)">
-              {{ overviewTradeResultLabel(trade) }}
+            <span class="overview-trade-result" :class="overviewTradeResult(trade).resultClass">
+              {{ overviewTradeResult(trade).label }}
             </span>
           </li>
         </ul>
