@@ -44,6 +44,25 @@ describe('router auth guard', () => {
     expect(router.currentRoute.value.name).toBe('Journal')
   })
 
+  it('sends an authenticated visitor at / to the Dashboard', async () => {
+    const { router, authStore } = setupRouter()
+    authStore.user = { id: 1, email: 'trader@edgelog.trade' }
+    authStore.accessToken = 'fake-access-token'
+
+    await router.push('/')
+
+    expect(router.currentRoute.value.name).toBe('Dashboard')
+  })
+
+  it('redirects an unauthenticated visitor at / to login rather than the Dashboard', async () => {
+    const { router, authStore } = setupRouter()
+    authStore.refreshAuth = vi.fn().mockResolvedValue(false)
+
+    await router.push('/')
+
+    expect(router.currentRoute.value.path).toBe('/login')
+  })
+
   it('shows the Not Found view for an unknown route while authenticated, without touching auth state', async () => {
     const { router, authStore } = setupRouter()
     authStore.user = { id: 1, email: 'trader@edgelog.trade' }

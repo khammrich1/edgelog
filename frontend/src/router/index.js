@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/auth'
 import api from '@/services/api'
 import Login from '@/views/Login.vue'
 import Register from '@/views/Register.vue'
+import Dashboard from '@/views/Dashboard.vue'
 import Journal from '@/views/Journal.vue'
 import JournalDay from '@/views/JournalDay.vue'
 import TradeCalendar from '@/views/TradeCalendar.vue'
@@ -16,7 +17,16 @@ import NotFound from '@/views/NotFound.vue'
 export const routes = [
   {
     path: '/',
-    redirect: '/journal'
+    redirect: '/dashboard'
+  },
+  {
+    // P2: the post-login command center -- how am I doing, what happened
+    // recently, what should I do next. Distinct from /journal (the month
+    // calendar), which stays the dedicated journaling surface.
+    path: '/dashboard',
+    name: 'Dashboard',
+    component: Dashboard,
+    meta: { requiresAuth: true }
   },
   {
     path: '/login',

@@ -1,12 +1,13 @@
 <template>
   <div class="app-shell">
     <nav class="app-rail">
-      <router-link to="/journal" class="rail-brand">
+      <router-link to="/dashboard" class="rail-brand">
         <EdgeLogLogo />
       </router-link>
       <p class="rail-tagline">Find Your Edge.</p>
 
       <div class="rail-section">
+        <router-link to="/dashboard" class="rail-link">Dashboard</router-link>
         <button class="rail-link rail-link--action" @click="goToToday">Today</button>
         <router-link to="/journal" class="rail-link">Calendar</router-link>
         <router-link to="/trades" class="rail-link">Trades</router-link>

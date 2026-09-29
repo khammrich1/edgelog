@@ -42,3 +42,70 @@ export function resultClass(value) {
   if (n < 0) return 'result-negative'
   return ''
 }
+
+/**
+ * Aggregates a list of TradeRead objects (as returned for a single day or
+ * merged across a range) into a truthful realized-result summary, for the
+ * Dashboard's "recent performance" snapshot and per-day activity rows.
+ *
+ * Dollar P&L is only summed from trades whose multiplier is known (same
+ * per-trade rule TradeCalendarCard already uses) -- it never mixes a known
+ * dollar total with a guessed one. When one or more closed trades in the
+ * set lack a known multiplier, allMultiplierKnown is false and callers
+ * should fall back to the points total rather than presenting a partial
+ * dollar figure as complete.
+ */
+export function summarizeClosedTrades(trades) {
+  const closed = trades.filter((t) => t.status === 'closed')
+
+  let dollarTotal = 0
+  let pointsTotal = 0
+  let allMultiplierKnown = true
+  let wins = 0
+  let losses = 0
+  let breakeven = 0
+
+  for (const trade of closed) {
+    pointsTotal += Number(trade.realized_points)
+
+    if (trade.multiplier_known) {
+      dollarTotal += Number(trade.realized_pnl)
+    } else {
+      allMultiplierKnown = false
+    }
+
+    const value = trade.multiplier_known ? Number(trade.realized_pnl) : Number(trade.realized_points)
+    if (value > 0) wins += 1
+    else if (value < 0) losses += 1
+    else breakeven += 1
+  }
+
+  return {
+    tradeCount: trades.length,
+    closedCount: closed.length,
+    dollarTotal,
+    pointsTotal,
+    allMultiplierKnown,
+    wins,
+    losses,
+    breakeven
+  }
+}
+
+/**
+ * The single headline figure for a summarizeClosedTrades() result: a dollar
+ * amount when every closed trade's multiplier is known, otherwise a points
+ * figure so the number shown is never a partial/misleading dollar total.
+ * Returns null when there's nothing closed yet to summarize.
+ */
+export function summaryResultLabel(summary) {
+  if (summary.closedCount === 0) return null
+  return summary.allMultiplierKnown
+    ? formatSignedDollars(summary.dollarTotal)
+    : `${formatSignedPoints(summary.pointsTotal)} pts`
+}
+
+export function summaryResultClass(summary) {
+  if (summary.closedCount === 0) return ''
+  return resultClass(summary.allMultiplierKnown ? summary.dollarTotal : summary.pointsTotal)
+}
