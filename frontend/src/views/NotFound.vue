@@ -11,7 +11,7 @@
 
 <style scoped>
 .not-found-view {
-  min-height: calc(100vh - 64px);
+  min-height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -64,11 +64,140 @@ button {
   background: none;
 }
 
+/* Baseline chrome for every native input/select/textarea in the app --
+   this is a default, not a cap: any component's own scoped styles (Vue
+   scoped attribute selectors) still win over these plain tag selectors.
+   It exists so a control nobody has explicitly restyled still looks like
+   EdgeLog instead of the browser's stock UI -- most visibly, native
+   <select> elements, which otherwise render with an unstyled system
+   dropdown arrow that reads as "default/scaffold." */
 input,
 textarea,
 select {
   font-family: inherit;
-  font-size: inherit;
+  font-size: var(--el-text-sm);
+  color: var(--el-text);
+  background-color: var(--el-surface);
+  border: 1px solid var(--el-border);
+  border-radius: var(--el-radius-sm);
+  padding: var(--el-space-2) var(--el-space-3);
+  transition: border-color var(--el-transition-fast), box-shadow var(--el-transition-fast);
+}
+
+input:hover:not(:disabled, :focus),
+textarea:hover:not(:disabled, :focus),
+select:hover:not(:disabled) {
+  border-color: var(--el-steel);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--el-copper);
+  box-shadow: 0 0 0 1px var(--el-copper);
+}
+
+input:disabled,
+textarea:disabled,
+select:disabled {
+  opacity: var(--el-disabled-opacity);
+  cursor: not-allowed;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--el-text-subtle);
+}
+
+select {
+  appearance: none;
+  padding-right: var(--el-space-8);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23A0A0A0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--el-space-3) center;
+  cursor: pointer;
+}
+
+select:disabled {
+  cursor: not-allowed;
+}
+
+textarea {
+  font-size: var(--el-text-base);
+  line-height: 1.5;
+}
+
+/* Condensed uppercase label -- section headings, nav items, table headers,
+   the "instrument panel" texture. Drop-in replacement for the several
+   near-identical text-transform/letter-spacing blocks that were
+   previously duplicated per-component. */
+.el-label {
+  font-size: var(--el-text-xs);
+  font-weight: var(--el-label-weight);
+  text-transform: uppercase;
+  letter-spacing: var(--el-label-tracking);
+  color: var(--el-text-subtle);
+}
+
+/* Status badge -- small outlined pill, used for trade/day/order state. */
+.el-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--el-space-1);
+  padding: 2px var(--el-space-2);
+  border-radius: var(--el-radius-sm);
+  font-size: var(--el-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.el-badge--neutral {
+  color: var(--el-text-muted);
+  border: 1px solid var(--el-border);
+}
+
+.el-badge--accent {
+  color: var(--el-copper);
+  border: 1px solid var(--el-copper);
+}
+
+.el-badge--positive {
+  color: var(--el-positive);
+  border: 1px solid var(--el-positive);
+}
+
+.el-badge--negative {
+  color: var(--el-negative);
+  border: 1px solid var(--el-negative);
+}
+
+.el-badge--warning {
+  color: var(--el-warning);
+  border: 1px solid var(--el-warning);
+}
+
+/* Empty / error state -- centered hint text for a list/table with nothing
+   in it, or a request that failed. Not a loading spinner (most fetches in
+   this app resolve fast enough that a global one adds more flicker than
+   it's worth); it standardizes what was already several near-identical
+   "no X yet" hints. */
+.el-empty-state {
+  padding: var(--el-space-8) var(--el-space-4);
+  text-align: center;
+  color: var(--el-text-subtle);
+  font-size: var(--el-text-sm);
+}
+
+.el-error-state {
+  padding: var(--el-space-4);
+  border: 1px solid var(--el-negative);
+  border-radius: var(--el-radius-md);
+  background-color: rgba(248, 113, 113, 0.08);
+  color: var(--el-negative);
+  font-size: var(--el-text-sm);
 }
 
 /* Focus styles */

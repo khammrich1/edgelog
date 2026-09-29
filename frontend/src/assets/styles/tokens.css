@@ -61,4 +61,16 @@
   --el-transition-fast: 150ms ease;
   --el-transition-base: 200ms ease;
   --el-transition-slow: 300ms ease;
+
+  /* Shell / layout */
+  --el-rail-width: 220px;
+  --el-rail-width-collapsed: 72px;
+  --el-content-max: 1200px;
+  --el-disabled-opacity: 0.5;
+
+  /* Condensed uppercase label treatment -- used for nav items, section
+     labels, table headers, badges: the "instrument panel" texture called
+     for in the visual direction. */
+  --el-label-tracking: 0.08em;
+  --el-label-weight: 600;
 }
