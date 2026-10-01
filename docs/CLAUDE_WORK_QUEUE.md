@@ -2,41 +2,71 @@
 
 This file establishes the current owner-authorized coordination queue for EdgeLog. Individual GitHub issues remain the source of truth for scope and acceptance criteria.
 
-Convention: an **issue** is a backlog item/specification. A **PR** is the actual implementation/testable unit for one or more issues. An issue with no linked PR yet has not been started.
+Convention: an **issue** is the authoritative backlog/specification record. Claude normally creates the **implementation PR** from the issue. The PR is the actual review/deploy/test unit.
 
-## Active queue (Strategy Trader epic)
+## Current priority — customer-facing product foundation
 
-- #25 — Strategy Trader ST0: Local TopstepX execution foundation -- **built, in PR #31**, stopped for owner acceptance testing before #26 begins
-- #26 — Strategy Trader ST1: Practice limit-order execution and kill controls -- blocked on #25 acceptance
-- #27 — Strategy Trader ST2: Strategy contract and observe-only engine -- blocked on #26
-- #28 — Strategy Trader ST3: Risk engine and Practice auto-execution -- blocked on #27
-- #29 — Strategy Trader ST4: EdgeLog strategy control panel and automatic journaling -- blocked on #28
-- #30 — Strategy analytics: win rate and per-day performance stats -- deliberately deferred until #29/ST4 lands canonical strategy ID/version/source + execution metadata
+Strategy Trader is temporarily parked while the core EdgeLog product becomes customer-presentable.
 
-### Strategy Trader dependency order
+- P1 — Product shell & visual system: accepted / merged (#36).
+- P2 — Dashboard / first impression: accepted / merged (#38).
+- P3 — Daily Journal & trade workflow UX: issue #39 / PR #40, current owner gate. Functional owner testing passed; latest layout is materially improved and the remaining broad visual-depth concern has been moved out of P3.
+- **NEXT: P3.5 — Cross-product visual system / workspace rebuild.** Implement only after its issue is created and P3's owner gate is resolved. This is a shared-system pass across Dashboard, Journal, Calendar, Trades, Stats, and future Trade Ranker surfaces — not a Daily Journal-only restyle.
+- P4 — Onboarding follows P3.5.
+- Define Your Edge / Trade Ranker follows the customer-facing foundation sequence as scoped/authorized.
 
-Work #25 → #26 → #27 → #28 → #29 in dependency order. Do not begin the next issue in this chain until the owner has explicitly accepted the one before it. Strategy analytics #30 must be anticipated by ST4's canonical trade metadata and implemented once automated trade reconciliation is stable.
+### P3.5 visual target
 
-## Backlog (scoped, not currently in the active queue)
+The current UI is too flat: too many graphite rectangles live on the same plane and hierarchy depends too much on labels/borders.
 
-These are legitimate future specifications, not superseded or abandoned -- they simply aren't being worked right now and have no sequencing dependency on the Strategy Trader epic above.
+Target:
+
+- onyx base canvas with intentional layered graphite surface levels;
+- stronger depth and hierarchy without decorative clutter;
+- fewer generic boxed cards / less card soup;
+- deliberate dividers, grouping, and negative space;
+- dense professional trading-workstation / premium-journal character;
+- condensed uppercase hierarchy where appropriate;
+- restrained copper used to direct attention;
+- one shared component language applied consistently across major screens;
+- preserve the information architecture and workflows already validated in P1–P3.
+
+## Product doctrine — do not optimize journaling away
+
+**You traded it. You journal it. You own it.**
+
+EdgeLog is manual-first. The act of reviewing and journaling a trade is intentional product value, not friction to eliminate.
+
+- AI/screenshot capture may prefill candidate facts, but the trader confirms them.
+- Future execution integration may prefill objective execution facts, but must not silently complete a journal entry.
+- Setup/context/psychology/reflection and deliberate journal completion remain the trader's responsibility.
+- Analytics are downstream of journaling.
+
+Core product loop: **Plan → Trade → Journal → Reflect → Improve**.
+
+## Strategy Trader — PARKED, NOT ABANDONED
+
+- ST0 / PR #31: merged.
+- ST1 / PR #33: parked/open; do not merge merely to clear the queue.
+- #27–#29 remain later Strategy Trader dependencies.
+- #30 Strategy Analytics remains deferred until canonical strategy execution metadata exists.
+
+Strategy Trader order origination must stay on the trader's personal device. TopstepX credentials remain local. EdgeLog cloud is never the order relay.
+
+When this work resumes, it must preserve the manual-journaling doctrine: execution knowledge may prefill facts but does not silently complete reflection/journaling.
+
+## Other backlog
 
 - #4 — Future slice: Mentorship groups and daily check-in dashboard
 - #5 — Future slice: Required pre-trade daily check-in for mentorship members
 - #6 — Future slice: Mentor mentee detail view with check-ins and trades
-- #32 — Trade Ranker: personal A+ setup grading (setups, confluences, versioning, AI-assisted) -- see `ROADMAP.md` VS4.9. Does not block, and is not blocked by, the Strategy Trader epic; connects to #30's analytics scope once both exist.
-
-## Closed
-
-- #8 — VS2: Daily Journal Core -- closed 2026-09-28, already implemented and accepted via PR #7 (merged 2026-09-11).
+- #32 — Trade Ranker: personal A+ setup grading; trader-defined setups/confluences/versioning with advisory AI assistance and user confirmation.
 
 ## Delivery rules
 
-- Read and reference the individual issue before implementation.
+- Read and reference the authoritative issue before implementation.
+- Normal handoff: **Issue/spec → Claude implementation PR → assistant review → exact PR DEV deploy → owner PASS/FAIL → same-PR fixes or merge → explicit production deploy.**
 - Keep implementation traceable to its issue.
 - Use canonical EdgeLog Trading Day / Trade / TradeEntry / TradeExit data rather than parallel stores.
-- Web changes go to d.edgelog.trade for owner testing.
 - No production deployment or major milestone merge without owner acceptance.
-- Keep Topstep credentials local; never commit, log, or store them in EdgeLog cloud.
-- Topstep trading/order origination stays on the trader's personal device as scoped by Strategy Trader issues.
 - Keep accepted documentation synchronized with implemented behavior.
