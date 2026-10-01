@@ -332,7 +332,7 @@ const recentDays = computed(() => {
 
 .dashboard-next-action {
   padding-top: var(--el-space-3);
-  border-top: 1px solid var(--el-border);
+  border-top: 1px solid var(--el-divider);
   display: flex;
   flex-direction: column;
   gap: var(--el-space-2);
@@ -391,7 +391,7 @@ const recentDays = computed(() => {
 
 .dashboard-setup-tally {
   padding-top: var(--el-space-3);
-  border-top: 1px solid var(--el-border);
+  border-top: 1px solid var(--el-divider);
   display: flex;
   flex-direction: column;
   gap: var(--el-space-2);
@@ -418,7 +418,7 @@ const recentDays = computed(() => {
   align-items: center;
   gap: var(--el-space-4);
   padding: var(--el-space-4) var(--el-space-3);
-  border-bottom: 1px solid var(--el-border);
+  border-bottom: 1px solid var(--el-divider);
   cursor: pointer;
   transition: background-color var(--el-transition-fast);
 }

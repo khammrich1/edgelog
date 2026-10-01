@@ -566,19 +566,19 @@ onUnmounted(revokeAllTradeScreenshots)
 
         <div class="el-field ticket-field--direction">
           <label class="el-field-label">Direction</label>
-          <div class="direction-toggle" role="group" aria-label="Direction">
+          <div class="direction-toggle el-segmented" role="group" aria-label="Direction">
             <button
               type="button"
-              class="direction-toggle-btn direction-toggle-btn--long"
-              :class="{ 'direction-toggle-btn--active': tradeForm.direction === 'long' }"
+              class="direction-toggle-btn direction-toggle-btn--long el-segmented-option el-segmented-option--positive"
+              :class="{ 'direction-toggle-btn--active el-segmented-option--active': tradeForm.direction === 'long' }"
               @click="tradeForm.direction = 'long'"
             >
               LONG
             </button>
             <button
               type="button"
-              class="direction-toggle-btn direction-toggle-btn--short"
-              :class="{ 'direction-toggle-btn--active': tradeForm.direction === 'short' }"
+              class="direction-toggle-btn direction-toggle-btn--short el-segmented-option el-segmented-option--negative"
+              :class="{ 'direction-toggle-btn--active el-segmented-option--active': tradeForm.direction === 'short' }"
               @click="tradeForm.direction = 'short'"
             >
               SHORT
@@ -599,9 +599,23 @@ onUnmounted(revokeAllTradeScreenshots)
         <div class="el-field ticket-field--stop">
           <div class="el-field-label-row">
             <label class="el-field-label">Stop</label>
-            <span class="price-points-toggle">
-              <button type="button" :class="{ active: stopMode === 'price' }" @click="stopMode = 'price'">Price</button>
-              <button type="button" :class="{ active: stopMode === 'points' }" @click="stopMode = 'points'">Points</button>
+            <span class="price-points-toggle el-segmented el-segmented--compact">
+              <button
+                type="button"
+                class="el-segmented-option"
+                :class="{ 'el-segmented-option--active': stopMode === 'price' }"
+                @click="stopMode = 'price'"
+              >
+                Price
+              </button>
+              <button
+                type="button"
+                class="el-segmented-option"
+                :class="{ 'el-segmented-option--active': stopMode === 'points' }"
+                @click="stopMode = 'points'"
+              >
+                Points
+              </button>
             </span>
           </div>
           <input
@@ -618,9 +632,23 @@ onUnmounted(revokeAllTradeScreenshots)
         <div class="el-field ticket-field--target">
           <div class="el-field-label-row">
             <label class="el-field-label">Target</label>
-            <span class="price-points-toggle">
-              <button type="button" :class="{ active: targetMode === 'price' }" @click="targetMode = 'price'">Price</button>
-              <button type="button" :class="{ active: targetMode === 'points' }" @click="targetMode = 'points'">Points</button>
+            <span class="price-points-toggle el-segmented el-segmented--compact">
+              <button
+                type="button"
+                class="el-segmented-option"
+                :class="{ 'el-segmented-option--active': targetMode === 'price' }"
+                @click="targetMode = 'price'"
+              >
+                Price
+              </button>
+              <button
+                type="button"
+                class="el-segmented-option"
+                :class="{ 'el-segmented-option--active': targetMode === 'points' }"
+                @click="targetMode = 'points'"
+              >
+                Points
+              </button>
             </span>
           </div>
           <input
@@ -1305,85 +1333,20 @@ onUnmounted(revokeAllTradeScreenshots)
   gap: var(--el-space-2);
 }
 
+/* Direction and unit toggles now share the .el-segmented primitive
+   (P3.5B) for their base shape/active-state visuals; only what's
+   specific to how this ticket uses them stays local. */
 .direction-toggle {
-  display: flex;
   height: 38px;
-  border: 1px solid var(--el-border);
-  border-radius: var(--el-radius-sm);
-  overflow: hidden;
 }
 
 .direction-toggle-btn {
   flex: 1;
-  padding: 0 var(--el-space-2);
-  background-color: var(--el-surface);
-  color: var(--el-text-muted);
-  border: none;
-  font-weight: 600;
-  font-size: var(--el-text-xs);
-  letter-spacing: 0.05em;
-  cursor: pointer;
-  transition: all var(--el-transition-fast);
+  text-align: center;
 }
 
-.direction-toggle-btn + .direction-toggle-btn {
-  border-left: 1px solid var(--el-border);
-}
-
-.direction-toggle-btn:hover:not(.direction-toggle-btn--active) {
-  color: var(--el-text);
-  background-color: var(--el-surface-raised);
-}
-
-.direction-toggle-btn--long.direction-toggle-btn--active {
-  background-color: var(--el-positive);
-  color: var(--el-bg);
-  border-left-color: var(--el-positive);
-}
-
-.direction-toggle-btn--short.direction-toggle-btn--active {
-  background-color: var(--el-negative);
-  color: var(--el-bg);
-  border-left-color: var(--el-negative);
-}
-
-/* A compact, clearly-joined 2-segment control -- deliberately styled
-   like a miniature of .direction-toggle so it reads as "one control
-   choosing a unit," not two loose buttons, and sits right next to the
-   Stop/Target label it belongs to. */
 .price-points-toggle {
-  display: flex;
-  height: 20px;
-  border: 1px solid var(--el-border);
-  border-radius: var(--el-radius-sm);
-  overflow: hidden;
   flex-shrink: 0;
-}
-
-.price-points-toggle button {
-  padding: 0 var(--el-space-2);
-  background-color: var(--el-surface);
-  color: var(--el-text-subtle);
-  border: none;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  cursor: pointer;
-  transition: all var(--el-transition-fast);
-}
-
-.price-points-toggle button + button {
-  border-left: 1px solid var(--el-border);
-}
-
-.price-points-toggle button:hover:not(.active) {
-  color: var(--el-text);
-  background-color: var(--el-surface-raised);
-}
-
-.price-points-toggle button.active {
-  background-color: var(--el-copper);
-  color: var(--el-bg);
 }
 
 .conversion-hint {

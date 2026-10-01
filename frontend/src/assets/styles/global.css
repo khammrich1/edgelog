@@ -495,6 +495,7 @@ input[type='date']::-webkit-calendar-picker-indicator:hover {
 
 .el-segmented-option:hover:not(.el-segmented-option--active) {
   color: var(--el-text);
+  background-color: var(--el-surface-raised);
 }
 
 .el-segmented-option--active {
