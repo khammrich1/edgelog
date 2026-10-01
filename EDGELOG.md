@@ -2,207 +2,149 @@
 
 ## Identity
 
-**EdgeLog** is a new standalone product, built from scratch.
+**EdgeLog** is a standalone trading journal.
 
 - Domain: `edgelog.trade`
 - Owner: Green Bread Enterprises LLC
 - Operating line: Green Bread Trades
-- Core loop: **TRADE → REFLECT → IMPROVE**
-- Primary brand phrase: **Find Your Edge.**
-
-The existing Profit Pros / TradeJournal application is a reference only. EdgeLog does not inherit its codebase, database schema, UI, or technical debt by default.
+- Brand phrase: **Find Your Edge.**
+- Product loop: **Plan → Trade → Journal → Reflect → Improve**
 
 ## Product positioning
 
-EdgeLog is a trading journal centered on **intentional manual entry**. Traders record preparation, market bias, trades, execution, psychology, mistakes, discipline, reflections, and results.
+EdgeLog is a trading journal centered on **intentional manual journaling**. Traders record preparation, market bias, trades, execution, psychology, mistakes, discipline, reflections, and results so they can determine both whether their defined edge is supported by their data and whether they are actually following it.
 
-Over time, EdgeLog should help answer:
+EdgeLog is intentionally distinct from an automated-import-first journal. Removing the act of journaling is not the goal.
 
-- What setups actually work?
+### Product doctrine
+
+**You traded it. You journal it. You own it.**
+
+The deliberate work of reviewing a trade is part of the product. A trader should revisit what they planned, what setup they took, what they actually executed, what happened, what they felt/did, and what should change.
+
+EdgeLog should reduce clerical friction without removing reflective friction:
+
+- manual journaling remains the primary workflow;
+- screenshot/AI capture may prefill candidate facts, but the trader reviews and confirms them;
+- future Strategy Trader/execution integration may prefill objective execution facts, but must not silently complete the journal;
+- imported or known execution data does not substitute for setup classification, context, screenshots where useful, psychology, reflection, or deliberate completion;
+- analytics are downstream of journaling and exist to reveal patterns in the trader's own process and data.
+
+A useful internal standard for the product is: **if a trader will not take the time to journal and review their trades, EdgeLog should not optimize the discipline out of the process.**
+
+EdgeLog is not primarily a broker, signal service, trading bot, automated trade importer, AI trading platform, or social network.
+
+## Questions EdgeLog should answer over time
+
+- What setups actually work for this trader?
 - Where do losses come from?
 - What conditions produce the best trading?
 - How does psychology affect performance?
 - Is the trader following their own process?
 - Where does the trader's actual statistical edge exist?
 
-EdgeLog is not primarily an automated trade importer, broker, signal service, trading bot, AI trading platform, or social network.
+## MVP stop line
 
-## Product philosophy
+MVP must let a trader:
 
-Journaling must be easy enough to use every trading day.
+1. define their own setup/edge;
+2. prepare for the trading day;
+3. deliberately journal trades and execution;
+4. record psychology/context and reflect;
+5. review daily/weekly performance;
+6. see core analytics that distinguish edge quality from execution/process adherence.
 
-Manual entry should be:
-
-- fast
-- comfortable
-- uncluttered
-- deliberate
-- easy to understand
-- optimized for repeated daily use
-
-Every field should earn its place by helping the trader:
-
-1. document what happened
-2. evaluate execution
-3. identify behavioral patterns
-4. discover their edge
-
-Psychology features may use structured techniques inspired by cognitive behavioral therapy (CBT), such as identifying thoughts, emotional triggers, cognitive distortions, urges, chosen actions, and outcomes. EdgeLog should present these as self-reflection and performance-journaling tools, not as therapy, diagnosis, or mental-health treatment.
+MVP does not require feature parity with other journals, every broker integration, a huge analytics library, or an automated edge finder. Once the core path is owner-accepted and customer-presentable, freeze feature expansion and put the product in front of paying traders.
 
 ## Visual identity
 
-EdgeLog uses a dark, professional visual system:
+EdgeLog should feel like a **professional field instrument + premium trading journal**, not a generic SaaS dashboard.
 
-- **Copper** — primary brand/accent, starting at `#B87333`
-- **Onyx** — primary background, starting at `#0D0D0D`
-- **Graphite** — primary surfaces, starting at `#2B2B2B`
-- **Steel** — muted text, borders, and secondary UI, starting at `#6B6B6B`
-- **Off-white** — primary text, approximately `#F5F5F5`
+Foundation:
 
-Functional colors remain separate from brand colors:
+- Onyx base canvas
+- Layered graphite surfaces with intentional depth
+- Steel dividers, borders, and muted text
+- Off-white primary text
+- Restrained copper for identity, selection, action, and emphasis
+- Green/red reserved for functional profit/loss and Long/Short meaning where established
 
-- green = positive/profit
-- red = negative/loss
-- neutral gray = no result / no trade
-- copper = EdgeLog identity, action, selection, and emphasis
+### P3.5 visual direction
 
-### Design character
+The current product is functionally stronger but still visually too flat. P3.5 must rebuild the **shared cross-product visual system**, not restyle only the Daily Journal.
 
-EdgeLog should feel precise, calm, disciplined, serious, modern, tactile, premium, and data-aware.
+Apply a consistent component/workspace language across:
 
-Preferred direction: **professional field instrument + premium journal**.
+- Dashboard
+- Daily Journal
+- Calendar
+- Trades
+- Stats
+- future Trade Ranker surfaces
 
-Avoid neon UI, excessive glow, excessive gradients, crypto aesthetics, bulls/bears, money graphics, Wall Street clichés, giant decorative cards, and unnecessary animation.
+Design targets:
 
-### Key UI reference
+- intentional surface levels and depth without decorative clutter;
+- fewer generic boxed cards / less card soup;
+- stronger hierarchy through typography, dividers, grouping, and negative space;
+- dense, readable trading-workstation composition;
+- condensed uppercase hierarchy where appropriate;
+- restrained copper rather than copper everywhere;
+- selected/expanded content should retain context rather than forcing unnecessary navigation;
+- responsive/mobile behavior remains first-class.
 
-A primary design reference for the app is a dark weekly trading-calendar interface with:
+Avoid neon UI, excessive glow/gradients, crypto aesthetics, bulls/bears, money graphics, Wall Street clichés, giant decorative cards, and unnecessary animation.
 
-- near-black / onyx background
-- narrow icon-focused left navigation rail
-- condensed uppercase typography
-- thin steel grid lines and dividers
-- graphite trade cards
-- restrained copper highlights
-- dense but readable information layout
-- selected trade cards expanding in context instead of forcing unnecessary navigation
+## Trade Ranker direction
 
-This visual language should influence the broader EdgeLog application, not only the Trade Calendar.
+EdgeLog does not define a universal A+ trade. **The trader defines their own edge.**
 
-## Logo direction
+Core direction:
 
-Use a geometric **E** built from layered/angular elements.
+**Define setup → rank trade → log outcome → discover edge**
 
-The logo should:
+Setups should become named/versioned definitions with trader-defined confluences and grading thresholds. Screenshot/AI assistance is advisory: the trader confirms/rejects/corrects the assessment. Historical trades preserve the setup/version used at trade time.
 
-- use copper + steel
-- have a strong silhouette
-- work as a favicon and small application mark
-- work beside the EdgeLog wordmark
-- feel modern, slightly industrial, and instrument-like
-- suggest an edge emerging from structured information
+## Strategy Trader direction
 
-Avoid candlesticks, bulls, bears, dollar signs, airplanes, notebooks, generic charts, and crypto-exchange styling.
+Strategy Trader is **parked, not abandoned** while the customer-facing foundation is completed.
 
-## Typography
+Execution North Star:
 
-Use a clean modern sans-serif for primary UI. A restrained monospace may be used selectively for prices, P&L, R values, timestamps, and statistics.
+**Plan → Validate → Take Trade → Track → Journal/Learn**
 
-Examples that must remain highly readable:
+Order origination must remain on the trader's personal device. TopstepX credentials remain local. EdgeLog cloud may handle planning, configuration/status, journaling, analytics, and execution results, but is not an order relay.
 
-- `MNQ`
-- `24,518.25`
-- `+$327.50`
-- `+2.15R`
-- `07:42`
+Even when execution integration knows a trade occurred, it may prefill objective facts only. The trader still deliberately completes the journal/review.
 
 ## Development model
 
-EdgeLog is built using vertical slices.
+EdgeLog uses owner-test-gated vertical slices.
 
-Rules:
+Standard flow:
 
-- Build one slice at a time.
-- Do not implement future slices early.
-- Do not create speculative infrastructure without a current need.
-- Do not create fake placeholder versions of future features.
-- Each slice must create a usable, testable improvement.
-- Tests and production build must pass before acceptance.
-- Manual testing is required before a slice is accepted.
-- Do not begin the next slice until the current slice is accepted.
+1. Owner + assistant scope the work.
+2. Create an authoritative GitHub Issue/spec.
+3. Claude creates/uses the implementation PR.
+4. Assistant reviews the PR.
+5. Deploy the exact PR candidate to `d.edgelog.trade`.
+6. Owner manually tests and gives PASS/FAIL.
+7. FAIL stays on the same PR for correction/retest.
+8. PASS merges to `main`.
+9. Production deployment is a separate explicit step.
 
-## Current authorized work
+Do not implement future slices early or create speculative infrastructure without a current need.
 
-**VS1 — Foundation** and **VS2 — Daily Journal Core** are accepted. **VS3 — Trade Lifecycle** is the current authorized work.
+## Current product-foundation sequence
 
-No VS4+ functionality should be implemented until VS3 is tested and accepted.
+- P1 — Product shell & visual system: accepted / merged.
+- P2 — Dashboard / first impression: accepted / merged.
+- P3 — Daily Journal & trade workflow UX: current owner gate in PR #40; functional acceptance passed and the latest layout is materially improved.
+- **P3.5 — Cross-product visual system / workspace rebuild: next.**
+- P4 — Onboarding.
+- Define Your Edge / Trade Ranker.
+- Pricing/subscription presentation.
+- Public marketing/landing experience.
+- Resume deeper Strategy Trader work when the core product is customer-presentable.
 
-## VS1 technical direction
-
-Approved direction:
-
-### Frontend
-
-- Vue 3
-- Vite
-- Pinia
-- Vue Router
-- CSS design tokens; no unnecessary UI framework
-- current stable compatible dependency versions
-
-### Backend
-
-- FastAPI
-- PostgreSQL
-- SQLAlchemy 2.x async
-- asyncpg
-- Alembic
-- Argon2 password hashing
-- JWT access tokens
-- secure refresh-session flow
-
-### Authentication
-
-- short-lived access token, approximately 15 minutes
-- access token preferably kept in application memory
-- refresh token in an HttpOnly cookie
-- Secure cookie in production
-- SameSite configured appropriately for deployment architecture
-- authentication restored after refresh via refresh/session endpoint
-- logout clears/invalidates refresh session
-- no long-lived auth credentials in localStorage
-
-### VS1 data model
-
-Keep the schema minimal.
-
-Required user data:
-
-- id
-- email
-- password_hash
-- created_at
-- updated_at
-
-A minimal auth/session table is allowed if required for secure refresh-token rotation or logout invalidation.
-
-Do not pre-create trade, trading-day, journal, psychology, analytics, XP, education, or social tables.
-
-### VS1 acceptance
-
-VS1 is accepted only when:
-
-- EdgeLog runs as its own application
-- branding and design tokens are established
-- SVG mark works
-- registration works
-- login works
-- logout works
-- authentication persists correctly across refresh
-- protected routes work
-- application shell works
-- desktop and mobile layouts work
-- production build succeeds
-- automated tests pass
-- there are no obvious runtime/console errors
-- no unnecessary VS2+ functionality exists
+The repository roadmap contains older numbered vertical-slice history as well as future feature direction. This product-foundation sequence is the current near-term priority.
