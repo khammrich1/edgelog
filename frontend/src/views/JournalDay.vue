@@ -28,9 +28,14 @@ const biasPreview = computed(() => {
 
 // Trades themselves are fetched by TradesSection (kept mounted via v-show
 // so its data -- and any in-progress form input -- survives switching
-// tabs); this just reads the same store's already-loaded state.
+// tabs); this just reads the same store's already-loaded state. Shared by
+// the Day Summary stats and the Overview trade recap list below.
+const overviewTrades = computed(() =>
+  (tradesStore.tradesByDate[route.params.date] || []).filter((t) => t.status !== 'canceled')
+)
+
 const overviewStats = computed(() => {
-  const trades = (tradesStore.tradesByDate[route.params.date] || []).filter((t) => t.status !== 'canceled')
+  const trades = overviewTrades.value
   const closedTrades = trades.filter((t) => t.status === 'closed')
 
   let dayPnlDollars = 0
@@ -65,6 +70,22 @@ const overviewStats = computed(() => {
     dayPnlPoints
   }
 })
+
+// Per-row result for the Overview trade recap -- only a closed trade has a
+// realized result to show; open/canceled-excluded trades show their state
+// instead of a fabricated number.
+// Single source of the status/multiplier-known branching so the label and
+// its color class can never drift out of sync with each other.
+function overviewTradeResult(trade) {
+  if (trade.status !== 'closed') {
+    return { label: 'OPEN', resultClass: '' }
+  }
+  const value = trade.multiplier_known ? Number(trade.realized_pnl) : Number(trade.realized_points)
+  const label = trade.multiplier_known
+    ? formatSignedDollars(trade.realized_pnl)
+    : `${formatSignedPoints(trade.realized_points)} pts`
+  return { label, resultClass: resultClass(value) }
+}
 
 const formattedDate = computed(() => {
   // Parsed as local time (not UTC) so the displayed weekday can't shift by
@@ -222,105 +243,128 @@ onBeforeUnmount(revokeBiasChartPreview)
       </button>
     </div>
 
-    <div v-show="activeTab === 'mood'">
-    <section class="field-section">
-      <h2>Sleep quality</h2>
-      <div class="scale-buttons">
-        <button
-          v-for="value in [1, 2, 3, 4, 5]"
-          :key="`sleep-${value}`"
-          class="scale-button"
-          :class="{ 'scale-button--selected': day.sleep_quality === value }"
-          :disabled="isLocked"
-          @click="setSleepQuality(value)"
-        >
-          {{ value }}
-        </button>
-      </div>
-    </section>
+    <div v-show="activeTab === 'mood'" class="prep-grid">
+      <div class="prep-column">
+        <section class="el-workstation">
+          <div class="el-workstation-header">
+            <span class="el-workstation-title">Readiness</span>
+          </div>
+          <div class="readiness-row">
+            <div class="el-field">
+              <span class="el-field-label">Sleep Quality</span>
+              <div class="scale-buttons">
+                <button
+                  v-for="value in [1, 2, 3, 4, 5]"
+                  :key="`sleep-${value}`"
+                  class="scale-button"
+                  :class="{ 'scale-button--selected': day.sleep_quality === value }"
+                  :disabled="isLocked"
+                  @click="setSleepQuality(value)"
+                >
+                  {{ value }}
+                </button>
+              </div>
+            </div>
+            <div class="el-field">
+              <span class="el-field-label">Mood</span>
+              <div class="scale-buttons">
+                <button
+                  v-for="value in [1, 2, 3, 4, 5]"
+                  :key="`mood-${value}`"
+                  class="scale-button"
+                  :class="{ 'scale-button--selected': day.mood === value }"
+                  :disabled="isLocked"
+                  @click="setMood(value)"
+                >
+                  {{ value }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
 
-    <section class="field-section">
-      <h2>Mood</h2>
-      <div class="scale-buttons">
-        <button
-          v-for="value in [1, 2, 3, 4, 5]"
-          :key="`mood-${value}`"
-          class="scale-button"
-          :class="{ 'scale-button--selected': day.mood === value }"
-          :disabled="isLocked"
-          @click="setMood(value)"
-        >
-          {{ value }}
-        </button>
-      </div>
-    </section>
-
-    <section class="field-section">
-      <h2>Morning checklist</h2>
-      <ul class="checklist">
-        <li v-for="entry in day.checklist" :key="entry.checklist_item_id" class="checklist-row">
-          <label class="checklist-label">
+        <section class="el-workstation">
+          <div class="el-workstation-header">
+            <span class="el-workstation-title">Morning Checklist</span>
+          </div>
+          <ul class="checklist">
+            <li v-for="entry in day.checklist" :key="entry.checklist_item_id" class="checklist-row">
+              <label class="checklist-label">
+                <input
+                  type="checkbox"
+                  :checked="entry.completed"
+                  :disabled="isLocked"
+                  @change="toggleChecklistItem(entry.checklist_item_id, $event.target.checked)"
+                />
+                {{ entry.label }}
+              </label>
+              <button
+                class="remove-item-button"
+                :disabled="isLocked"
+                title="Remove from checklist"
+                @click="removeChecklistItem(entry.checklist_item_id)"
+              >
+                &times;
+              </button>
+            </li>
+            <li v-if="day.checklist.length === 0" class="el-empty-state checklist-empty">No checklist items yet.</li>
+          </ul>
+          <form class="add-item-form" @submit.prevent="addChecklistItem">
             <input
-              type="checkbox"
-              :checked="entry.completed"
+              v-model="newChecklistLabel"
+              type="text"
+              placeholder="Add a checklist item"
               :disabled="isLocked"
-              @change="toggleChecklistItem(entry.checklist_item_id, $event.target.checked)"
+              maxlength="200"
             />
-            {{ entry.label }}
-          </label>
-          <button
-            class="remove-item-button"
-            :disabled="isLocked"
-            title="Remove from checklist"
-            @click="removeChecklistItem(entry.checklist_item_id)"
-          >
-            &times;
-          </button>
-        </li>
-      </ul>
-      <form class="add-item-form" @submit.prevent="addChecklistItem">
-        <input
-          v-model="newChecklistLabel"
-          type="text"
-          placeholder="Add a checklist item"
-          :disabled="isLocked"
-          maxlength="200"
-        />
-        <button type="submit" :disabled="isLocked || !newChecklistLabel.trim()">Add</button>
-      </form>
-    </section>
-
-    <section class="field-section">
-      <h2>Market bias / thesis</h2>
-      <textarea
-        v-model="marketBiasDraft"
-        rows="4"
-        placeholder="What's the plan today?"
-        :disabled="isLocked"
-      ></textarea>
-      <button
-        class="save-button"
-        :disabled="isLocked || marketBiasDraft === (day.market_bias ?? '')"
-        @click="saveMarketBias"
-      >
-        Save
-      </button>
-    </section>
-
-    <section class="field-section">
-      <h2>Bias chart</h2>
-      <img v-if="biasChartObjectUrl" :src="biasChartObjectUrl" alt="Bias chart" class="bias-chart-preview" />
-      <p v-if="uploadError" class="upload-error">{{ uploadError }}</p>
-      <div class="chart-actions">
-        <label class="upload-button" :class="{ 'upload-button--disabled': isLocked }">
-          {{ day.has_bias_chart ? 'Replace image' : 'Upload image' }}
-          <input type="file" accept="image/png,image/jpeg,image/webp" :disabled="isLocked" @change="handleFileSelected" hidden />
-        </label>
-        <button v-if="day.has_bias_chart" class="remove-item-button" :disabled="isLocked" @click="removeBiasChart">
-          Remove
-        </button>
+            <button type="submit" :disabled="isLocked || !newChecklistLabel.trim()">Add</button>
+          </form>
+        </section>
       </div>
-    </section>
+
+      <div class="prep-column">
+        <section class="el-workstation">
+          <div class="el-workstation-header">
+            <span class="el-workstation-title">Market Bias / Thesis</span>
+          </div>
+          <textarea
+            v-model="marketBiasDraft"
+            rows="5"
+            placeholder="What's the plan today?"
+            :disabled="isLocked"
+          ></textarea>
+          <button
+            class="el-btn-primary"
+            :disabled="isLocked || marketBiasDraft === (day.market_bias ?? '')"
+            @click="saveMarketBias"
+          >
+            Save
+          </button>
+        </section>
+
+        <section class="el-workstation">
+          <div class="el-workstation-header">
+            <span class="el-workstation-title">Bias Chart</span>
+          </div>
+          <img v-if="biasChartObjectUrl" :src="biasChartObjectUrl" alt="Bias chart" class="bias-chart-preview" />
+          <p v-if="uploadError" class="upload-error">{{ uploadError }}</p>
+          <div class="chart-actions">
+            <label class="upload-button" :class="{ 'upload-button--disabled': isLocked }">
+              {{ day.has_bias_chart ? 'Replace image' : 'Upload image' }}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                :disabled="isLocked"
+                @change="handleFileSelected"
+                hidden
+              />
+            </label>
+            <button v-if="day.has_bias_chart" class="remove-item-button" :disabled="isLocked" @click="removeBiasChart">
+              Remove
+            </button>
+          </div>
+        </section>
+      </div>
     </div>
 
     <div v-show="activeTab === 'trades'">
@@ -328,62 +372,93 @@ onBeforeUnmount(revokeBiasChartPreview)
     </div>
 
     <div v-show="activeTab === 'overview'" class="day-overview">
-      <h2>Day Overview</h2>
-      <div class="overview-grid">
-        <div class="overview-stat">
-          <span class="overview-label">Mood</span>
-          <span class="overview-value">{{ day.mood ?? '—' }}</span>
+      <section class="el-workstation">
+        <div class="el-workstation-header">
+          <span class="el-workstation-title">Day Summary</span>
         </div>
-        <div class="overview-stat">
-          <span class="overview-label">Sleep</span>
-          <span class="overview-value">{{ day.sleep_quality ?? '—' }}</span>
+        <div class="overview-stat-row">
+          <div class="el-field">
+            <span class="el-field-label">Trades</span>
+            <span class="overview-value">{{ overviewStats.tradeCount }}</span>
+          </div>
+          <div class="el-field">
+            <span class="el-field-label">Wins</span>
+            <span class="overview-value">{{ overviewStats.wins }}</span>
+          </div>
+          <div class="el-field">
+            <span class="el-field-label">Losses</span>
+            <span class="overview-value">{{ overviewStats.losses }}</span>
+          </div>
+          <div class="el-field">
+            <span class="el-field-label">Day P&amp;L</span>
+            <span
+              class="overview-value"
+              :class="resultClass(overviewStats.dayPnlDollars ?? overviewStats.dayPnlPoints)"
+            >
+              <template v-if="overviewStats.dayPnlDollars !== null">
+                {{ formatSignedDollars(overviewStats.dayPnlDollars) }}
+                <span v-if="overviewStats.dayPnlPoints !== 0" class="overview-value-note">
+                  + {{ formatSignedPoints(overviewStats.dayPnlPoints) }} pts (unknown instrument)
+                </span>
+              </template>
+              <template v-else-if="overviewStats.tradeCount > 0">
+                {{ formatSignedPoints(overviewStats.dayPnlPoints) }} pts
+              </template>
+              <template v-else>—</template>
+            </span>
+          </div>
         </div>
-        <div class="overview-stat overview-stat--wide">
-          <span class="overview-label">Bias</span>
-          <span class="overview-value overview-value--text">{{ biasPreview ?? '—' }}</span>
-        </div>
-      </div>
+      </section>
 
-      <div class="overview-grid">
-        <div class="overview-stat">
-          <span class="overview-label">Trades</span>
-          <span class="overview-value">{{ overviewStats.tradeCount }}</span>
+      <section class="el-workstation">
+        <div class="el-workstation-header">
+          <span class="el-workstation-title">Preparation Recap</span>
         </div>
-        <div class="overview-stat">
-          <span class="overview-label">Wins</span>
-          <span class="overview-value">{{ overviewStats.wins }}</span>
+        <div class="overview-stat-row overview-stat-row--prep">
+          <div class="el-field">
+            <span class="el-field-label">Sleep</span>
+            <span class="overview-value">{{ day.sleep_quality ?? '—' }}</span>
+          </div>
+          <div class="el-field">
+            <span class="el-field-label">Mood</span>
+            <span class="overview-value">{{ day.mood ?? '—' }}</span>
+          </div>
         </div>
-        <div class="overview-stat">
-          <span class="overview-label">Losses</span>
-          <span class="overview-value">{{ overviewStats.losses }}</span>
+        <div class="el-field overview-bias-field">
+          <span class="el-field-label">Bias</span>
+          <span class="overview-bias-text">{{ biasPreview ?? '—' }}</span>
         </div>
-        <div class="overview-stat">
-          <span class="overview-label">Day P&amp;L</span>
-          <span
-            class="overview-value"
-            :class="resultClass(overviewStats.dayPnlDollars ?? overviewStats.dayPnlPoints)"
-          >
-            <template v-if="overviewStats.dayPnlDollars !== null">
-              {{ formatSignedDollars(overviewStats.dayPnlDollars) }}
-              <span v-if="overviewStats.dayPnlPoints !== 0" class="overview-value-note">
-                + {{ formatSignedPoints(overviewStats.dayPnlPoints) }} pts (unknown instrument)
-              </span>
-            </template>
-            <template v-else-if="overviewStats.tradeCount > 0">
-              {{ formatSignedPoints(overviewStats.dayPnlPoints) }} pts
-            </template>
-            <template v-else>—</template>
-          </span>
+      </section>
+
+      <section class="el-workstation overview-trades-panel">
+        <div class="el-workstation-header">
+          <span class="el-workstation-title">Trades</span>
         </div>
-      </div>
+        <div v-if="overviewTrades.length === 0" class="el-empty-state">No trades logged today.</div>
+        <ul v-else class="overview-trade-list">
+          <li v-for="trade in overviewTrades" :key="trade.id" class="overview-trade-row">
+            <span class="overview-trade-symbol">{{ trade.symbol }}</span>
+            <span class="overview-trade-direction" :class="`overview-trade-direction--${trade.direction}`">
+              {{ trade.direction === 'long' ? 'LONG' : 'SHORT' }}
+            </span>
+            <span class="overview-trade-setup">{{ trade.setup || '—' }}</span>
+            <span class="overview-trade-result" :class="overviewTradeResult(trade).resultClass">
+              {{ overviewTradeResult(trade).label }}
+            </span>
+          </li>
+        </ul>
+      </section>
     </div>
   </div>
 </template>
 
 <style scoped>
 .journal-day {
-  padding: var(--el-space-8);
-  max-width: 640px;
+  /* Same composition language approved for the Dashboard in P2: a
+     controlled content width with a deliberate side gutter, instead of a
+     narrow form floating in the middle of a mostly-empty canvas. */
+  padding: var(--el-space-8) var(--el-space-12);
+  max-width: 1100px;
   margin: 0 auto;
 }
 
@@ -535,58 +610,68 @@ onBeforeUnmount(revokeBiasChartPreview)
   font-weight: 600;
 }
 
-.day-overview h2 {
-  font-size: var(--el-text-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--el-text-muted);
-  margin: 0 0 var(--el-space-4);
-}
-
-.overview-grid {
+/* Mood & Bias: a two-column "Prepare" workspace -- Readiness + Checklist
+   on the left, the written plan (Bias/Thesis + chart) on the right --
+   instead of one long vertical stack of unrelated sections. */
+.prep-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-  gap: var(--el-space-3);
-  margin-bottom: var(--el-space-6);
+  grid-template-columns: 1fr 1fr;
+  gap: var(--el-space-6);
 }
 
-.overview-stat {
-  padding: var(--el-space-3) var(--el-space-4);
-  background-color: var(--el-surface);
-  border: 1px solid var(--el-border);
-  border-radius: var(--el-radius-sm);
+.prep-column {
   display: flex;
   flex-direction: column;
-  gap: var(--el-space-1);
+  gap: var(--el-space-6);
 }
 
-.overview-stat--wide {
-  grid-column: span 2;
+.readiness-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--el-space-8);
 }
 
-.overview-label {
-  font-size: var(--el-text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--el-text-muted);
+.day-overview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--el-space-6);
+}
+
+/* Same non-stretching row treatment as the Dashboard's stat rows: a field
+   or two forced to fill a wide panel just spreads each value into its own
+   pocket of whitespace, so these stay left-aligned at their natural
+   width instead. */
+.overview-stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--el-space-6) var(--el-space-8);
+}
+
+.overview-stat-row--prep {
+  margin-bottom: var(--el-space-5);
 }
 
 .overview-value {
-  font-size: var(--el-text-lg);
-  font-weight: 600;
+  font-size: var(--el-text-xl);
+  font-weight: 700;
   color: var(--el-text);
   font-variant-numeric: tabular-nums;
-}
-
-.overview-value--text {
-  font-size: var(--el-text-sm);
-  font-weight: 400;
-  font-variant-numeric: normal;
 }
 
 .overview-value-note {
   display: block;
   font-size: var(--el-text-xs);
+  font-weight: 400;
+  color: var(--el-text-muted);
+}
+
+.overview-bias-field {
+  padding-top: var(--el-space-5);
+  border-top: 1px solid var(--el-border);
+}
+
+.overview-bias-text {
+  font-size: var(--el-text-sm);
   font-weight: 400;
   color: var(--el-text-muted);
 }
@@ -599,42 +684,68 @@ onBeforeUnmount(revokeBiasChartPreview)
   color: var(--el-negative);
 }
 
-.field-section {
-  margin-bottom: var(--el-space-8);
-}
-
-.field-section h2 {
-  font-size: var(--el-text-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--el-text-muted);
-  margin: 0 0 var(--el-space-3);
-}
-
-.scale-buttons {
+.overview-trade-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
-  gap: var(--el-space-2);
+  flex-direction: column;
 }
 
-.scale-button {
-  width: 40px;
-  height: 40px;
-  background-color: var(--el-surface);
-  color: var(--el-text);
-  border: 1px solid var(--el-border);
+.overview-trade-row {
+  display: grid;
+  grid-template-columns: 90px 70px 1fr auto;
+  align-items: center;
+  gap: var(--el-space-3);
+  padding: var(--el-space-3) 0;
+  border-bottom: 1px solid var(--el-border);
+  font-size: var(--el-text-sm);
+}
+
+.overview-trade-row:last-child {
+  border-bottom: none;
+}
+
+.overview-trade-symbol {
+  font-weight: 700;
+  font-family: var(--el-font-mono);
+}
+
+.overview-trade-direction {
+  font-size: var(--el-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 2px var(--el-space-2);
   border-radius: var(--el-radius-sm);
-  cursor: pointer;
+  width: fit-content;
 }
 
-.scale-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
+.overview-trade-direction--long {
+  color: var(--el-positive);
+  border: 1px solid var(--el-positive);
 }
 
-.scale-button--selected {
-  border-color: var(--el-copper);
-  color: var(--el-copper);
-  background-color: rgba(184, 115, 51, 0.1);
+.overview-trade-direction--short {
+  color: var(--el-negative);
+  border: 1px solid var(--el-negative);
+}
+
+.overview-trade-setup {
+  color: var(--el-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overview-trade-result {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.checklist-empty {
+  padding: var(--el-space-4) 0;
+  text-align: left;
 }
 
 .checklist {
@@ -686,12 +797,6 @@ onBeforeUnmount(revokeBiasChartPreview)
 
 .add-item-form input {
   flex: 1;
-  padding: var(--el-space-2) var(--el-space-3);
-  background-color: var(--el-surface);
-  border: 1px solid var(--el-border);
-  border-radius: var(--el-radius-sm);
-  color: var(--el-text);
-  font-size: var(--el-text-sm);
 }
 
 .add-item-form button {
@@ -708,32 +813,36 @@ onBeforeUnmount(revokeBiasChartPreview)
   opacity: 0.5;
 }
 
-.field-section textarea {
-  width: 100%;
-  padding: var(--el-space-3);
-  background-color: var(--el-surface);
-  border: 1px solid var(--el-border);
-  border-radius: var(--el-radius-sm);
-  color: var(--el-text);
-  font-size: var(--el-text-base);
-  font-family: inherit;
-  resize: vertical;
-  margin-bottom: var(--el-space-3);
+.scale-buttons {
+  display: flex;
+  gap: var(--el-space-2);
 }
 
-.save-button {
-  padding: var(--el-space-2) var(--el-space-6);
-  background-color: var(--el-copper);
-  color: var(--el-bg);
-  border: none;
+.scale-button {
+  width: 40px;
+  height: 40px;
+  background-color: var(--el-surface);
+  color: var(--el-text);
+  border: 1px solid var(--el-border);
   border-radius: var(--el-radius-sm);
-  font-weight: 500;
   cursor: pointer;
 }
 
-.save-button:disabled {
+.scale-button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+.scale-button--selected {
+  border-color: var(--el-copper);
+  color: var(--el-copper);
+  background-color: rgba(184, 115, 51, 0.1);
+}
+
+.el-workstation textarea {
+  width: 100%;
+  resize: vertical;
+  margin-bottom: var(--el-space-3);
 }
 
 .bias-chart-preview {
@@ -773,5 +882,43 @@ onBeforeUnmount(revokeBiasChartPreview)
   cursor: not-allowed;
   opacity: 0.5;
   pointer-events: none;
+}
+
+@media (max-width: 900px) {
+  .prep-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .journal-day {
+    padding: var(--el-space-4);
+  }
+
+  .overview-trade-row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'symbol result'
+      'direction direction'
+      'setup setup';
+    row-gap: var(--el-space-1);
+  }
+
+  .overview-trade-symbol {
+    grid-area: symbol;
+  }
+
+  .overview-trade-direction {
+    grid-area: direction;
+  }
+
+  .overview-trade-setup {
+    grid-area: setup;
+    white-space: normal;
+  }
+
+  .overview-trade-result {
+    grid-area: result;
+  }
 }
 </style>
