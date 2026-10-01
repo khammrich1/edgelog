@@ -603,7 +603,7 @@ onUnmounted(revokeAllTradeScreenshots)
               <button
                 type="button"
                 class="el-segmented-option"
-                :class="{ active: stopMode === 'price', 'el-segmented-option--active': stopMode === 'price' }"
+                :class="{ 'el-segmented-option--active': stopMode === 'price' }"
                 @click="stopMode = 'price'"
               >
                 Price
@@ -611,7 +611,7 @@ onUnmounted(revokeAllTradeScreenshots)
               <button
                 type="button"
                 class="el-segmented-option"
-                :class="{ active: stopMode === 'points', 'el-segmented-option--active': stopMode === 'points' }"
+                :class="{ 'el-segmented-option--active': stopMode === 'points' }"
                 @click="stopMode = 'points'"
               >
                 Points
@@ -636,7 +636,7 @@ onUnmounted(revokeAllTradeScreenshots)
               <button
                 type="button"
                 class="el-segmented-option"
-                :class="{ active: targetMode === 'price', 'el-segmented-option--active': targetMode === 'price' }"
+                :class="{ 'el-segmented-option--active': targetMode === 'price' }"
                 @click="targetMode = 'price'"
               >
                 Price
@@ -644,7 +644,7 @@ onUnmounted(revokeAllTradeScreenshots)
               <button
                 type="button"
                 class="el-segmented-option"
-                :class="{ active: targetMode === 'points', 'el-segmented-option--active': targetMode === 'points' }"
+                :class="{ 'el-segmented-option--active': targetMode === 'points' }"
                 @click="targetMode = 'points'"
               >
                 Points
