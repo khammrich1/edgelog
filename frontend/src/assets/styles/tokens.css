@@ -2,9 +2,14 @@
 
 :root {
   /* Colors - Copper + Graphite + Steel + Onyx */
-  --el-bg: #0D0D0D;                    /* Onyx - primary background */
-  --el-surface: #2B2B2B;                /* Graphite - surfaces */
-  --el-surface-raised: #353535;         /* Raised surfaces */
+  --el-bg: #0D0D0D;                    /* Onyx - primary background (canvas, level 0) */
+  /* Structural plane (level 1) -- chrome that extends the canvas (nav rail,
+     table/section header strips) rather than sitting on it as content.
+     Distinct from --el-surface so structure and content stop reading as
+     "the same graphite rectangle" (P3.5 visual system). */
+  --el-surface-sunken: #171717;
+  --el-surface: #2B2B2B;                /* Graphite - content surfaces (level 2) */
+  --el-surface-raised: #353535;         /* Raised surfaces (level 3 -- hover/active emphasis) */
   --el-copper: #B87333;                 /* Copper - primary brand/accent */
   --el-copper-hover: #CD8F4F;          /* Copper hover state */
   --el-copper-active: #9D5F23;         /* Copper active state */
@@ -17,8 +22,14 @@
   --el-text-subtle: #707070;           /* Subtle text */
 
   /* Borders */
-  --el-border: #3F3F3F;                /* Default border */
+  --el-border: #3F3F3F;                /* Default border -- panel/control outlines */
   --el-border-focus: #B87333;          /* Focused border (copper) */
+  /* Internal separator -- a row divider inside a panel (or between rail
+     sections) reads quieter than the panel's own outline; a flat
+     translucent white works across any surface level rather than a fixed
+     hex tuned for one background. "Use dividers... where a full card is
+     unnecessary" (P3.5 visual system). */
+  --el-divider: rgba(255, 255, 255, 0.08);
 
   /* Functional Colors (separate from brand) */
   --el-positive: #4ADE80;              /* Green for profit */

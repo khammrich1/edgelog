@@ -65,7 +65,9 @@ function goToToday() {
 .app-rail {
   width: var(--el-rail-width);
   flex-shrink: 0;
-  background-color: var(--el-surface);
+  /* Structural plane, not a content panel -- the rail extends the onyx
+     canvas rather than sitting on it as another graphite card (P3.5). */
+  background-color: var(--el-surface-sunken);
   border-right: 1px solid var(--el-border);
   padding: var(--el-space-6) var(--el-space-4);
   display: flex;
@@ -111,7 +113,10 @@ function goToToday() {
 }
 
 .rail-link:hover {
-  background-color: var(--el-surface-raised);
+  /* A translucent lift (not --el-surface-raised) -- that's tuned for
+     hovering content panels, a visibly brighter jump off the much darker
+     sunken rail. This stays proportional to the structural plane itself. */
+  background-color: rgba(255, 255, 255, 0.06);
   color: var(--el-text);
 }
 
@@ -136,7 +141,8 @@ function goToToday() {
 }
 
 .rail-section--secondary {
-  border-top: 1px solid var(--el-border);
+  /* A quiet internal grouping line, not another hard panel edge. */
+  border-top: 1px solid var(--el-divider);
   padding-top: var(--el-space-4);
 }
 
@@ -189,7 +195,7 @@ function goToToday() {
 
   .rail-section--secondary {
     border-top: none;
-    border-left: 1px solid var(--el-border);
+    border-left: 1px solid var(--el-divider);
     padding-top: 0;
     padding-left: var(--el-space-4);
   }

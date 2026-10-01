@@ -406,6 +406,132 @@ input[type='date']::-webkit-calendar-picker-indicator:hover {
   font-size: var(--el-text-sm);
 }
 
+/* Small secondary action -- a trade/list row's inline actions (edit,
+   cancel, delete, add contracts...). Promoted from TradesSection.vue's
+   local styles (P3.5) so any surface with dense per-row actions can reuse
+   it instead of re-declaring its own chip button. */
+.btn-chip {
+  padding: var(--el-space-1) var(--el-space-3);
+  background-color: transparent;
+  border: 1px solid var(--el-border);
+  border-radius: var(--el-radius-sm);
+  color: var(--el-text-muted);
+  font-size: var(--el-text-xs);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-chip:disabled {
+  cursor: not-allowed;
+  opacity: var(--el-disabled-opacity);
+}
+
+.btn-chip--ghost:hover:not(:disabled) {
+  border-color: var(--el-copper);
+  color: var(--el-copper);
+}
+
+.btn-chip--primary {
+  background-color: var(--el-copper);
+  border-color: var(--el-copper);
+  color: var(--el-bg);
+}
+
+.btn-chip--warning {
+  border-color: var(--el-warning);
+  color: var(--el-warning);
+}
+
+.btn-chip--warning:hover:not(:disabled) {
+  background-color: rgba(251, 191, 36, 0.12);
+}
+
+.btn-chip--danger {
+  border-color: var(--el-negative);
+  color: var(--el-negative);
+}
+
+.btn-chip--danger:hover:not(:disabled) {
+  background-color: rgba(248, 113, 113, 0.12);
+}
+
+/* Quiet hairline separator -- a row/section boundary that shouldn't read
+   as another bordered box. Prefer this over wrapping a region in a second
+   .el-workstation when grouping/typography/negative space can do the job
+   (P3.5 direction: "fewer generic boxed cards"). */
+.el-divider {
+  border: none;
+  border-top: 1px solid var(--el-divider);
+}
+
+/* Segmented control -- a joined group of mutually-exclusive options (day
+   tabs, a unit toggle, long/short). One shared shape for every page's
+   tab-like control instead of each one re-declaring its own pill group.
+   .el-segmented-option--positive/--negative let a consumer give a specific
+   option domain coloring (e.g. Long/Short) without forking the primitive. */
+.el-segmented {
+  display: inline-flex;
+  background-color: var(--el-surface);
+  border: 1px solid var(--el-border);
+  border-radius: var(--el-radius-md);
+  padding: var(--el-space-1);
+  gap: var(--el-space-1);
+  width: fit-content;
+}
+
+.el-segmented-option {
+  padding: var(--el-space-2) var(--el-space-5);
+  background: none;
+  border: none;
+  border-radius: var(--el-radius-sm);
+  color: var(--el-text-muted);
+  font-family: inherit;
+  font-size: var(--el-text-sm);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: all var(--el-transition-fast);
+}
+
+.el-segmented-option:hover:not(.el-segmented-option--active) {
+  color: var(--el-text);
+}
+
+.el-segmented-option--active {
+  color: var(--el-bg);
+  background-color: var(--el-copper);
+  font-weight: 600;
+}
+
+.el-segmented-option--positive.el-segmented-option--active {
+  background-color: var(--el-positive);
+}
+
+.el-segmented-option--negative.el-segmented-option--active {
+  background-color: var(--el-negative);
+}
+
+/* Compact variant -- a small inline unit toggle (price/points) sitting next
+   to the field label it belongs to, not a primary navigation control. */
+.el-segmented--compact {
+  padding: 0;
+  border-radius: var(--el-radius-sm);
+  gap: 0;
+}
+
+.el-segmented--compact .el-segmented-option {
+  padding: 0 var(--el-space-2);
+  height: 20px;
+  border-radius: 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.el-segmented--compact .el-segmented-option + .el-segmented-option {
+  border-left: 1px solid var(--el-border);
+}
+
 /* Focus styles */
 :focus-visible {
   outline: 2px solid var(--el-copper);

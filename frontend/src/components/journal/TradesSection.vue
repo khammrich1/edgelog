@@ -1147,50 +1147,9 @@ onUnmounted(revokeAllTradeScreenshots)
   margin-top: var(--el-space-3);
 }
 
-.btn-chip {
-  padding: var(--el-space-1) var(--el-space-3);
-  background-color: transparent;
-  border: 1px solid var(--el-border);
-  border-radius: var(--el-radius-sm);
-  color: var(--el-text-muted);
-  font-size: var(--el-text-xs);
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.btn-chip:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.btn-chip--ghost:hover:not(:disabled) {
-  border-color: var(--el-copper);
-  color: var(--el-copper);
-}
-
-.btn-chip--primary {
-  background-color: var(--el-copper);
-  border-color: var(--el-copper);
-  color: var(--el-bg);
-}
-
-.btn-chip--warning {
-  border-color: var(--el-warning);
-  color: var(--el-warning);
-}
-
-.btn-chip--warning:hover:not(:disabled) {
-  background-color: rgba(251, 191, 36, 0.12);
-}
-
-.btn-chip--danger {
-  border-color: var(--el-negative);
-  color: var(--el-negative);
-}
-
-.btn-chip--danger:hover:not(:disabled) {
-  background-color: rgba(248, 113, 113, 0.12);
-}
+/* .btn-chip and its variants moved to global.css (P3.5) -- promoted from
+   here since this is exactly the kind of page-specific styling the shared
+   visual system is meant to replace. */
 
 .trade-notes {
   color: var(--el-text);
