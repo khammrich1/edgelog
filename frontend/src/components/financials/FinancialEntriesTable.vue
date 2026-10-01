@@ -232,30 +232,9 @@ defineExpose({ loadEntryScreenshot })
   white-space: nowrap;
 }
 
-.btn-chip {
-  padding: var(--el-space-1) var(--el-space-3);
-  background-color: transparent;
-  border: 1px solid var(--el-border);
-  border-radius: var(--el-radius-sm);
-  color: var(--el-text-muted);
-  font-size: var(--el-text-xs);
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.btn-chip--ghost:hover {
-  border-color: var(--el-copper);
-  color: var(--el-copper);
-}
-
-.btn-chip--danger {
-  border-color: var(--el-negative);
-  color: var(--el-negative);
-}
-
-.btn-chip--danger:hover {
-  background-color: rgba(248, 113, 113, 0.12);
-}
+/* .btn-chip and its variants moved to global.css (P3.5A) -- this file's
+   copy was identical and shadowed it silently (scoped styles win over
+   global ones), defeating the point of a shared primitive. */
 
 .empty-hint {
   text-align: center;
