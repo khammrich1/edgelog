@@ -111,8 +111,10 @@ onMounted(loadMonth)
 
 <style scoped>
 .journal-calendar {
-  padding: var(--el-space-8);
-  max-width: 900px;
+  /* Same composition language as Dashboard/Daily Journal (P2/P3): a
+     controlled width with a deliberate side gutter (P3.5B). */
+  padding: var(--el-space-8) var(--el-space-12);
+  max-width: 1100px;
   margin: 0 auto;
 }
 
@@ -153,7 +155,9 @@ onMounted(loadMonth)
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 1px;
-  background-color: var(--el-border);
+  /* Thin, quiet grid lines (P3.5B) -- the reference calendar look calls
+     for "thin steel grid lines," not the same weight as a panel outline. */
+  background-color: var(--el-divider);
   border: 1px solid var(--el-border);
   border-radius: var(--el-radius-md);
   overflow: hidden;

@@ -213,11 +213,11 @@ onBeforeUnmount(revokeBiasChartPreview)
 
     <p v-if="isLocked" class="locked-hint">This day is locked. Unlock it to make changes.</p>
 
-    <div class="day-tabs" role="tablist">
+    <div class="day-tabs el-segmented" role="tablist">
       <button
         role="tab"
-        class="day-tab"
-        :class="{ 'day-tab--active': activeTab === 'mood' }"
+        class="day-tab el-segmented-option"
+        :class="{ 'day-tab--active el-segmented-option--active': activeTab === 'mood' }"
         :aria-selected="activeTab === 'mood'"
         @click="activeTab = 'mood'"
       >
@@ -225,8 +225,8 @@ onBeforeUnmount(revokeBiasChartPreview)
       </button>
       <button
         role="tab"
-        class="day-tab"
-        :class="{ 'day-tab--active': activeTab === 'trades' }"
+        class="day-tab el-segmented-option"
+        :class="{ 'day-tab--active el-segmented-option--active': activeTab === 'trades' }"
         :aria-selected="activeTab === 'trades'"
         @click="activeTab = 'trades'"
       >
@@ -234,8 +234,8 @@ onBeforeUnmount(revokeBiasChartPreview)
       </button>
       <button
         role="tab"
-        class="day-tab"
-        :class="{ 'day-tab--active': activeTab === 'overview' }"
+        class="day-tab el-segmented-option"
+        :class="{ 'day-tab--active el-segmented-option--active': activeTab === 'overview' }"
         :aria-selected="activeTab === 'overview'"
         @click="activeTab = 'overview'"
       >
@@ -575,39 +575,12 @@ onBeforeUnmount(revokeBiasChartPreview)
   margin-bottom: var(--el-space-6);
 }
 
+/* Visuals (background/border/active state) now come from the shared
+   .el-segmented/.el-segmented-option primitive (P3.5B) -- only this
+   page's own placement stays local. .day-tabs/.day-tab/.day-tab--active
+   stay as additional classes purely as stable test hooks. */
 .day-tabs {
-  display: flex;
-  gap: var(--el-space-2);
-  background-color: var(--el-surface);
-  border: 1px solid var(--el-border);
-  border-radius: var(--el-radius-md);
-  padding: var(--el-space-2);
   margin: var(--el-space-5) 0 var(--el-space-6);
-  width: fit-content;
-}
-
-.day-tab {
-  padding: var(--el-space-2) var(--el-space-6);
-  background: none;
-  border: none;
-  border-radius: var(--el-radius-sm);
-  color: var(--el-text-muted);
-  font-size: var(--el-text-sm);
-  font-weight: 500;
-  font-family: inherit;
-  letter-spacing: 0.01em;
-  cursor: pointer;
-  transition: all var(--el-transition-fast);
-}
-
-.day-tab:hover {
-  color: var(--el-text);
-}
-
-.day-tab--active {
-  color: var(--el-bg);
-  background-color: var(--el-copper);
-  font-weight: 600;
 }
 
 /* Mood & Bias: a two-column "Prepare" workspace -- Readiness + Checklist
@@ -667,7 +640,7 @@ onBeforeUnmount(revokeBiasChartPreview)
 
 .overview-bias-field {
   padding-top: var(--el-space-5);
-  border-top: 1px solid var(--el-border);
+  border-top: 1px solid var(--el-divider);
 }
 
 .overview-bias-text {
@@ -698,7 +671,7 @@ onBeforeUnmount(revokeBiasChartPreview)
   align-items: center;
   gap: var(--el-space-3);
   padding: var(--el-space-3) 0;
-  border-bottom: 1px solid var(--el-border);
+  border-bottom: 1px solid var(--el-divider);
   font-size: var(--el-text-sm);
 }
 
