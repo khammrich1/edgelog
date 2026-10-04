@@ -34,6 +34,35 @@ A useful internal standard for the product is: **if a trader will not take the t
 
 EdgeLog is not primarily a broker, signal service, trading bot, automated trade importer, AI trading platform, or social network.
 
+### Consistency, missed days, and recovery
+
+EdgeLog should promote **consistency without perfectionism**.
+
+A **missed day** is not simply any calendar day without a journal entry. Weekends, planned days off, market holidays, and days when the trader did not intend to trade/journal are not failures. A missed day should represent a day where the trader participated in or intended to complete their trading/journaling process but did not complete the expected EdgeLog process.
+
+Core principle:
+
+> **You missed a day. You didn't break the system.**
+
+A lapse does not erase previous work, reset the trader's identity, or mean the journaling system has failed. EdgeLog should help the trader return to the process rather than punish the lapse.
+
+Recovery loop:
+
+**Acknowledge → Understand → Recover → Continue**
+
+When a missed day is identified, EdgeLog should eventually support a lightweight recovery flow:
+
+1. **Acknowledge** — identify that the expected process was missed without shame language.
+2. **Understand** — optionally capture why: forgot, busy, avoided journaling, tilted, did not want to face the trades, outside-life event, technical issue, or other.
+3. **Recover** — offer the opportunity to capture anything from that day that is still useful.
+4. **Continue** — return directly to today's process. No restart ritual and no implication that the trader is back at zero.
+
+A missed day can itself become useful process data. Repeated avoidance after losses, rule violations, tilt, or other conditions may reveal a pattern worth surfacing later, but EdgeLog should describe the trader's own observed pattern rather than moralize or diagnose it.
+
+Avoid punitive streak mechanics where one lapse destroys a long record of consistency. Prefer measures such as rolling journal completion rate, recovery after missed days, and sustained consistency over time.
+
+**Consistency is the goal. Perfection is not the requirement. A lapse is data—not evidence that the process has failed.**
+
 ## Questions EdgeLog should answer over time
 
 - What setups actually work for this trader?
@@ -42,6 +71,8 @@ EdgeLog is not primarily a broker, signal service, trading bot, automated trade 
 - How does psychology affect performance?
 - Is the trader following their own process?
 - Where does the trader's actual statistical edge exist?
+- When does the trader avoid or miss their journaling process, and what tends to happen before and after that lapse?
+- How quickly does the trader return to their process after a missed day?
 
 ## MVP stop line
 
