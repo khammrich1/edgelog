@@ -38,30 +38,25 @@ EdgeLog is not primarily a broker, signal service, trading bot, automated trade 
 
 EdgeLog should promote **consistency without perfectionism**.
 
-A **missed day** is not simply any calendar day without a journal entry. Weekends, planned days off, market holidays, and days when the trader did not intend to trade/journal are not failures. A missed day should represent a day where the trader participated in or intended to complete their trading/journaling process but did not complete the expected EdgeLog process.
+A **missed day** is not simply any calendar day without a journal entry. Weekends, planned days off, market holidays, and days when the trader did not intend to trade/journal are not failures. A missed day represents a day where the trader participated in or intended to complete their trading/journaling process but did not complete the expected EdgeLog process.
 
-Core principle:
+Core principles:
 
-> **You missed a day. You didn't break the system.**
+> **One missed day is data, not a pattern.**
 
-A lapse does not erase previous work, reset the trader's identity, or mean the journaling system has failed. EdgeLog should help the trader return to the process rather than punish the lapse.
+> **The only rule: don't miss twice.**
 
-Recovery loop:
+One lapse does not justify analysis, diagnosis, shame, a reset, or a conclusion that the trader's system is broken. EdgeLog should not overinterpret a single missed day. The immediate objective is simply to return to the process on the next expected day.
 
-**Acknowledge → Understand → Recover → Continue**
+The product should reinforce that previous work still counts. There is no restart ritual and no implication that the trader is back at zero.
 
-When a missed day is identified, EdgeLog should eventually support a lightweight recovery flow:
+If a missed day occurs, EdgeLog may acknowledge it and offer the trader a chance to backfill anything useful, but the primary call to action is **complete the next expected journal day**.
 
-1. **Acknowledge** — identify that the expected process was missed without shame language.
-2. **Understand** — optionally capture why: forgot, busy, avoided journaling, tilted, did not want to face the trades, outside-life event, technical issue, or other.
-3. **Recover** — offer the opportunity to capture anything from that day that is still useful.
-4. **Continue** — return directly to today's process. No restart ritual and no implication that the trader is back at zero.
+Only repeated misses create a pattern worth examining. If misses recur, EdgeLog may then help the trader identify context around them — for example whether they tend to occur after losses, rule violations, tilt, outside-life events, or other recurring conditions. That analysis should be based on accumulated evidence, not inferred from a single lapse.
 
-A missed day can itself become useful process data. Repeated avoidance after losses, rule violations, tilt, or other conditions may reveal a pattern worth surfacing later, but EdgeLog should describe the trader's own observed pattern rather than moralize or diagnose it.
+Avoid punitive streak mechanics where one missed day destroys a long record of consistency. Prefer measures that reward returning to the process, including rolling completion rate and whether the trader successfully avoided missing two expected days in a row.
 
-Avoid punitive streak mechanics where one lapse destroys a long record of consistency. Prefer measures such as rolling journal completion rate, recovery after missed days, and sustained consistency over time.
-
-**Consistency is the goal. Perfection is not the requirement. A lapse is data—not evidence that the process has failed.**
+**Consistency is the goal. Perfection is not the requirement. One miss is data. Don't miss twice.**
 
 ## Questions EdgeLog should answer over time
 
@@ -71,8 +66,8 @@ Avoid punitive streak mechanics where one lapse destroys a long record of consis
 - How does psychology affect performance?
 - Is the trader following their own process?
 - Where does the trader's actual statistical edge exist?
-- When does the trader avoid or miss their journaling process, and what tends to happen before and after that lapse?
-- How quickly does the trader return to their process after a missed day?
+- When repeated missed days form a pattern, what tends to happen before and after them?
+- Does the trader reliably return to the process after one missed day?
 
 ## MVP stop line
 
