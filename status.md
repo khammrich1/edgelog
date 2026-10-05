@@ -1,5 +1,17 @@
 # EdgeLog Status
 
+## Current coordination — October 4, 2026 (Pacific)
+
+P1 #36 and P2 #38 are accepted/merged. P3 #40 is merged with the recorded functional pass. P3.5A #42 is merged; **P3.5B #43 is open for DEV owner acceptance**, covering Dashboard, Daily Journal and Calendar. P3.5C remains follow-up under #41. Check the exact DEV revision before testing; no fresh production deployment is claimed.
+
+**Tilt Journal #45** is scoped, not delivered: CBT-informed Trigger → Thought → Emotion → Urge → Behavior → Consequence → Reframe → Recovery → later reflection. Catching/interruption (“I caught it”) is success. **Missed Day Recovery #46** is scoped: **One missed day is data, not a pattern. The only rule: don't miss twice.** An expected journal day excludes weekends/non-trading days, market holidays and planned time off. One miss invites a return; it does not erase progress or prove a broken process.
+
+Keep the customer-facing foundation first. Strategy Trader ST1 #33 is still open/parked. Order origination and credentials remain on the owner's personal Windows device. No execution work is resumed by this update.
+
+The current GitHub issues/PRs and [portfolio board](https://github.com/khammrich1/ProjectStatus/blob/main/boards/EDGELOG.md) supersede stale queue/current-status labels in the older history below. No feature implementation, release or new owner acceptance is claimed.
+
+
+
 Live status doc, kept up to date as work happens. Not a roadmap (see `ROADMAP.md`) and not a deploy how-to (see `DEPLOYMENT.md`) -- this is "what's actually true right now."
 
 _Last updated: 2026-09-28 (GitHub cleanup pass + Strategy Trader ST0, PR #31, unmerged)_

@@ -1,5 +1,17 @@
 # EdgeLog Marketing & Positioning
 
+## Current coordination — October 4, 2026 (Pacific)
+
+P1 #36 and P2 #38 are accepted/merged. P3 #40 is merged with the recorded functional pass. P3.5A #42 is merged; **P3.5B #43 is open for DEV owner acceptance**, covering Dashboard, Daily Journal and Calendar. P3.5C remains follow-up under #41. Check the exact DEV revision before testing; no fresh production deployment is claimed.
+
+**Tilt Journal #45** is scoped, not delivered: CBT-informed Trigger → Thought → Emotion → Urge → Behavior → Consequence → Reframe → Recovery → later reflection. Catching/interruption (“I caught it”) is success. **Missed Day Recovery #46** is scoped: **One missed day is data, not a pattern. The only rule: don't miss twice.** An expected journal day excludes weekends/non-trading days, market holidays and planned time off. One miss invites a return; it does not erase progress or prove a broken process.
+
+Keep the customer-facing foundation first. Strategy Trader ST1 #33 is still open/parked. Order origination and credentials remain on the owner's personal Windows device. No execution work is resumed by this update.
+
+The current GitHub issues/PRs and [portfolio board](https://github.com/khammrich1/ProjectStatus/blob/main/boards/EDGELOG.md) supersede stale queue/current-status labels in the older history below. No feature implementation, release or new owner acceptance is claimed.
+
+
+
 This document is the working source of truth for EdgeLog's external positioning, product story, and marketing language. Product behavior remains governed by the product specification and scoped GitHub issues.
 
 ## Brand
@@ -150,3 +162,9 @@ Keep **EdgeLog** as the product name unless a later branding decision explicitly
 EdgeLog helps traders improve their **process**. Marketing should not promise that using EdgeLog will make someone profitable or guarantee better trading outcomes.
 
 CBT concepts are described as **CBT-informed structured reflection**. EdgeLog is not psychotherapy, does not diagnose mental-health conditions, and should not market itself as treatment.
+
+## Consistency and recovery
+
+**One missed day is data, not a pattern. The only rule: don't miss twice.**
+
+A missed expected journal day is an invitation to return, not evidence that the whole system is broken. Avoid punitive streak resets, shame and pattern claims from one miss. Missed Day Recovery is scoped in #46; Tilt Journal is scoped in #45. Describe these as planned until delivered and accepted.
