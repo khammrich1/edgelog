@@ -1,10 +1,10 @@
 # Claude Open-Issue Work Queue
 
-## Current coordination — October 4, 2026 (Pacific)
+## Current coordination — October 7, 2026 (Pacific)
 
-P1 #36 and P2 #38 are accepted/merged. P3 #40 is merged with the recorded functional pass. P3.5A #42 is merged; **P3.5B #43 is open for DEV owner acceptance**, covering Dashboard, Daily Journal and Calendar. P3.5C remains follow-up under #41. Check the exact DEV revision before testing; no fresh production deployment is claimed.
+Issues #37 (P1) and #39 (P3) are closed -- both delivered and merged (PR #38, PR #40) with recorded functional passes; closing them just catches up GitHub bookkeeping to what `status.md` already recorded as accepted. P3.5A #42 is merged. **P3.5B #43 is still open**, unmerged: the owner's DEV visual pass (Dashboard/Calendar/Mood & Bias) and a Claude-run scripted functional check (Trades + Overview controls/data/navigation, no issues found) are both done -- it is waiting only on the owner's final pass and merge. **P3.5C (Trades/Stats/Settings consistency) has not been started** -- per the explicitly agreed structure, it does not begin until #43 merges.
 
-**Tilt Journal #45** is scoped, not delivered: CBT-informed Trigger → Thought → Emotion → Urge → Behavior → Consequence → Reframe → Recovery → later reflection. Catching/interruption (“I caught it”) is success. **Missed Day Recovery #46** is scoped: **One missed day is data, not a pattern. The only rule: don't miss twice.** An expected journal day excludes weekends/non-trading days, market holidays and planned time off. One miss invites a return; it does not erase progress or prove a broken process.
+Three new issues are scoped but explicitly **not authorized to interrupt P3.5**, each carrying "do not interrupt currently authorized P3.5 work unless Kyle explicitly reprioritizes" in its own body: **Tilt Journal #45** (CBT-informed Trigger → Thought → Emotion → Urge → Behavior → Consequence → Reframe → Recovery → later reflection; catching/interrupting the urge is success). **Missed Day Recovery #46** (one missed day is data, not a pattern; the only rule is don't miss twice; an expected journal day excludes weekends/non-trading days, market holidays and planned time off; one miss invites a return, it does not erase progress). **Trade Management Counterfactual #48** (opened 2026-10-07): captures whether the trader "touched" a closed trade after entry (moved stop/target, exited early, re-entered, etc.) versus executed the plan as documented, records the counterfactual untouched-plan outcome only when determinable (never fabricated), and measures an intervention delta -- separating edge quality from management interference. None of #45/#46/#48 has implementation started.
 
 Keep the customer-facing foundation first. Strategy Trader ST1 #33 is still open/parked. Order origination and credentials remain on the owner's personal Windows device. No execution work is resumed by this update.
 
@@ -20,12 +20,20 @@ Convention: an **issue** is the authoritative backlog/specification record. Clau
 
 Strategy Trader is temporarily parked while the core EdgeLog product becomes customer-presentable.
 
-- P1 — Product shell & visual system: accepted / merged (#36).
-- P2 — Dashboard / first impression: accepted / merged (#38).
-- P3 — Daily Journal & trade workflow UX: issue #39 / PR #40, merged with recorded functional pass. Functional owner testing passed; latest layout is materially improved and the remaining broad visual-depth concern has been moved out of P3.
-- **CURRENT: P3.5 — #41.** A / #42 is merged; B / #43 is open for DEV acceptance; C follows the applicable owner gate. This is a shared-system pass across Dashboard, Journal, Calendar, Trades, Stats, and future Trade Ranker surfaces — not a Daily Journal-only restyle.
+- P1 — Product shell & visual system: accepted / merged (#36, closed). PR #38.
+- P2 — Dashboard / first impression: accepted / merged. Issue #37 (closed) / PR #38.
+- P3 — Daily Journal & trade workflow UX: issue #39 (closed) / PR #40, merged with recorded functional pass. Functional owner testing passed; latest layout is materially improved and the remaining broad visual-depth concern has been moved out of P3.
+- **CURRENT: P3.5 — #41 (open, parent issue).** A / #42 is merged. **B / #43 is open, unmerged** -- owner DEV visual pass done, Claude's scripted functional check of Trades + Overview done (no issues found); waiting on the owner's final pass and merge. **C has not started** and does not begin until #43 merges. This is a shared-system pass across Dashboard, Journal, Calendar, Trades, Stats, and future Trade Ranker surfaces — not a Daily Journal-only restyle.
 - P4 — Onboarding follows P3.5.
 - Define Your Edge / Trade Ranker follows the customer-facing foundation sequence as scoped/authorized.
+
+### Scoped, not authorized to interrupt P3.5
+
+Each of these issues explicitly states it must not interrupt the currently authorized P3.5 work unless Kyle reprioritizes. None has implementation started.
+
+- **#45 — Tilt Journal.** CBT-informed reflection chain (Trigger → Automatic Thought → Emotion → Urge → Behavior → Consequence → Challenge/Reframe → Recovery Action → Later Reflection). Key product nuance: successfully feeling an urge and *not* acting on it ("I caught it") must be recorded as a process win, not a failure.
+- **#46 — Missed Day Recovery.** "One missed day is data, not a pattern. The only rule: don't miss twice." Requires distinguishing a genuinely missed *expected* journal day from a legitimate no-journal day (weekends, holidays, planned time off) before anything is treated as a miss; recovery UX must be lightweight and non-punitive, and must not auto-create a Tilt Journal entry.
+- **#48 — Trade Management Counterfactual** (opened 2026-10-07). Asks "Did you touch this trade?" post-close, and if so, "What would have happened if you didn't touch it?" Must preserve an immutable original-plan snapshot at entry time, never fabricate an untouched-outcome counterfactual when price-path data is insufficient (label it indeterminate/estimated instead), and never auto-label a touched trade as tilt/a mistake. Suggested slices: TMC1 (capture) → TMC2 (counterfactual calculation) → TMC3 (analytics).
 
 ### P3.5 visual target
 
