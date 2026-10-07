@@ -1,4 +1,6 @@
 <script setup>
+import WorkspaceHeader from '@/components/common/WorkspaceHeader.vue'
+import WorkspaceSummary from '@/components/common/WorkspaceSummary.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTradesStore } from '@/stores/trades'
@@ -38,7 +40,14 @@ const selectedTradeId = ref(null)
 const loading = ref(true)
 const error = ref(null)
 let requestId = 0
-const tradeCount = computed(() => weekDays.value.reduce((total, day) => total + day.trades.length, 0))
+const weekTrades = computed(() => weekDays.value.flatMap(day => day.trades))
+const tradeCount = computed(() => weekTrades.value.length)
+const weekSummary = computed(() => [
+  { label: 'Trades logged', value: tradeCount.value },
+  { label: 'Open', value: weekTrades.value.filter(trade => trade.status === 'open').length },
+  { label: 'Closed', value: weekTrades.value.filter(trade => trade.status === 'closed').length },
+  { label: 'Canceled', value: weekTrades.value.filter(trade => trade.status === 'canceled').length }
+])
 const selectedTrade = computed(() => {
   if (selectedTradeId.value === null) return null
   for (const day of weekDays.value) {
@@ -65,6 +74,7 @@ async function fetchWeek() {
   const id = ++requestId
   loading.value = true
   error.value = null
+  selectedTradeId.value = null
   try {
     await tradesStore.fetchTradesInWeek(weekStart.value, weekEnd.value)
   } catch (e) {
@@ -117,10 +127,10 @@ watch([weekStart, weekEnd], fetchWeek, { immediate: true })
 </script>
 
 <template>
-  <div class="trade-calendar">
-    <div class="calendar-header">
-      <div><p class="el-label">Trades</p><h1>{{ heading }}</h1></div>
-      <div class="calendar-nav">
+  <div class="trade-calendar el-page">
+    <WorkspaceHeader :title="heading" eyebrow="Trade history" description="Inspect your execution. Select a trade to review its details.">
+      <template #actions>
+      <div class="calendar-nav el-toolbar">
         <button class="nav-button" @click="goToPreviousWeek" aria-label="Previous week">&lsaquo;</button>
         <button class="nav-button nav-today" @click="goToToday">Today</button>
         <button class="nav-button" @click="goToNextWeek" aria-label="Next week">&rsaquo;</button>
@@ -132,20 +142,23 @@ watch([weekStart, weekEnd], fetchWeek, { immediate: true })
           @change="onJumpToDate"
         />
       </div>
-    </div>
+      </template>
+    </WorkspaceHeader>
 
     <p v-if="loading" class="el-empty-state" role="status">Loading trades...</p>
     <div v-else-if="error"><p class="el-error-state" role="alert">{{ error }}</p><button class="btn-chip" @click="fetchWeek">Try again</button></div>
     <template v-else>
+    <WorkspaceSummary label="Trades in the displayed week" :items="weekSummary" />
     <div v-if="!tradeCount" class="week-empty">
       <h2>No trades logged this week</h2>
       <router-link :to="`/journal/${viewedDate}`">Open journal for {{ viewedDate }}</router-link>
     </div>
-    <div class="week-grid">
+    <div v-if="tradeCount" class="week-grid">
       <div v-for="day in weekDays" :key="day.dateKey" class="day-column" :class="{ 'day-column--today': day.isToday }">
         <div class="day-column-header">
           <span class="day-weekday">{{ day.weekdayLabel }}</span>
           <span class="day-number">{{ day.dayNumber }}</span>
+          <span class="day-trade-count" :aria-label="`${day.trades.length} trades`">{{ day.trades.length }}</span>
         </div>
         <div class="day-column-cards">
           <span v-if="!day.trades.length" class="empty-day-hint">No trades</span>
@@ -161,13 +174,15 @@ watch([weekStart, weekEnd], fetchWeek, { immediate: true })
     </div>
 
     <!-- Mobile: week-selector chip strip + single focused day -->
-    <div class="week-chip-strip">
+    <div v-if="tradeCount" class="week-chip-strip" role="group" aria-label="Select trade day">
       <button
         v-for="day in weekDays"
         :key="day.dateKey"
         type="button"
         class="week-chip"
         :class="{ 'week-chip--focused': day.dateKey === focusedDayKey, 'week-chip--today': day.isToday }"
+        :aria-pressed="day.dateKey === focusedDayKey"
+        :aria-label="`${day.weekdayLabel} ${day.dateKey}, ${day.trades.length} trades`"
         @click="focusedDayKey = day.dateKey"
       >
         <span class="week-chip-label">{{ day.weekdayLabel }}</span>
@@ -175,7 +190,8 @@ watch([weekStart, weekEnd], fetchWeek, { immediate: true })
         <span v-if="day.trades.length" class="week-chip-dot"></span>
       </button>
     </div>
-    <div class="focused-day-cards">
+    <div v-if="tradeCount" class="focused-day-cards">
+      <h2 class="focused-day-title">{{ focusedDay?.weekdayLabel }} · {{ focusedDay?.dateKey }}</h2>
       <TradeCalendarCard
         v-for="trade in focusedDay?.trades ?? []"
         :key="trade.id"
@@ -188,7 +204,7 @@ watch([weekStart, weekEnd], fetchWeek, { immediate: true })
     </template>
 
     <TradeDetailDrawer
-      v-if="selectedTrade"
+      v-if="selectedTrade && !loading && !error"
       :trade="selectedTrade.trade"
       :date="selectedTrade.date"
       @close="closeDrawer"
@@ -197,25 +213,9 @@ watch([weekStart, weekEnd], fetchWeek, { immediate: true })
 </template>
 
 <style scoped>
-.trade-calendar {
-  padding: var(--el-space-8);
-  max-width: 1200px;
-  margin: 0 auto;
-}
 
-.calendar-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--el-space-3);
-  margin-bottom: var(--el-space-6);
-}
 
-.calendar-header h1 {
-  font-size: var(--el-text-2xl);
-  margin: 0;
-}
+
 
 .calendar-nav {
   display: flex;
@@ -252,7 +252,11 @@ watch([weekStart, weekEnd], fetchWeek, { immediate: true })
 .week-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: var(--el-space-2);
+  gap: 1px;
+  background: var(--el-border);
+  border: 1px solid var(--el-border);
+  border-radius: var(--el-radius-md);
+  overflow: hidden;
 }
 
 .day-column {
@@ -260,9 +264,7 @@ watch([weekStart, weekEnd], fetchWeek, { immediate: true })
   overflow-wrap: anywhere;
   min-height: 120px;
   padding: var(--el-space-2);
-  background-color: var(--el-bg);
-  border: 1px solid var(--el-border);
-  border-radius: var(--el-radius-md);
+  background-color: var(--el-surface-sunken);
 }
 
 .day-column--today .day-number {
@@ -304,7 +306,6 @@ watch([weekStart, weekEnd], fetchWeek, { immediate: true })
 .week-empty h2 { font-size: 18px; margin-bottom: 8px; }
 .week-empty a { font-size: 14px; }
 .empty-day-hint { color: var(--el-text-subtle); font-size: 12px; }
-.calendar-header h1 { margin-top: 8px; }
 
 @media (max-width: 768px) {
   .trade-calendar {
@@ -373,4 +374,6 @@ watch([weekStart, weekEnd], fetchWeek, { immediate: true })
     font-size: var(--el-text-sm);
   }
 }
+.day-trade-count { margin-left: auto; color: var(--el-text-subtle); font-size: 11px; font-variant-numeric: tabular-nums; }
+.focused-day-title { font-size: 14px; margin-bottom: 8px; color: var(--el-text-muted); }
 </style>

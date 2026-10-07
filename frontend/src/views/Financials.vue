@@ -1,4 +1,5 @@
 <script setup>
+import WorkspaceHeader from '@/components/common/WorkspaceHeader.vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useFinancialEntriesStore } from '@/stores/financialEntries'
@@ -76,16 +77,17 @@ watch(viewedYear, fetchYear, { immediate: true })
 </script>
 
 <template>
-  <div class="financials-page">
-    <div class="page-header">
-      <h1>Financials -- {{ viewedYear }}</h1>
-      <div class="year-nav">
+  <div class="financials-page el-page">
+    <WorkspaceHeader :title="`Financials -- ${viewedYear}`" eyebrow="Business ledger" description="Track payouts and expenses separately from trade performance.">
+      <template #actions>
+      <div class="year-nav el-toolbar">
         <button class="nav-button" @click="goToPreviousYear" aria-label="Previous year">&lsaquo;</button>
         <button class="nav-button nav-today" @click="goToCurrentYear">This year</button>
         <button class="nav-button" @click="goToNextYear" aria-label="Next year">&rsaquo;</button>
         <input type="number" class="jump-input" :value="viewedYear" aria-label="Jump to year" @change="onJumpToYear" />
       </div>
-    </div>
+      </template>
+    </WorkspaceHeader>
 
     <div class="summary-tiles">
       <div class="summary-tile">
@@ -118,25 +120,9 @@ watch(viewedYear, fetchYear, { immediate: true })
 </template>
 
 <style scoped>
-.financials-page {
-  padding: var(--el-space-8);
-  max-width: 1000px;
-  margin: 0 auto;
-}
 
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--el-space-3);
-  margin-bottom: var(--el-space-6);
-}
 
-.page-header h1 {
-  font-size: var(--el-text-2xl);
-  margin: 0;
-}
+
 
 .year-nav {
   display: flex;

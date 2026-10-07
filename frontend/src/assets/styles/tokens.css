@@ -78,6 +78,7 @@
   --el-rail-width: 220px;
   --el-rail-width-collapsed: 72px;
   --el-content-max: 1200px;
+  --el-page-padding: clamp(20px, 3.5vw, 48px);
   --el-disabled-opacity: 0.5;
 
   /* Condensed uppercase label treatment -- used for nav items, section

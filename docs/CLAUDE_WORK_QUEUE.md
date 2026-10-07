@@ -2,6 +2,11 @@
 
 ## Owner revision - October 7, 2026 (Pacific)
 
+Owner subsequently selected PR #49 as the preferred workspace candidate.
+Continue the #50 correction on #49 and test that PR first. Keep #43 unmerged;
+reconcile/close it as superseded after #49 receives explicit DEV PASS. Visual
+preference does not claim functional acceptance, merge, or production deploy.
+
 Owner requested a broader workspace correction after DEV testing PR #49.
 Issue #50 records that revision under P3.5/#41. PR #49 is the current correction
 candidate; PR #43 remains open and overlapping. No new owner PASS or merge is

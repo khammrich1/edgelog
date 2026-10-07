@@ -1,4 +1,5 @@
 <script setup>
+import WorkspaceHeader from '@/components/common/WorkspaceHeader.vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useJournalStore } from '@/stores/journal'
@@ -142,15 +143,8 @@ const recentDays = computed(() => {
 </script>
 
 <template>
-  <div class="dashboard">
-    <header class="dashboard-header">
-      <div>
-        <p class="el-label dashboard-kicker">
-          {{ parseDateKey(today).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) }}
-        </p>
-        <h1>Dashboard</h1>
-      </div>
-    </header>
+  <div class="dashboard el-page">
+    <WorkspaceHeader title="Dashboard" :eyebrow="parseDateKey(today).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })" description="Your journal, your execution, your next step." />
 
     <p v-if="loading" class="el-empty-state" role="status">Loading journal...</p>
     <template v-else-if="error">
@@ -160,7 +154,7 @@ const recentDays = computed(() => {
 
     <template v-else>
       <section class="dashboard-focus dashboard-top-grid">
-        <div class="dashboard-focus-main">
+        <div class="dashboard-focus-main el-focus-surface">
           <div class="dashboard-focus-header">
             <div>
               <h2>Today's journal</h2>
@@ -214,7 +208,7 @@ const recentDays = computed(() => {
         <div class="dashboard-focus-side dashboard-snapshot">
           <div class="dashboard-focus-header dashboard-focus-header--compact">
             <div>
-              <span class="el-workstation-title">This Week</span>
+              <h2 class="el-workstation-title">This Week</h2>
               <div class="dashboard-snapshot-headline" :class="weekResultClass">
                 {{ weekSummary.closedCount === 0 ? '—' : weekResultLabel }}
               </div>
@@ -238,9 +232,12 @@ const recentDays = computed(() => {
               <div v-if="weekWinRate !== null" class="el-field">
                 <span class="el-field-label">Win Rate</span>
                 <span class="dashboard-stat">{{ weekWinRate }}%</span>
+
               </div>
             </div>
           </template>
+
+          <p v-if="weekWinRate !== null" class="dashboard-caveat">Win rate uses closed wins and losses; breakeven trades are excluded.</p>
 
           <div v-if="weekSetupTally.length" class="dashboard-setup-tally">
             <span class="el-label">Setups This Week</span>
@@ -255,7 +252,8 @@ const recentDays = computed(() => {
 
       <section class="el-workstation dashboard-activity">
         <div class="el-workstation-header">
-          <span class="el-workstation-title">Recent Activity</span>
+          <h2 class="el-workstation-title">Recent Activity</h2>
+          <span class="el-label">Last 14 days</span>
         </div>
 
         <div v-if="recentDays.length === 0" class="el-empty-state">
@@ -279,29 +277,10 @@ const recentDays = computed(() => {
 </template>
 
 <style scoped>
-.dashboard {
-  padding: var(--el-space-8) var(--el-space-12);
-  max-width: 1160px;
-  margin: 0 auto;
-}
 
-.dashboard-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--el-space-8);
-  margin-bottom: var(--el-space-6);
-}
 
-.dashboard-header h1 {
-  font-size: 26px;
-  line-height: 1.3;
-}
 
-.dashboard-kicker {
-  color: var(--el-text-subtle);
-  margin-bottom: var(--el-space-3);
-}
+
 
 .el-workstation {
   padding: var(--el-space-5) 0;
@@ -310,6 +289,7 @@ const recentDays = computed(() => {
 .dashboard-focus {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  align-items: start;
   gap: var(--el-space-5);
   margin-bottom: var(--el-space-6);
 }
@@ -317,11 +297,10 @@ const recentDays = computed(() => {
 .dashboard-focus-main,
 .dashboard-focus-side {
   min-width: 0;
-  border-top: 1px solid var(--el-border);
 }
 
 .dashboard-focus-main {
-  padding: var(--el-space-5) 0;
+  padding: var(--el-space-6);
 }
 
 .dashboard-focus-side {
@@ -519,14 +498,13 @@ const recentDays = computed(() => {
 }
 
 @media (max-width: 640px) {
+  .dashboard-stat-row { gap: 16px; }
   .dashboard {
     padding: var(--el-space-4);
   }
 
-  .dashboard-focus-main,
-  .dashboard-focus-side {
-    padding: var(--el-space-5) 0;
-  }
+  .dashboard-focus-main { padding: var(--el-space-5); }
+  .dashboard-focus-side { padding: var(--el-space-5) 0; }
 
   .el-workstation {
     padding: var(--el-space-5) 0;

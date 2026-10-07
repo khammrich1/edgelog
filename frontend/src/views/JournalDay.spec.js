@@ -71,6 +71,26 @@ describe('JournalDay tab navigation', () => {
     )
   })
 
+  it('supports arrow, Home, and End navigation with one tab stop and linked panels', async () => {
+    const wrapper = await mountJournalDay()
+    const tabs = wrapper.findAll('[role="tab"]')
+    expect(tabs.map(tab => tab.attributes('tabindex'))).toEqual(['0', '-1', '-1'])
+    await tabs[0].trigger('keydown', { key: 'ArrowRight' })
+    expect(wrapper.find('.day-tab--active').text()).toBe('Trades')
+    expect(wrapper.find('#trades-panel').isVisible()).toBe(true)
+    await tabs[1].trigger('keydown', { key: 'End' })
+    expect(wrapper.find('#overview-panel').isVisible()).toBe(true)
+    await tabs[2].trigger('keydown', { key: 'ArrowRight' })
+    expect(wrapper.find('#preparation-panel').isVisible()).toBe(true)
+    await tabs[0].trigger('keydown', { key: 'ArrowLeft' })
+    expect(wrapper.find('#overview-panel').isVisible()).toBe(true)
+    await tabs[2].trigger('keydown', { key: 'Home' })
+    expect(wrapper.find('.day-tab--active').text()).toBe('Mood & Bias')
+    for (const tab of tabs) {
+      expect(wrapper.find(`#${tab.attributes('aria-controls')}`).attributes('aria-labelledby')).toBe(tab.attributes('id'))
+    }
+  })
+
   it('switches to the Overview tab and shows the day summary', async () => {
     const wrapper = await mountJournalDay()
     const tabs = wrapper.findAll('.day-tab')

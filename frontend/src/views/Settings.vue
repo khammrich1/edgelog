@@ -1,80 +1,93 @@
 <script setup>
+import WorkspaceHeader from '@/components/common/WorkspaceHeader.vue'
 import { onMounted, ref } from 'vue'
 import { useTradesStore } from '@/stores/trades'
 
 const tradesStore = useTradesStore()
 const newSetupName = ref('')
 const submitError = ref(null)
+const loadError = ref(null)
+const loading = ref(true)
+const saving = ref(false)
+const removing = ref(null)
 
-onMounted(() => {
-  tradesStore.fetchSetups()
-})
+async function loadSetups() {
+  loading.value = true
+  loadError.value = null
+  try { await tradesStore.fetchSetups() }
+  catch { loadError.value = 'Could not load your setups. Try again.' }
+  finally { loading.value = false }
+}
+onMounted(loadSetups)
 
 async function addSetup() {
   const name = newSetupName.value.trim()
-  if (!name) return
+  if (!name || saving.value) return
+  saving.value = true
   submitError.value = null
   try {
     await tradesStore.createSetup(name)
     newSetupName.value = ''
   } catch (error) {
     submitError.value = error.response?.data?.detail || 'Could not add that setup.'
-  }
+  } finally { saving.value = false }
 }
 
 async function removeSetup(setupId) {
-  await tradesStore.deleteSetup(setupId)
+  if (removing.value !== null) return
+  removing.value = setupId
+  submitError.value = null
+  try { await tradesStore.deleteSetup(setupId) }
+  catch { submitError.value = 'Could not remove that setup. Try again.' }
+  finally { removing.value = null }
 }
 </script>
 
 <template>
-  <div class="settings-page">
-    <h1>Settings</h1>
+  <div class="settings-page el-page">
+    <WorkspaceHeader title="Settings" eyebrow="Your workspace" />
 
-    <section class="field-section">
+    <section class="field-section el-workstation" :aria-busy="loading">
       <h2>Trade Setups</h2>
       <p class="section-hint">
         These appear as quick-pick options on the trade entry form. You can still type any
         setup by hand -- this list is a shortcut, not a restriction.
       </p>
 
-      <ul v-if="tradesStore.setups.length > 0" class="setup-list">
+      <p v-if="loading" class="section-hint" role="status">Loading your setups…</p>
+      <div v-else-if="loadError" class="load-error" role="alert"><p>{{ loadError }}</p><button class="retry-button" @click="loadSetups">Try again</button></div>
+      <ul v-else-if="tradesStore.setups.length > 0" class="setup-list">
         <li v-for="setup in tradesStore.setups" :key="setup.id" class="setup-row">
           <span class="setup-name">{{ setup.name }}</span>
-          <button class="remove-item-button" title="Remove setup" @click="removeSetup(setup.id)">
+          <button class="remove-item-button" :aria-label="`Remove ${setup.name}`" :disabled="removing !== null" @click="removeSetup(setup.id)">
             &times;
           </button>
         </li>
       </ul>
       <p v-else class="section-hint">No setups configured yet.</p>
 
-      <form class="add-item-form" @submit.prevent="addSetup">
+      <form v-if="!loading && !loadError" class="add-item-form" @submit.prevent="addSetup">
         <input
           v-model="newSetupName"
+          aria-label="New setup name"
+          :disabled="saving"
           type="text"
           placeholder="Add a setup (e.g. Breakout, Reversal)"
           maxlength="200"
         />
-        <button type="submit" :disabled="!newSetupName.trim()">Add</button>
+        <button type="submit" :disabled="saving || !newSetupName.trim()">{{ saving ? 'Adding…' : 'Add setup' }}</button>
       </form>
-      <p v-if="submitError" class="submit-error">{{ submitError }}</p>
+      <p v-if="submitError" class="submit-error" role="alert">{{ submitError }}</p>
     </section>
   </div>
 </template>
 
 <style scoped>
-.settings-page {
-  padding: var(--el-space-8);
-  max-width: 640px;
-  margin: 0 auto;
-}
 
-.settings-page h1 {
-  font-size: var(--el-text-xl);
-  margin: 0 0 var(--el-space-6);
-}
+
 
 .field-section {
+  max-width: 680px;
   margin-bottom: var(--el-space-8);
 }
 
@@ -123,6 +136,8 @@ async function removeSetup(setupId) {
   color: var(--el-text-subtle);
   cursor: pointer;
   font-size: var(--el-text-lg);
+  min-width: 44px;
+  min-height: 44px;
   line-height: 1;
 }
 
@@ -163,5 +178,13 @@ async function removeSetup(setupId) {
   color: var(--el-negative);
   font-size: var(--el-text-sm);
   margin-top: var(--el-space-2);
+}
+.setup-name { overflow-wrap: anywhere; min-width: 0; }
+.load-error { color: var(--el-text-muted); margin-bottom: 20px; }
+.retry-button { color: var(--el-copper); text-decoration: underline; padding: 8px 0; }
+@media (max-width: 640px) {
+  .settings-page { padding: 20px 16px; }
+  .add-item-form { flex-wrap: wrap; }
+  .add-item-form input { flex-basis: 100%; }
 }
 </style>

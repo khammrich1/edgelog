@@ -1,4 +1,6 @@
 <script setup>
+import WorkspaceHeader from '@/components/common/WorkspaceHeader.vue'
+import WorkspaceSummary from '@/components/common/WorkspaceSummary.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useJournalStore } from '@/stores/journal'
@@ -41,7 +43,18 @@ const calendarCells = computed(() => {
       summary: journalStore.daysByDate[dateKey] ?? null
     })
   }
+  while (cells.length % 7) cells.push(null)
   return cells
+})
+
+const monthSummary = computed(() => {
+  const days = calendarCells.value.filter(Boolean).map(cell => cell.summary).filter(Boolean)
+  return [
+    { label: 'Journal days', value: days.length },
+    { label: 'Draft', value: days.filter(day => day.status === 'draft').length },
+    { label: 'Locked', value: days.filter(day => day.status === 'locked').length },
+    { label: 'With bias chart', value: days.filter(day => day.has_bias_chart).length }
+  ]
 })
 
 async function loadMonth() {
@@ -82,19 +95,28 @@ onMounted(loadMonth)
 </script>
 
 <template>
-  <div class="journal-calendar">
-    <div class="calendar-header">
-      <div><p class="el-label">Journal calendar</p><h1>{{ monthLabel }}</h1></div>
-      <div class="calendar-nav">
-        <button class="nav-button" @click="goToPreviousMonth" aria-label="Previous month">&lsaquo;</button>
-        <button class="nav-button nav-today" @click="goToToday">Today</button>
-        <button class="nav-button" @click="goToNextMonth" aria-label="Next month">&rsaquo;</button>
-      </div>
-    </div>
+  <div class="journal-calendar el-page">
+    <WorkspaceHeader :title="monthLabel" eyebrow="Journal calendar" description="Revisit a day, continue a draft, or prepare today's journal.">
+      <template #actions>
+        <div class="calendar-nav el-toolbar">
+          <button class="nav-button" @click="goToPreviousMonth" aria-label="Previous month">&lsaquo;</button>
+          <button class="nav-button nav-today" @click="goToToday">Today</button>
+          <button class="nav-button" @click="goToNextMonth" aria-label="Next month">&rsaquo;</button>
+        </div>
+        <button class="el-btn-primary" @click="openDay(todayDateKey())">Open today's journal</button>
+      </template>
+    </WorkspaceHeader>
 
     <p v-if="loading" class="el-empty-state" role="status">Loading calendar...</p>
     <div v-else-if="error"><p class="el-error-state" role="alert">{{ error }}</p><button class="btn-chip" @click="loadMonth">Try again</button></div>
-    <div v-else class="calendar-grid">
+    <template v-else>
+    <WorkspaceSummary label="Journals in the displayed month" :items="monthSummary" />
+    <div class="calendar-legend" aria-label="Calendar legend">
+      <span><i class="status-dot status-dot--draft" aria-hidden="true"></i>Draft</span>
+      <span><i class="status-dot status-dot--locked" aria-hidden="true"></i>Locked</span>
+      <span>Fractions show checklist progress</span>
+    </div>
+    <div class="calendar-grid">
       <div v-for="label in WEEKDAY_LABELS" :key="label" class="weekday-label">{{ label }}</div>
 
       <div
@@ -104,6 +126,7 @@ onMounted(loadMonth)
         :class="{ 'day-cell--blank': !cell, 'day-cell--today': cell?.isToday }"
         :role="cell ? 'link' : undefined"
         :tabindex="cell ? 0 : undefined"
+        :aria-current="cell?.isToday ? 'date' : undefined"
         :aria-label="cell ? `Open journal ${cell.dateKey}${cell.summary ? ', ' + cell.summary.status : ''}` : undefined"
         @click="cell && openDay(cell.dateKey)"
         @keydown.enter="cell && openDay(cell.dateKey)"
@@ -120,34 +143,20 @@ onMounted(loadMonth)
             <span v-if="cell.summary.checklist_total_count > 0" class="checklist-progress">
               {{ cell.summary.checklist_completed_count }}/{{ cell.summary.checklist_total_count }}
             </span>
-            <span v-if="cell.summary.has_bias_chart" class="chart-indicator" title="Bias chart attached">&#128200;</span>
+            <span v-if="cell.summary.has_bias_chart" class="chart-indicator" title="Bias chart attached" aria-label="Bias chart attached">↗</span>
           </div>
         </template>
       </div>
     </div>
+    <p class="calendar-note">An empty date means no journal is recorded. It does not indicate a missed trading day.</p>
+    </template>
   </div>
 </template>
 
 <style scoped>
-.journal-calendar {
-  padding: var(--el-space-8);
-  max-width: 900px;
-  margin: 0 auto;
-}
 
-.calendar-header {
-  flex-wrap: wrap;
-  gap: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--el-space-6);
-}
 
-.calendar-header h1 {
-  font-size: var(--el-text-2xl);
-  margin: 8px 0 0;
-}
+
 
 .calendar-nav {
   display: flex;
@@ -192,8 +201,9 @@ onMounted(loadMonth)
 
 .day-cell {
   min-width: 0;
-  background-color: var(--el-bg);
-  min-height: 84px;
+  background-color: var(--el-surface-sunken);
+  min-height: 104px;
+  position: relative;
   padding: var(--el-space-2);
   cursor: pointer;
   transition: background-color var(--el-transition-fast);
@@ -211,6 +221,9 @@ onMounted(loadMonth)
 .day-cell--blank:hover {
   background-color: var(--el-bg);
 }
+
+.day-cell--today { box-shadow: inset 0 2px var(--el-copper); }
+.day-cell:focus-visible { outline-offset: -3px; z-index: 1; }
 
 .day-cell--today .day-number {
   color: var(--el-copper);
@@ -255,4 +268,7 @@ onMounted(loadMonth)
     min-height: 56px;
   }
 }
+.calendar-legend { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; font-size: 12px; color: var(--el-text-subtle); margin-bottom: 16px; }
+.calendar-legend span { display: inline-flex; gap: 8px; align-items: center; }
+.calendar-note { color: var(--el-text-subtle); font-size: 12px; margin-top: 16px; }
 </style>

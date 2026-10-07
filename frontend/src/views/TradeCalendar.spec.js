@@ -61,6 +61,30 @@ describe('TradeCalendar', () => {
     expect(wrapper.find('h1').text()).toBe('Feb 2 – Feb 8, 2026')
   })
 
+  it('counts each status from only the displayed week and labels mobile selection', async () => {
+    const { wrapper } = await mountTradeCalendar({
+      '2026-02-04': [fakeTrade(), fakeTrade({ id: 2, status: 'closed' }), fakeTrade({ id: 3, status: 'canceled' })],
+      '2026-01-01': [fakeTrade({ id: 4 })]
+    })
+    const counts = Object.fromEntries(wrapper.findAll('.summary-item').map(item => [item.find('dt').text(), item.find('dd').text()]))
+    expect(counts).toEqual({ 'Trades logged': '3', Open: '1', Closed: '1', Canceled: '1' })
+    await wrapper.findAll('.week-chip')[2].trigger('click')
+    expect(wrapper.findAll('.week-chip')[2].attributes('aria-pressed')).toBe('true')
+    expect(wrapper.findAll('.week-chip')[3].attributes('aria-pressed')).toBe('false')
+  })
+
+  it('clears a selected trade when navigating weeks', async () => {
+    const { wrapper } = await mountTradeCalendar({ '2026-02-04': [fakeTrade()] })
+    await wrapper.find('.calendar-trade-card').trigger('click')
+    expect(wrapper.find('.drawer-panel').exists()).toBe(true)
+    await wrapper.find('[aria-label="Next week"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.drawer-panel').exists()).toBe(false)
+    await wrapper.find('[aria-label="Previous week"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.drawer-panel').exists()).toBe(false)
+  })
+
   it('renders trade cards under the correct day column', async () => {
     const { wrapper } = await mountTradeCalendar({ '2026-02-04': [fakeTrade()] })
 

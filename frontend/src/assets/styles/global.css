@@ -27,7 +27,42 @@ body {
   min-height: 100vh;
 }
 
+/* Shared workspace polish, including dense tables and narrow viewports. */
+img, svg { max-width: 100%; }
+button:disabled { cursor: not-allowed; }
+th, td { font-variant-numeric: tabular-nums; }
+input[type='checkbox'], input[type='radio'] { accent-color: var(--el-copper); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Typography */
+.el-page {
+  width: 100%;
+  max-width: var(--el-content-max);
+  margin-inline: auto;
+  padding: 32px var(--el-page-padding);
+}
+
+.el-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.el-toolbar > button, .el-toolbar > input { min-height: 40px; }
+.el-toolbar > button { min-width: 40px; }
+
+.el-focus-surface {
+  background: var(--el-surface);
+  border: 1px solid var(--el-border);
+  border-radius: var(--el-radius-md);
+  box-shadow: var(--el-shadow-sm);
+}
+
+@media (max-width: 640px) { .el-page { padding: 20px 16px; } }
+
 h1, h2, h3, h4, h5, h6 {
   font-weight: 600;
   line-height: 1.2;
