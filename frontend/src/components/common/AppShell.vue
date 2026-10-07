@@ -1,203 +1,83 @@
-<template>
-  <div class="app-shell">
-    <nav class="app-rail">
-      <router-link to="/dashboard" class="rail-brand">
-        <EdgeLogLogo />
-      </router-link>
-      <p class="rail-tagline">Find Your Edge.</p>
-
-      <div class="rail-section">
-        <router-link to="/dashboard" class="rail-link">Dashboard</router-link>
-        <button class="rail-link rail-link--action" @click="goToToday">Today</button>
-        <router-link to="/journal" class="rail-link">Calendar</router-link>
-        <router-link to="/trades" class="rail-link">Trades</router-link>
-        <router-link to="/stats" class="rail-link">Stats</router-link>
-        <router-link to="/financials" class="rail-link">Financials</router-link>
-      </div>
-
-      <div class="rail-spacer"></div>
-
-      <div class="rail-section rail-section--secondary">
-        <router-link to="/feedback" class="rail-link rail-link--secondary">Feedback</router-link>
-        <router-link v-if="authStore.user?.is_admin" to="/admin" class="rail-link rail-link--secondary">
-          Admin
-        </router-link>
-        <router-link to="/settings" class="rail-link rail-link--secondary">Settings</router-link>
-        <button class="rail-link rail-link--secondary" @click="handleLogout">Logout</button>
-      </div>
-    </nav>
-
-    <main class="app-main">
-      <slot />
-    </main>
-  </div>
-</template>
-
 <script setup>
-import { useRouter } from 'vue-router'
+import { ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { LayoutDashboard, BookOpen, CalendarDays, ListOrdered, ChartNoAxesCombined, Wallet, MessageSquare, Settings, LogOut, Menu, X, Shield } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { todayDateKey } from '@/utils/date'
 import EdgeLogLogo from './EdgeLogLogo.vue'
-
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
-
+const menuOpen = ref(false)
+const links = [
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: `/journal/${todayDateKey()}`, label: 'Today', icon: BookOpen },
+  { to: '/journal', label: 'Calendar', icon: CalendarDays, exact: true },
+  { to: '/trades', label: 'Trades', icon: ListOrdered },
+  { to: '/stats', label: 'Stats', icon: ChartNoAxesCombined },
+  { to: '/financials', label: 'Financials', icon: Wallet }
+]
+watch(() => route.fullPath, () => { menuOpen.value = false })
+function isActive(link) {
+  return link.exact ? route.path === link.to : route.path === link.to || route.path.startsWith(`${link.to}/`)
+}
 async function handleLogout() {
   await authStore.logout()
   router.push('/login')
 }
-
-function goToToday() {
-  router.push(`/journal/${todayDateKey()}`)
-}
 </script>
 
+<template>
+  <div class="app-shell">
+    <a class="skip-link" href="#workspace">Skip to content</a>
+    <header class="mobile-header">
+      <router-link to="/dashboard"><EdgeLogLogo /></router-link>
+      <button class="menu-toggle" :aria-expanded="menuOpen" aria-controls="workspace-navigation" :aria-label="menuOpen ? 'Close navigation' : 'Open navigation'" :title="menuOpen ? 'Close navigation' : 'Open navigation'" @click="menuOpen = !menuOpen">
+        <component :is="menuOpen ? X : Menu" :size="22" />
+      </button>
+    </header>
+    <nav id="workspace-navigation" class="app-rail" :class="{ 'app-rail--open': menuOpen }" aria-label="Main navigation">
+      <router-link to="/dashboard" class="rail-brand"><EdgeLogLogo /></router-link>
+      <div class="rail-section">
+        <router-link v-for="link in links" :key="link.label" :to="link.to" class="rail-link" :class="{ 'rail-link--active': isActive(link) }" :aria-current="isActive(link) ? 'page' : undefined">
+          <component :is="link.icon" :size="18" aria-hidden="true" />{{ link.label }}
+        </router-link>
+      </div>
+      <div class="rail-section rail-section--secondary">
+        <router-link to="/feedback" class="rail-link"><MessageSquare :size="18" />Feedback</router-link>
+        <router-link v-if="authStore.user?.is_admin" to="/admin" class="rail-link"><Shield :size="18" />Admin</router-link>
+        <router-link to="/settings" class="rail-link"><Settings :size="18" />Settings</router-link>
+        <button class="rail-link" @click="handleLogout"><LogOut :size="18" />Logout</button>
+      </div>
+      <div class="rail-account"><span class="account-mark">E</span><div><strong>EdgeLog</strong><span>Trading journal</span></div></div>
+    </nav>
+    <main id="workspace" class="app-main" tabindex="-1"><slot /></main>
+  </div>
+</template>
+
 <style scoped>
-.app-shell {
-  min-height: 100vh;
-  display: flex;
-}
-
-/* Narrow left navigation rail -- the primary "this is EdgeLog" cue. Fixed
-   width on desktop; collapses to a horizontal strip on narrow viewports
-   (see the media query below) rather than disappearing behind a hamburger,
-   since every link here needs to stay reachable in one tap. */
-.app-rail {
-  width: var(--el-rail-width);
-  flex-shrink: 0;
-  /* Structural plane, not a content panel -- the rail extends the onyx
-     canvas rather than sitting on it as another graphite card (P3.5). */
-  background-color: var(--el-surface-sunken);
-  border-right: 1px solid var(--el-border);
-  padding: var(--el-space-6) var(--el-space-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--el-space-6);
-}
-
-.rail-brand {
-  display: flex;
-}
-
-.rail-tagline {
-  margin-top: calc(var(--el-space-4) * -1);
-  font-size: 10px;
-  font-weight: var(--el-label-weight);
-  text-transform: uppercase;
-  letter-spacing: var(--el-label-tracking);
-  color: var(--el-steel);
-}
-
-.rail-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--el-space-1);
-}
-
-.rail-link {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  padding: var(--el-space-2) var(--el-space-3);
-  background-color: transparent;
-  color: var(--el-text-muted);
-  border: none;
-  border-radius: var(--el-radius-sm);
-  font-family: inherit;
-  font-size: var(--el-text-sm);
-  font-weight: 500;
-  text-align: left;
-  text-decoration: none;
-  cursor: pointer;
-  transition: all var(--el-transition-fast);
-}
-
-.rail-link:hover {
-  /* A translucent lift (not --el-surface-raised) -- that's tuned for
-     hovering content panels, a visibly brighter jump off the much darker
-     sunken rail. This stays proportional to the structural plane itself. */
-  background-color: rgba(255, 255, 255, 0.06);
-  color: var(--el-text);
-}
-
-.rail-link.router-link-active {
-  color: var(--el-copper);
-  background-color: rgba(184, 115, 51, 0.12);
-}
-
-.rail-link--action {
-  border: 1px solid var(--el-border);
-  margin-bottom: var(--el-space-2);
-}
-
-.rail-link--action:hover {
-  border-color: var(--el-copper);
-  color: var(--el-copper);
-  background-color: transparent;
-}
-
-.rail-spacer {
-  flex: 1;
-}
-
-.rail-section--secondary {
-  /* A quiet internal grouping line, not another hard panel edge. */
-  border-top: 1px solid var(--el-divider);
-  padding-top: var(--el-space-4);
-}
-
-.app-main {
-  flex: 1;
-  min-width: 0;
-  background-color: var(--el-bg);
-}
-
-/* Below desktop widths the rail becomes a compact, horizontally scrollable
-   top strip instead of a sidebar -- everything above still applies (same
-   colors, same active-state treatment), only the axis and a couple of
-   spacing rules change. */
+.app-shell { min-height: 100vh; display: flex; }
+.app-rail { position: sticky; top: 0; width: 208px; height: 100dvh; flex: 0 0 208px; padding: 28px 14px 16px; display: flex; flex-direction: column; gap: 32px; background: var(--el-surface-sunken); border-right: 1px solid var(--el-border); overflow-y: auto; }
+.rail-brand { padding: 0 12px; display: flex; }
+.rail-section { display: flex; flex-direction: column; gap: 4px; }
+.rail-link { display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 10px 12px; color: var(--el-text-muted); border-radius: 4px; font-size: 14px; font-weight: 500; text-align: left; }
+.rail-link:hover { background: var(--el-surface-raised); color: var(--el-text); }
+.rail-link--active { background: var(--el-surface-raised); color: var(--el-copper); box-shadow: inset 3px 0 var(--el-copper); }
+.rail-section--secondary { margin-top: auto; padding-top: 20px; border-top: 1px solid var(--el-border); }
+.rail-account { display: flex; align-items: center; gap: 10px; padding: 0 12px; font-size: 12px; }
+.rail-account strong, .rail-account span { display: block; }
+.rail-account div span { color: var(--el-text-subtle); }
+.account-mark { width: 32px; height: 32px; display: grid !important; place-items: center; background: var(--el-surface-raised); color: var(--el-copper); border-radius: 4px; font-weight: 700; }
+.app-main { flex: 1; min-width: 0; }
+.mobile-header { display: none; }
+.skip-link { position: fixed; top: -100px; left: 16px; z-index: 100; padding: 12px; background: var(--el-surface); }
+.skip-link:focus { top: 12px; }
 @media (max-width: 768px) {
-  .app-shell {
-    flex-direction: column;
-  }
-
-  .app-rail {
-    width: 100%;
-    flex-direction: row;
-    align-items: center;
-    gap: var(--el-space-4);
-    padding: var(--el-space-2) var(--el-space-4);
-    border-right: none;
-    border-bottom: 1px solid var(--el-border);
-    overflow-x: auto;
-  }
-
-  .rail-tagline {
-    display: none;
-  }
-
-  .rail-section {
-    flex-direction: row;
-  }
-
-  .rail-link {
-    width: auto;
-    white-space: nowrap;
-  }
-
-  .rail-link--action {
-    margin-bottom: 0;
-  }
-
-  .rail-spacer {
-    display: none;
-  }
-
-  .rail-section--secondary {
-    border-top: none;
-    border-left: 1px solid var(--el-divider);
-    padding-top: 0;
-    padding-left: var(--el-space-4);
-  }
+  .app-shell { display: block; }
+  .mobile-header { position: sticky; top: 0; z-index: 30; display: flex; justify-content: space-between; align-items: center; height: 64px; padding: 12px 16px; background: var(--el-surface-sunken); border-bottom: 1px solid var(--el-border); }
+  .menu-toggle { display: grid; place-items: center; width: 40px; height: 40px; }
+  .app-rail { display: none; position: fixed; top: 64px; left: 0; bottom: 0; z-index: 30; width: 100%; height: calc(100dvh - 64px); padding: 16px; gap: 24px; }
+  .app-rail--open { display: flex; }
+  .rail-brand { display: none; }
 }
 </style>

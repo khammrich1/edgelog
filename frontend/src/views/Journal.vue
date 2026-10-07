@@ -9,6 +9,9 @@ const journalStore = useJournalStore()
 
 const today = new Date()
 const viewedMonth = ref(new Date(today.getFullYear(), today.getMonth(), 1))
+const loading = ref(true)
+const error = ref(null)
+let requestId = 0
 
 const monthLabel = computed(() =>
   viewedMonth.value.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
@@ -46,7 +49,16 @@ async function loadMonth() {
   const month = viewedMonth.value.getMonth()
   const start = toDateKey(new Date(year, month, 1))
   const end = toDateKey(new Date(year, month + 1, 0))
-  await journalStore.fetchDaysInRange(start, end)
+  const id = ++requestId
+  loading.value = true
+  error.value = null
+  try {
+    await journalStore.fetchDaysInRange(start, end)
+  } catch (e) {
+    if (id === requestId) error.value = e.response?.data?.detail || 'Could not load the calendar.'
+  } finally {
+    if (id === requestId) loading.value = false
+  }
 }
 
 function goToPreviousMonth() {
@@ -72,7 +84,7 @@ onMounted(loadMonth)
 <template>
   <div class="journal-calendar">
     <div class="calendar-header">
-      <h1>{{ monthLabel }}</h1>
+      <div><p class="el-label">Journal calendar</p><h1>{{ monthLabel }}</h1></div>
       <div class="calendar-nav">
         <button class="nav-button" @click="goToPreviousMonth" aria-label="Previous month">&lsaquo;</button>
         <button class="nav-button nav-today" @click="goToToday">Today</button>
@@ -80,7 +92,9 @@ onMounted(loadMonth)
       </div>
     </div>
 
-    <div class="calendar-grid">
+    <p v-if="loading" class="el-empty-state" role="status">Loading calendar...</p>
+    <div v-else-if="error"><p class="el-error-state" role="alert">{{ error }}</p><button class="btn-chip" @click="loadMonth">Try again</button></div>
+    <div v-else class="calendar-grid">
       <div v-for="label in WEEKDAY_LABELS" :key="label" class="weekday-label">{{ label }}</div>
 
       <div
@@ -88,7 +102,12 @@ onMounted(loadMonth)
         :key="cell ? cell.dateKey : `blank-${index}`"
         class="day-cell"
         :class="{ 'day-cell--blank': !cell, 'day-cell--today': cell?.isToday }"
+        :role="cell ? 'link' : undefined"
+        :tabindex="cell ? 0 : undefined"
+        :aria-label="cell ? `Open journal ${cell.dateKey}${cell.summary ? ', ' + cell.summary.status : ''}` : undefined"
         @click="cell && openDay(cell.dateKey)"
+        @keydown.enter="cell && openDay(cell.dateKey)"
+        @keydown.space.prevent="cell && openDay(cell.dateKey)"
       >
         <template v-if="cell">
           <div class="day-number">{{ cell.day }}</div>
@@ -117,6 +136,8 @@ onMounted(loadMonth)
 }
 
 .calendar-header {
+  flex-wrap: wrap;
+  gap: 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -125,7 +146,7 @@ onMounted(loadMonth)
 
 .calendar-header h1 {
   font-size: var(--el-text-2xl);
-  margin: 0;
+  margin: 8px 0 0;
 }
 
 .calendar-nav {
@@ -151,7 +172,7 @@ onMounted(loadMonth)
 
 .calendar-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 1px;
   background-color: var(--el-border);
   border: 1px solid var(--el-border);
@@ -170,6 +191,7 @@ onMounted(loadMonth)
 }
 
 .day-cell {
+  min-width: 0;
   background-color: var(--el-bg);
   min-height: 84px;
   padding: var(--el-space-2);

@@ -1,34 +1,20 @@
 <template>
   <div class="stats-page">
-    <h1>Stats</h1>
-    <div class="el-empty-state stats-placeholder">
-      <p class="stats-placeholder-title">Edge analytics are on the way.</p>
+    <header><p class="el-label">Performance</p><h1>Stats</h1></header>
+    <section class="stats-placeholder">
+      <h2>Edge analytics are on the way.</h2>
       <p>Win rate, expectancy, and per-setup performance will live here once enough trades are logged.</p>
-    </div>
+      <router-link to="/trades">Review trade history</router-link>
+    </section>
   </div>
 </template>
 
 <style scoped>
-.stats-page {
-  padding: var(--el-space-8);
-  max-width: 640px;
-  margin: 0 auto;
-}
-
-.stats-page h1 {
-  font-size: var(--el-text-xl);
-  margin: 0 0 var(--el-space-3);
-}
-
-.stats-placeholder {
-  border: 1px solid var(--el-border);
-  border-radius: var(--el-radius-lg);
-  background-color: var(--el-surface);
-}
-
-.stats-placeholder-title {
-  color: var(--el-text);
-  font-weight: 500;
-  margin-bottom: var(--el-space-1);
-}
+.stats-page { max-width: 1160px; margin: auto; padding: 32px 48px; }
+h1 { font-size: 26px; margin: 8px 0 24px; }
+.stats-placeholder { border-top: 1px solid var(--el-border); padding: 24px 0; }
+h2 { font-size: 18px; margin-bottom: 12px; }
+p { color: var(--el-text-muted); font-size: 14px; max-width: 560px; }
+a { display: inline-block; margin-top: 20px; font-size: 14px; }
+@media(max-width: 640px) { .stats-page { padding: 20px 16px; } }
 </style>

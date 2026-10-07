@@ -11,6 +11,7 @@ const journalStore = useJournalStore()
 const tradesStore = useTradesStore()
 
 const error = ref(null)
+const loading = ref(true)
 
 const today = todayDateKey()
 const weekStart = startOfWeekDateKey(today)
@@ -22,6 +23,7 @@ const RECENT_ACTIVITY_DAYS = 14
 const rangeStart = addDaysToDateKey(today, -(RECENT_ACTIVITY_DAYS - 1))
 
 async function load() {
+  loading.value = true
   error.value = null
   try {
     await Promise.all([
@@ -30,6 +32,8 @@ async function load() {
     ])
   } catch (e) {
     error.value = e.response?.data?.detail || 'Could not load your dashboard right now.'
+  } finally {
+    loading.value = false
   }
 }
 
@@ -110,7 +114,6 @@ const weekSummary = computed(() => summarizeClosedTrades(weekTrades.value))
 const weekResultLabel = computed(() => summaryResultLabel(weekSummary.value))
 const weekResultClass = computed(() => summaryResultClass(weekSummary.value))
 const weekSetupTally = computed(() => setupTally(weekTrades.value))
-const weekTopSetup = computed(() => weekSetupTally.value[0] ?? null)
 const weekWinRate = computed(() => {
   const closedDecisions = weekSummary.value.wins + weekSummary.value.losses
   if (closedDecisions === 0) return null
@@ -140,30 +143,27 @@ const recentDays = computed(() => {
 
 <template>
   <div class="dashboard">
-    <header class="dashboard-hero">
+    <header class="dashboard-header">
       <div>
         <p class="el-label dashboard-kicker">
           {{ parseDateKey(today).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) }}
         </p>
-        <h1>Trading command center</h1>
-        <p class="dashboard-lede">
-          Keep today's journal moving, catch unfinished reflection, and see the week's signal without digging.
-        </p>
+        <h1>Dashboard</h1>
       </div>
-      <button type="button" class="dashboard-hero-action" @click="goToToday">
-        {{ todayCta.label }}
-      </button>
     </header>
 
-    <p v-if="error" class="el-error-state">{{ error }}</p>
+    <p v-if="loading" class="el-empty-state" role="status">Loading journal...</p>
+    <template v-else-if="error">
+      <p class="el-error-state" role="alert">{{ error }}</p>
+      <button class="btn-chip" @click="load">Try again</button>
+    </template>
 
     <template v-else>
       <section class="dashboard-focus dashboard-top-grid">
         <div class="dashboard-focus-main">
           <div class="dashboard-focus-header">
             <div>
-              <span class="el-workstation-title">Today</span>
-              <h2>{{ todayStatusLabel }}</h2>
+              <h2>Today's journal</h2>
             </div>
             <span class="el-badge" :class="todayBadgeClass">{{ todayStatusLabel }}</span>
           </div>
@@ -216,7 +216,7 @@ const recentDays = computed(() => {
             <div>
               <span class="el-workstation-title">This Week</span>
               <div class="dashboard-snapshot-headline" :class="weekResultClass">
-                {{ weekSummary.closedCount === 0 ? 'No closes yet' : weekResultLabel }}
+                {{ weekSummary.closedCount === 0 ? '—' : weekResultLabel }}
               </div>
             </div>
           </div>
@@ -253,24 +253,6 @@ const recentDays = computed(() => {
         </div>
       </section>
 
-      <div class="dashboard-insights" aria-label="Quick insights">
-        <article>
-          <span class="el-label">Journal State</span>
-          <strong>{{ todayStatusLabel }}</strong>
-          <p>{{ todayState === 'locked' ? 'Today is wrapped. Review only if something changed.' : 'One clear next step is ready.' }}</p>
-        </article>
-        <article>
-          <span class="el-label">Week Volume</span>
-          <strong>{{ weekSummary.tradeCount }}</strong>
-          <p>{{ weekSummary.tradeCount === 1 ? 'trade logged this week' : 'trades logged this week' }}</p>
-        </article>
-        <article>
-          <span class="el-label">Top Setup</span>
-          <strong>{{ weekTopSetup?.name ?? 'None yet' }}</strong>
-          <p>{{ weekTopSetup ? `${weekTopSetup.count} occurrence${weekTopSetup.count === 1 ? '' : 's'} this week` : 'Log setups to expose repeatable behavior.' }}</p>
-        </article>
-      </div>
-
       <section class="el-workstation dashboard-activity">
         <div class="el-workstation-header">
           <span class="el-workstation-title">Recent Activity</span>
@@ -281,7 +263,7 @@ const recentDays = computed(() => {
         </div>
 
         <ul v-else class="dashboard-activity-list">
-          <li v-for="day in recentDays" :key="day.date" class="dashboard-activity-row" @click="openDay(day.date)">
+          <li v-for="day in recentDays" :key="day.date" class="dashboard-activity-row" tabindex="0" role="link" :aria-label="`Open journal for ${formatDateLabel(day.date)}`" @click="openDay(day.date)" @keydown.enter="openDay(day.date)" @keydown.space.prevent="openDay(day.date)">
             <span class="dashboard-activity-date">{{ formatDateLabel(day.date) }}</span>
             <span class="el-badge" :class="day.status === 'locked' ? 'el-badge--neutral' : 'el-badge--accent'">
               {{ day.status === 'locked' ? 'Locked' : 'Draft' }}
@@ -303,25 +285,17 @@ const recentDays = computed(() => {
   margin: 0 auto;
 }
 
-.dashboard-hero {
+.dashboard-header {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: var(--el-space-8);
-  margin-bottom: var(--el-space-8);
-  padding: var(--el-space-8);
-  background:
-    linear-gradient(135deg, rgba(184, 115, 51, 0.14), transparent 46%),
-    linear-gradient(180deg, var(--el-surface-sunken), var(--el-bg));
-  border: 1px solid var(--el-border);
-  border-radius: var(--el-radius-lg);
+  margin-bottom: var(--el-space-6);
 }
 
-.dashboard-hero h1 {
-  max-width: 680px;
-  font-size: clamp(2.25rem, 5vw, 4.25rem);
-  line-height: 0.98;
-  margin: 0 0 var(--el-space-4);
+.dashboard-header h1 {
+  font-size: 26px;
+  line-height: 1.3;
 }
 
 .dashboard-kicker {
@@ -329,55 +303,30 @@ const recentDays = computed(() => {
   margin-bottom: var(--el-space-3);
 }
 
-.dashboard-lede {
-  max-width: 620px;
-  color: var(--el-text-muted);
-  font-size: var(--el-text-lg);
-  line-height: 1.55;
-}
-
-.dashboard-hero-action {
-  flex: 0 0 auto;
-  min-height: 48px;
-  padding: 0 var(--el-space-6);
-  background-color: var(--el-copper);
-  color: var(--el-bg);
-  border-radius: var(--el-radius-md);
-  font-weight: 700;
-  transition: background-color var(--el-transition-fast), transform var(--el-transition-fast);
-}
-
-.dashboard-hero-action:hover {
-  background-color: var(--el-copper-hover);
-  transform: translateY(-1px);
-}
-
 .el-workstation {
-  padding: var(--el-space-8) var(--el-space-6) var(--el-space-6);
+  padding: var(--el-space-5) 0;
 }
 
 .dashboard-focus {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
   gap: var(--el-space-5);
   margin-bottom: var(--el-space-6);
 }
 
 .dashboard-focus-main,
-.dashboard-focus-side,
-.dashboard-insights article {
-  background-color: var(--el-surface);
-  border: 1px solid var(--el-border);
-  border-radius: var(--el-radius-lg);
+.dashboard-focus-side {
+  min-width: 0;
+  border-top: 1px solid var(--el-border);
 }
 
 .dashboard-focus-main {
-  padding: var(--el-space-8);
+  padding: var(--el-space-5) 0;
 }
 
 .dashboard-focus-side {
-  padding: var(--el-space-6);
-  background-color: var(--el-surface-sunken);
+  padding: var(--el-space-5) 0 var(--el-space-5) var(--el-space-5);
+  border-left: 1px solid var(--el-border);
 }
 
 .dashboard-focus-header {
@@ -385,12 +334,11 @@ const recentDays = computed(() => {
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--el-space-4);
-  margin-bottom: var(--el-space-8);
+  margin-bottom: var(--el-space-5);
 }
 
 .dashboard-focus-header h2 {
-  margin-top: var(--el-space-2);
-  font-size: var(--el-text-3xl);
+  font-size: var(--el-text-lg);
 }
 
 .dashboard-focus-header--compact {
@@ -471,7 +419,7 @@ const recentDays = computed(() => {
 }
 
 .dashboard-snapshot-headline {
-  font-size: var(--el-text-3xl);
+  font-size: 26px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   margin-top: var(--el-space-2);
@@ -497,31 +445,6 @@ const recentDays = computed(() => {
   gap: var(--el-space-2);
 }
 
-.dashboard-insights {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--el-space-4);
-  margin-bottom: var(--el-space-6);
-}
-
-.dashboard-insights article {
-  padding: var(--el-space-5);
-}
-
-.dashboard-insights strong {
-  display: block;
-  margin: var(--el-space-3) 0 var(--el-space-1);
-  font-size: var(--el-text-2xl);
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-
-.dashboard-insights p {
-  margin: 0;
-  color: var(--el-text-muted);
-  font-size: var(--el-text-sm);
-}
-
 .dashboard-activity-list {
   list-style: none;
   margin: 0;
@@ -533,7 +456,7 @@ const recentDays = computed(() => {
 
 .dashboard-activity-row {
   display: grid;
-  grid-template-columns: 140px 90px 90px 1fr auto;
+  grid-template-columns: 140px 72px 70px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--el-space-4);
   padding: var(--el-space-4) var(--el-space-3);
@@ -584,22 +507,15 @@ const recentDays = computed(() => {
 }
 
 @media (max-width: 900px) {
-  .dashboard-hero,
   .dashboard-focus {
     grid-template-columns: 1fr;
   }
 
-  .dashboard-hero {
-    display: block;
+  .dashboard-focus-side {
+    border-left: 0;
+    padding-left: 0;
   }
 
-  .dashboard-hero-action {
-    margin-top: var(--el-space-5);
-  }
-
-  .dashboard-insights {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 640px) {
@@ -607,22 +523,13 @@ const recentDays = computed(() => {
     padding: var(--el-space-4);
   }
 
-  .dashboard-hero,
   .dashboard-focus-main,
   .dashboard-focus-side {
-    padding: var(--el-space-5);
-  }
-
-  .dashboard-hero h1 {
-    font-size: 2.35rem;
-  }
-
-  .dashboard-lede {
-    font-size: var(--el-text-base);
+    padding: var(--el-space-5) 0;
   }
 
   .el-workstation {
-    padding: var(--el-space-5) var(--el-space-4) var(--el-space-4);
+    padding: var(--el-space-5) 0;
   }
 
   .dashboard-activity-row {

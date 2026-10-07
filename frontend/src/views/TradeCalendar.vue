@@ -35,6 +35,10 @@ const weekDays = computed(() =>
 )
 
 const selectedTradeId = ref(null)
+const loading = ref(true)
+const error = ref(null)
+let requestId = 0
+const tradeCount = computed(() => weekDays.value.reduce((total, day) => total + day.trades.length, 0))
 const selectedTrade = computed(() => {
   if (selectedTradeId.value === null) return null
   for (const day of weekDays.value) {
@@ -58,7 +62,16 @@ watch(weekDays, (days) => {
 const focusedDay = computed(() => weekDays.value.find((d) => d.dateKey === focusedDayKey.value))
 
 async function fetchWeek() {
-  await tradesStore.fetchTradesInWeek(weekStart.value, weekEnd.value)
+  const id = ++requestId
+  loading.value = true
+  error.value = null
+  try {
+    await tradesStore.fetchTradesInWeek(weekStart.value, weekEnd.value)
+  } catch (e) {
+    if (id === requestId) error.value = e.response?.data?.detail || 'Could not load trades for this week.'
+  } finally {
+    if (id === requestId) loading.value = false
+  }
 }
 
 // Using replace (not push) for week navigation keeps browser history from
@@ -106,7 +119,7 @@ watch([weekStart, weekEnd], fetchWeek, { immediate: true })
 <template>
   <div class="trade-calendar">
     <div class="calendar-header">
-      <h1>{{ heading }}</h1>
+      <div><p class="el-label">Trades</p><h1>{{ heading }}</h1></div>
       <div class="calendar-nav">
         <button class="nav-button" @click="goToPreviousWeek" aria-label="Previous week">&lsaquo;</button>
         <button class="nav-button nav-today" @click="goToToday">Today</button>
@@ -121,7 +134,13 @@ watch([weekStart, weekEnd], fetchWeek, { immediate: true })
       </div>
     </div>
 
-    <!-- Desktop: full 7-column week grid -->
+    <p v-if="loading" class="el-empty-state" role="status">Loading trades...</p>
+    <div v-else-if="error"><p class="el-error-state" role="alert">{{ error }}</p><button class="btn-chip" @click="fetchWeek">Try again</button></div>
+    <template v-else>
+    <div v-if="!tradeCount" class="week-empty">
+      <h2>No trades logged this week</h2>
+      <router-link :to="`/journal/${viewedDate}`">Open journal for {{ viewedDate }}</router-link>
+    </div>
     <div class="week-grid">
       <div v-for="day in weekDays" :key="day.dateKey" class="day-column" :class="{ 'day-column--today': day.isToday }">
         <div class="day-column-header">
@@ -129,6 +148,7 @@ watch([weekStart, weekEnd], fetchWeek, { immediate: true })
           <span class="day-number">{{ day.dayNumber }}</span>
         </div>
         <div class="day-column-cards">
+          <span v-if="!day.trades.length" class="empty-day-hint">No trades</span>
           <TradeCalendarCard
             v-for="trade in day.trades"
             :key="trade.id"
@@ -165,6 +185,7 @@ watch([weekStart, weekEnd], fetchWeek, { immediate: true })
       />
       <p v-if="focusedDay && focusedDay.trades.length === 0" class="empty-day-hint">No trades this day.</p>
     </div>
+    </template>
 
     <TradeDetailDrawer
       v-if="selectedTrade"
@@ -230,11 +251,13 @@ watch([weekStart, weekEnd], fetchWeek, { immediate: true })
 
 .week-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: var(--el-space-2);
 }
 
 .day-column {
+  min-width: 0;
+  overflow-wrap: anywhere;
   min-height: 120px;
   padding: var(--el-space-2);
   background-color: var(--el-bg);
@@ -277,10 +300,17 @@ watch([weekStart, weekEnd], fetchWeek, { immediate: true })
   display: none;
 }
 
+.week-empty { padding: 24px 0; border-top: 1px solid var(--el-border); }
+.week-empty h2 { font-size: 18px; margin-bottom: 8px; }
+.week-empty a { font-size: 14px; }
+.empty-day-hint { color: var(--el-text-subtle); font-size: 12px; }
+.calendar-header h1 { margin-top: 8px; }
+
 @media (max-width: 768px) {
   .trade-calendar {
     padding: var(--el-space-4);
   }
+  .calendar-nav { flex-wrap: wrap; }
 
   .week-grid {
     display: none;

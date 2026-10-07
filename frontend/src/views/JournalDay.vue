@@ -16,6 +16,8 @@ const newChecklistLabel = ref('')
 const biasChartObjectUrl = ref(null)
 const uploadError = ref(null)
 const activeTab = ref('mood')
+const loading = ref(true)
+const loadError = ref(null)
 
 const day = computed(() => journalStore.currentDay)
 const isLocked = computed(() => day.value?.status === 'locked')
@@ -101,10 +103,18 @@ const formattedDate = computed(() => {
 })
 
 async function loadDay() {
-  await journalStore.fetchChecklistItems()
-  const data = await journalStore.fetchDay(route.params.date)
-  marketBiasDraft.value = data.market_bias ?? ''
-  await refreshBiasChartPreview()
+  loading.value = true
+  loadError.value = null
+  try {
+    await journalStore.fetchChecklistItems()
+    const data = await journalStore.fetchDay(route.params.date)
+    marketBiasDraft.value = data.market_bias ?? ''
+    await refreshBiasChartPreview()
+  } catch (e) {
+    loadError.value = e.response?.data?.detail || 'Could not load this journal.'
+  } finally {
+    loading.value = false
+  }
 }
 
 async function refreshBiasChartPreview() {
@@ -193,7 +203,9 @@ onBeforeUnmount(revokeBiasChartPreview)
 </script>
 
 <template>
-  <div v-if="day" class="journal-day">
+  <div v-if="loading" class="journal-day el-empty-state" role="status">Loading journal...</div>
+  <div v-else-if="loadError" class="journal-day"><p class="el-error-state" role="alert">{{ loadError }}</p><button class="btn-chip" @click="loadDay">Try again</button></div>
+  <div v-else-if="day" class="journal-day">
     <button class="back-link" @click="backToCalendar">&lsaquo; Back to Calendar</button>
 
     <div class="workspace-header">
@@ -259,6 +271,8 @@ onBeforeUnmount(revokeBiasChartPreview)
                   class="scale-button"
                   :class="{ 'scale-button--selected': day.sleep_quality === value }"
                   :disabled="isLocked"
+                  :aria-label="`Sleep quality ${value} of 5`"
+                  :aria-pressed="day.sleep_quality === value"
                   @click="setSleepQuality(value)"
                 >
                   {{ value }}
@@ -274,6 +288,8 @@ onBeforeUnmount(revokeBiasChartPreview)
                   class="scale-button"
                   :class="{ 'scale-button--selected': day.mood === value }"
                   :disabled="isLocked"
+                  :aria-label="`Mood ${value} of 5`"
+                  :aria-pressed="day.mood === value"
                   @click="setMood(value)"
                 >
                   {{ value }}
@@ -314,6 +330,7 @@ onBeforeUnmount(revokeBiasChartPreview)
               v-model="newChecklistLabel"
               type="text"
               placeholder="Add a checklist item"
+              aria-label="New checklist item"
               :disabled="isLocked"
               maxlength="200"
             />
@@ -331,6 +348,7 @@ onBeforeUnmount(revokeBiasChartPreview)
             v-model="marketBiasDraft"
             rows="5"
             placeholder="What's the plan today?"
+            aria-label="Market bias and thesis"
             :disabled="isLocked"
           ></textarea>
           <button
@@ -520,6 +538,8 @@ onBeforeUnmount(revokeBiasChartPreview)
   display: flex;
   align-items: center;
   gap: var(--el-space-3);
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .workspace-header h1 {
@@ -578,19 +598,18 @@ onBeforeUnmount(revokeBiasChartPreview)
 .day-tabs {
   display: flex;
   gap: var(--el-space-2);
-  background-color: var(--el-surface);
-  border: 1px solid var(--el-border);
-  border-radius: var(--el-radius-md);
-  padding: var(--el-space-2);
+  border-bottom: 1px solid var(--el-border);
+  padding: 0;
   margin: var(--el-space-5) 0 var(--el-space-6);
-  width: fit-content;
+  width: 100%;
 }
 
 .day-tab {
   padding: var(--el-space-2) var(--el-space-6);
   background: none;
   border: none;
-  border-radius: var(--el-radius-sm);
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
   color: var(--el-text-muted);
   font-size: var(--el-text-sm);
   font-weight: 500;
@@ -605,8 +624,8 @@ onBeforeUnmount(revokeBiasChartPreview)
 }
 
 .day-tab--active {
-  color: var(--el-bg);
-  background-color: var(--el-copper);
+  color: var(--el-text);
+  border-bottom-color: var(--el-copper);
   font-weight: 600;
 }
 
@@ -623,7 +642,11 @@ onBeforeUnmount(revokeBiasChartPreview)
   display: flex;
   flex-direction: column;
   gap: var(--el-space-6);
+  min-width: 0;
 }
+
+.prep-column > .el-workstation,
+.day-overview > .el-workstation { margin-bottom: 0; }
 
 .readiness-row {
   display: flex;
@@ -816,6 +839,7 @@ onBeforeUnmount(revokeBiasChartPreview)
 .scale-buttons {
   display: flex;
   gap: var(--el-space-2);
+  max-width: 100%;
 }
 
 .scale-button {
@@ -826,6 +850,7 @@ onBeforeUnmount(revokeBiasChartPreview)
   border: 1px solid var(--el-border);
   border-radius: var(--el-radius-sm);
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .scale-button:disabled {
@@ -891,6 +916,9 @@ onBeforeUnmount(revokeBiasChartPreview)
 }
 
 @media (max-width: 640px) {
+  .day-tab { padding: 12px 16px; }
+  .workspace-header-actions { max-width: 100%; }
+  .workspace-header h1 { font-size: 22px; overflow-wrap: anywhere; }
   .journal-day {
     padding: var(--el-space-4);
   }

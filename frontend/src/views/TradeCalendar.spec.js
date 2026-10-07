@@ -36,7 +36,7 @@ async function mountTradeCalendar(tradesByDate = {}) {
   const instrumentsStore = useInstrumentsStore()
   instrumentsStore.fetchMultipliers = vi.fn().mockResolvedValue({})
 
-  const wrapper = mount(TradeCalendar)
+  const wrapper = mount(TradeCalendar, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
   await flushPromises()
   return { wrapper, tradesStore }
 }
