@@ -1,4 +1,5 @@
 <script setup>
+import WorkspaceHeader from '@/components/common/WorkspaceHeader.vue'
 import { ref } from 'vue'
 import { useFeedbackStore } from '@/stores/feedback'
 
@@ -25,13 +26,13 @@ async function submit() {
 </script>
 
 <template>
-  <div class="feedback-page">
-    <h1>Feedback</h1>
-    <p class="feedback-intro">Found a bug, or something you'd like EdgeLog to do differently? Let us know.</p>
+  <div class="feedback-page el-page">
+    <WorkspaceHeader title="Feedback" eyebrow="Help improve EdgeLog" description="Found a bug, or something you'd like EdgeLog to do differently? Let us know." />
 
-    <form class="feedback-form" @submit.prevent="submit">
+    <form class="feedback-form el-workstation" @submit.prevent="submit">
       <textarea
         v-model="message"
+        aria-label="Feedback message"
         rows="6"
         placeholder="What's on your mind?"
         maxlength="2000"
@@ -40,30 +41,18 @@ async function submit() {
       <button type="submit" :disabled="submitting || !message.trim()">Send feedback</button>
     </form>
 
-    <p v-if="submitted" class="feedback-success">Thanks -- your feedback was sent.</p>
-    <p v-if="submitError" class="submit-error">{{ submitError }}</p>
+    <p v-if="submitted" class="feedback-success" role="status">Thanks -- your feedback was sent.</p>
+    <p v-if="submitError" class="submit-error" role="alert">{{ submitError }}</p>
   </div>
 </template>
 
 <style scoped>
-.feedback-page {
-  padding: var(--el-space-8);
-  max-width: 640px;
-  margin: 0 auto;
-}
 
-.feedback-page h1 {
-  font-size: var(--el-text-2xl);
-  margin: 0 0 var(--el-space-2);
-}
 
-.feedback-intro {
-  color: var(--el-text-muted);
-  font-size: var(--el-text-sm);
-  margin: 0 0 var(--el-space-6);
-}
+
 
 .feedback-form {
+  max-width: 680px;
   display: flex;
   flex-direction: column;
   gap: var(--el-space-3);

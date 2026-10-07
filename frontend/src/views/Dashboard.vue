@@ -1,4 +1,5 @@
 <script setup>
+import WorkspaceHeader from '@/components/common/WorkspaceHeader.vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useJournalStore } from '@/stores/journal'
@@ -11,6 +12,7 @@ const journalStore = useJournalStore()
 const tradesStore = useTradesStore()
 
 const error = ref(null)
+const loading = ref(true)
 
 const today = todayDateKey()
 const weekStart = startOfWeekDateKey(today)
@@ -22,6 +24,7 @@ const RECENT_ACTIVITY_DAYS = 14
 const rangeStart = addDaysToDateKey(today, -(RECENT_ACTIVITY_DAYS - 1))
 
 async function load() {
+  loading.value = true
   error.value = null
   try {
     await Promise.all([
@@ -30,6 +33,8 @@ async function load() {
     ])
   } catch (e) {
     error.value = e.response?.data?.detail || 'Could not load your dashboard right now.'
+  } finally {
+    loading.value = false
   }
 }
 
@@ -110,6 +115,11 @@ const weekSummary = computed(() => summarizeClosedTrades(weekTrades.value))
 const weekResultLabel = computed(() => summaryResultLabel(weekSummary.value))
 const weekResultClass = computed(() => summaryResultClass(weekSummary.value))
 const weekSetupTally = computed(() => setupTally(weekTrades.value))
+const weekWinRate = computed(() => {
+  const closedDecisions = weekSummary.value.wins + weekSummary.value.losses
+  if (closedDecisions === 0) return null
+  return Math.round((weekSummary.value.wins / closedDecisions) * 100)
+})
 
 // ---- Recent activity ----
 
@@ -133,21 +143,22 @@ const recentDays = computed(() => {
 </script>
 
 <template>
-  <div class="dashboard">
-    <div class="dashboard-header">
-      <h1>Dashboard</h1>
-      <p class="el-label dashboard-date">
-        {{ parseDateKey(today).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) }}
-      </p>
-    </div>
+  <div class="dashboard el-page">
+    <WorkspaceHeader title="Dashboard" :eyebrow="parseDateKey(today).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })" description="Your journal, your execution, your next step." />
 
-    <p v-if="error" class="el-error-state">{{ error }}</p>
+    <p v-if="loading" class="el-empty-state" role="status">Loading journal...</p>
+    <template v-else-if="error">
+      <p class="el-error-state" role="alert">{{ error }}</p>
+      <button class="btn-chip" @click="load">Try again</button>
+    </template>
 
     <template v-else>
-      <div class="dashboard-top-grid">
-        <section class="el-workstation dashboard-today">
-          <div class="el-workstation-header">
-            <span class="el-workstation-title">Today</span>
+      <section class="dashboard-focus dashboard-top-grid">
+        <div class="dashboard-focus-main el-focus-surface">
+          <div class="dashboard-focus-header">
+            <div>
+              <h2>Today's journal</h2>
+            </div>
             <span class="el-badge" :class="todayBadgeClass">{{ todayStatusLabel }}</span>
           </div>
 
@@ -170,12 +181,10 @@ const recentDays = computed(() => {
             </div>
           </div>
 
-          <p v-if="todaySetups.length" class="dashboard-setups">
-            <span class="el-label">Setup</span> {{ todaySetups.join(', ') }}
-          </p>
-
           <div class="dashboard-next-action">
-            <span class="el-label">Next Action</span>
+            <p v-if="todaySetups.length" class="dashboard-setups">
+              <span class="el-label">Setup</span> {{ todaySetups.join(', ') }}
+            </p>
             <div class="dashboard-next-action-buttons">
               <button
                 type="button"
@@ -194,16 +203,20 @@ const recentDays = computed(() => {
               </button>
             </div>
           </div>
-        </section>
+        </div>
 
-        <section class="el-workstation dashboard-snapshot">
-          <div class="el-workstation-header">
-            <span class="el-workstation-title">This Week</span>
+        <div class="dashboard-focus-side dashboard-snapshot">
+          <div class="dashboard-focus-header dashboard-focus-header--compact">
+            <div>
+              <h2 class="el-workstation-title">This Week</h2>
+              <div class="dashboard-snapshot-headline" :class="weekResultClass">
+                {{ weekSummary.closedCount === 0 ? '—' : weekResultLabel }}
+              </div>
+            </div>
           </div>
 
           <div v-if="weekSummary.closedCount === 0" class="el-empty-state">No closed trades yet this week.</div>
           <template v-else>
-            <div class="dashboard-snapshot-headline" :class="weekResultClass">{{ weekResultLabel }}</div>
             <p v-if="!weekSummary.allMultiplierKnown" class="dashboard-caveat">
               Points-based -- one or more trades this week are missing instrument $ conversion.
             </p>
@@ -216,8 +229,15 @@ const recentDays = computed(() => {
                 <span class="el-field-label">Win / Loss / BE</span>
                 <span class="dashboard-stat">{{ weekSummary.wins }}/{{ weekSummary.losses }}/{{ weekSummary.breakeven }}</span>
               </div>
+              <div v-if="weekWinRate !== null" class="el-field">
+                <span class="el-field-label">Win Rate</span>
+                <span class="dashboard-stat">{{ weekWinRate }}%</span>
+
+              </div>
             </div>
           </template>
+
+          <p v-if="weekWinRate !== null" class="dashboard-caveat">Win rate uses closed wins and losses; breakeven trades are excluded.</p>
 
           <div v-if="weekSetupTally.length" class="dashboard-setup-tally">
             <span class="el-label">Setups This Week</span>
@@ -227,12 +247,13 @@ const recentDays = computed(() => {
               </span>
             </div>
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
 
       <section class="el-workstation dashboard-activity">
         <div class="el-workstation-header">
-          <span class="el-workstation-title">Recent Activity</span>
+          <h2 class="el-workstation-title">Recent Activity</h2>
+          <span class="el-label">Last 14 days</span>
         </div>
 
         <div v-if="recentDays.length === 0" class="el-empty-state">
@@ -240,7 +261,7 @@ const recentDays = computed(() => {
         </div>
 
         <ul v-else class="dashboard-activity-list">
-          <li v-for="day in recentDays" :key="day.date" class="dashboard-activity-row" @click="openDay(day.date)">
+          <li v-for="day in recentDays" :key="day.date" class="dashboard-activity-row" tabindex="0" role="link" :aria-label="`Open journal for ${formatDateLabel(day.date)}`" @click="openDay(day.date)" @keydown.enter="openDay(day.date)" @keydown.space.prevent="openDay(day.date)">
             <span class="dashboard-activity-date">{{ formatDateLabel(day.date) }}</span>
             <span class="el-badge" :class="day.status === 'locked' ? 'el-badge--neutral' : 'el-badge--accent'">
               {{ day.status === 'locked' ? 'Locked' : 'Draft' }}
@@ -256,53 +277,53 @@ const recentDays = computed(() => {
 </template>
 
 <style scoped>
-.dashboard {
-  /* Narrower than the shared content-max and with a deliberately generous
-     side gutter -- at typical desktop widths this reads as a composed
-     workspace instead of stretching edge-to-edge against the rail. */
-  padding: var(--el-space-8) var(--el-space-12);
-  max-width: 1100px;
-  margin: 0 auto;
-}
 
-.dashboard-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--el-space-3);
-  margin-bottom: var(--el-space-8);
-}
 
-.dashboard-header h1 {
-  font-size: var(--el-text-2xl);
-  margin: 0;
-}
 
-.dashboard-date {
-  color: var(--el-text-subtle);
-}
 
-/* The shared .el-workstation padding is tuned for compact data-entry
-   tickets; the Dashboard's panels are read-heavy, not entry forms, so they
-   get noticeably more interior breathing room. Scoped to this component
-   only -- other .el-workstation usages (trade/financial tickets) are
-   untouched. */
+
 .el-workstation {
-  padding: var(--el-space-8) var(--el-space-6) var(--el-space-6);
+  padding: var(--el-space-5) 0;
 }
 
-.dashboard-top-grid {
+.dashboard-focus {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--el-space-6);
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--el-space-5);
   margin-bottom: var(--el-space-6);
 }
 
-/* Deliberately not a stretching grid -- with a stat or two per panel,
-   forcing them to fill the row just spreads each value out into its own
-   awkward pocket of whitespace. Left-aligned, content-sized fields read as
-   one composed row with a single intentional margin at the end, not a
-   spreadsheet. */
+.dashboard-focus-main,
+.dashboard-focus-side {
+  min-width: 0;
+}
+
+.dashboard-focus-main {
+  padding: var(--el-space-6);
+}
+
+.dashboard-focus-side {
+  padding: var(--el-space-5) 0 var(--el-space-5) var(--el-space-5);
+  border-left: 1px solid var(--el-border);
+}
+
+.dashboard-focus-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--el-space-4);
+  margin-bottom: var(--el-space-5);
+}
+
+.dashboard-focus-header h2 {
+  font-size: var(--el-text-lg);
+}
+
+.dashboard-focus-header--compact {
+  margin-bottom: var(--el-space-5);
+}
+
 .dashboard-stat-row {
   display: flex;
   flex-wrap: wrap;
@@ -332,10 +353,10 @@ const recentDays = computed(() => {
 
 .dashboard-next-action {
   padding-top: var(--el-space-3);
-  border-top: 1px solid var(--el-border);
+  border-top: 1px solid var(--el-divider);
   display: flex;
   flex-direction: column;
-  gap: var(--el-space-2);
+  gap: var(--el-space-4);
 }
 
 .dashboard-next-action-buttons {
@@ -377,10 +398,10 @@ const recentDays = computed(() => {
 }
 
 .dashboard-snapshot-headline {
-  font-size: var(--el-text-3xl);
+  font-size: 26px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  margin-bottom: var(--el-space-1);
+  margin-top: var(--el-space-2);
 }
 
 .dashboard-caveat {
@@ -391,7 +412,7 @@ const recentDays = computed(() => {
 
 .dashboard-setup-tally {
   padding-top: var(--el-space-3);
-  border-top: 1px solid var(--el-border);
+  border-top: 1px solid var(--el-divider);
   display: flex;
   flex-direction: column;
   gap: var(--el-space-2);
@@ -414,11 +435,11 @@ const recentDays = computed(() => {
 
 .dashboard-activity-row {
   display: grid;
-  grid-template-columns: 140px 90px 90px 1fr auto;
+  grid-template-columns: 140px 72px 70px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--el-space-4);
   padding: var(--el-space-4) var(--el-space-3);
-  border-bottom: 1px solid var(--el-border);
+  border-bottom: 1px solid var(--el-divider);
   cursor: pointer;
   transition: background-color var(--el-transition-fast);
 }
@@ -465,18 +486,28 @@ const recentDays = computed(() => {
 }
 
 @media (max-width: 900px) {
-  .dashboard-top-grid {
+  .dashboard-focus {
     grid-template-columns: 1fr;
   }
+
+  .dashboard-focus-side {
+    border-left: 0;
+    padding-left: 0;
+  }
+
 }
 
 @media (max-width: 640px) {
+  .dashboard-stat-row { gap: 16px; }
   .dashboard {
     padding: var(--el-space-4);
   }
 
+  .dashboard-focus-main { padding: var(--el-space-5); }
+  .dashboard-focus-side { padding: var(--el-space-5) 0; }
+
   .el-workstation {
-    padding: var(--el-space-5) var(--el-space-4) var(--el-space-4);
+    padding: var(--el-space-5) 0;
   }
 
   .dashboard-activity-row {

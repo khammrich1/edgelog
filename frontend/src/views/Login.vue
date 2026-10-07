@@ -37,7 +37,7 @@
             {{ authStore.loading ? 'Signing in...' : 'Sign In' }}
           </BaseButton>
 
-          <p v-if="errors.general" class="auth-error">{{ errors.general }}</p>
+          <p v-if="errors.general" class="auth-error" role="alert">{{ errors.general }}</p>
         </form>
 
         <p class="auth-footer">
@@ -105,7 +105,9 @@ async function handleLogin() {
   background-color: var(--el-surface);
   border: 1px solid var(--el-border);
   border-radius: var(--el-radius-lg);
-  padding: var(--el-space-8);
+  padding: clamp(20px, 5vw, 32px);
+  box-shadow: var(--el-shadow-lg);
+  border-top: 2px solid var(--el-copper);
   display: flex;
   flex-direction: column;
   gap: var(--el-space-6);
@@ -148,7 +150,7 @@ async function handleLogin() {
 .auth-tagline {
   text-align: center;
   font-size: var(--el-text-sm);
-  color: var(--el-steel);
+  color: var(--el-text-subtle);
   font-weight: 500;
   letter-spacing: 0.05em;
 }

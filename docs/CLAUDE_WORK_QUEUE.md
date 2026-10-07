@@ -1,5 +1,19 @@
 # Claude Open-Issue Work Queue
 
+## Owner revision - October 7, 2026 (Pacific)
+
+Owner subsequently selected PR #49 as the preferred workspace candidate.
+Continue the #50 correction on #49 and test that PR first. Keep #43 unmerged;
+reconcile/close it as superseded after #49 receives explicit DEV PASS. Visual
+preference does not claim functional acceptance, merge, or production deploy.
+
+Owner requested a broader workspace correction after DEV testing PR #49.
+Issue #50 records that revision under P3.5/#41. PR #49 is the current correction
+candidate; PR #43 remains open and overlapping. No new owner PASS or merge is
+claimed. Choose/accept one candidate before reconciling overlapping PRs.
+P4 onboarding and #32 follow P3.5; #45/#46/#48 remain scoped backlog.
+Strategy Trader remains parked. See `docs/PRODUCT_REVIEW_2026-10-07.md`.
+
 ## Current coordination — October 4, 2026 (Pacific)
 
 P1 #36 and P2 #38 are accepted/merged. P3 #40 is merged with the recorded functional pass. P3.5A #42 is merged; **P3.5B #43 is open for DEV owner acceptance**, covering Dashboard, Daily Journal and Calendar. P3.5C remains follow-up under #41. Check the exact DEV revision before testing; no fresh production deployment is claimed.

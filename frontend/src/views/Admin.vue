@@ -1,4 +1,5 @@
 <script setup>
+import WorkspaceHeader from '@/components/common/WorkspaceHeader.vue'
 import { onMounted } from 'vue'
 import { useAdminStore } from '@/stores/admin'
 
@@ -16,8 +17,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="admin-page">
-    <h1>Admin</h1>
+  <div class="admin-page el-page">
+    <WorkspaceHeader title="Admin" eyebrow="Administration" />
 
     <h2 class="section-title">Account Roster</h2>
     <table class="admin-table">
@@ -94,16 +95,8 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.admin-page {
-  padding: var(--el-space-8);
-  max-width: 1000px;
-  margin: 0 auto;
-}
 
-.admin-page h1 {
-  font-size: var(--el-text-2xl);
-  margin: 0 0 var(--el-space-6);
-}
+
 
 .section-title {
   font-size: var(--el-text-sm);

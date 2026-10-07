@@ -1,5 +1,26 @@
 # EdgeLog Vertical Slice Roadmap
 
+## Owner review - October 7, 2026 (Pacific)
+
+The owner requested a shared-workspace rebuild after reviewing DEV PR #49.
+Issue #41 remains the product-foundation scope; #50 records this owner-requested
+revision, implemented on PR #49. PR #43 is still open and overlaps the same
+core screens. Neither candidate has a new owner PASS. Select and accept one
+candidate before merging overlapping visual changes.
+
+Near-term order remains P3.5 workspace acceptance, P4 onboarding, then
+Define Your Edge / Trade Ranker (#32). Tilt (#45), missed-day recovery (#46),
+and trade-management counterfactual (#48) remain scoped backlog. Strategy
+Trader (#26-#29 / PR #33) remains parked; strategy analytics (#30) waits for
+canonical strategy metadata. This workspace revision does not implement
+analytics, onboarding, grading, psychology, or execution features.
+
+Older VS4 "current" and ST0 "unmerged" labels below describe historical
+slice status, not the active implementation queue. Use the coordination
+sections, live issues/PRs, and owner acceptance records for current status.
+
+Review findings and proposed sequencing: `docs/PRODUCT_REVIEW_2026-10-07.md`.
+
 ## Current coordination — October 4, 2026 (Pacific)
 
 P1 #36 and P2 #38 are accepted/merged. P3 #40 is merged with the recorded functional pass. P3.5A #42 is merged; **P3.5B #43 is open for DEV owner acceptance**, covering Dashboard, Daily Journal and Calendar. P3.5C remains follow-up under #41. Check the exact DEV revision before testing; no fresh production deployment is claimed.

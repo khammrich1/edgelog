@@ -1267,6 +1267,12 @@ onUnmounted(revokeAllTradeScreenshots)
 /* New-trade ticket grid -- six labeled fields (symbol/direction/qty/
    entry/stop/target) laid out with equal rhythm, replacing the old
    flex-wrap row of unlabeled, arbitrarily-sized inputs. */
+.ticket-field--entry-time { grid-column: span 2; }
+
+@media (max-width: 420px) {
+  .ticket-field--entry-time { grid-column: 1 / -1; }
+}
+
 .ticket-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));

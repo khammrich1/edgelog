@@ -36,6 +36,7 @@ const pnlResultClass = computed(() => {
     type="button"
     class="calendar-trade-card"
     :class="{ 'calendar-trade-card--selected': selected }"
+    :aria-pressed="selected"
     @click="$emit('select', trade.id)"
   >
     <div class="calendar-trade-card__top">
@@ -51,8 +52,8 @@ const pnlResultClass = computed(() => {
     <div class="calendar-trade-card__bottom">
       <span class="trade-status" :class="`trade-status--${trade.status}`">{{ trade.status.toUpperCase() }}</span>
       <span v-if="pnlLabel" class="calendar-trade-card__result" :class="pnlResultClass">
-        {{ pnlLabel }}
-        <template v-if="realizedR !== null"> ({{ realizedR > 0 ? '+' : '' }}{{ realizedR.toFixed(1) }}R)</template>
+        <span>{{ pnlLabel }}</span>
+        <span v-if="realizedR !== null">({{ realizedR > 0 ? '+' : '' }}{{ realizedR.toFixed(1) }}R)</span>
       </span>
     </div>
   </button>
@@ -86,6 +87,7 @@ const pnlResultClass = computed(() => {
 
 .calendar-trade-card__top {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--el-space-2);
@@ -99,6 +101,7 @@ const pnlResultClass = computed(() => {
 
 .calendar-trade-card__meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--el-space-2);
   font-size: var(--el-text-xs);
@@ -113,16 +116,24 @@ const pnlResultClass = computed(() => {
 
 .calendar-trade-card__bottom {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--el-space-2);
 }
 
 .calendar-trade-card__result {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
   font-size: var(--el-text-xs);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+
+.calendar-trade-card__result > span,
+.calendar-trade-card__meta > span:first-child { white-space: nowrap; }
+.calendar-trade-card__setup { min-width: 0; max-width: 100%; }
 
 .trade-direction {
   font-size: var(--el-text-xs);
@@ -143,6 +154,7 @@ const pnlResultClass = computed(() => {
 }
 
 .trade-status {
+  white-space: nowrap;
   font-size: var(--el-text-xs);
   font-weight: 600;
   letter-spacing: 0.05em;

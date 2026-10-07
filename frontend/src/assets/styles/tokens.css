@@ -2,15 +2,15 @@
 
 :root {
   /* Colors - Copper + Graphite + Steel + Onyx */
-  --el-bg: #0D0D0D;                    /* Onyx - primary background (canvas, level 0) */
+  --el-bg: #111416;                    /* Workspace canvas */
   /* Structural plane (level 1) -- chrome that extends the canvas (nav rail,
      table/section header strips) rather than sitting on it as content.
      Distinct from --el-surface so structure and content stop reading as
      "the same graphite rectangle" (P3.5 visual system). */
-  --el-surface-sunken: #171717;
-  --el-surface: #2B2B2B;                /* Graphite - content surfaces (level 2) */
-  --el-surface-raised: #353535;         /* Raised surfaces (level 3 -- hover/active emphasis) */
-  --el-copper: #B87333;                 /* Copper - primary brand/accent */
+  --el-surface-sunken: #181c1f;
+  --el-surface: #1e2326;
+  --el-surface-raised: #292f33;
+  --el-copper: #e1a568;                 /* Copper brand accent */
   --el-copper-hover: #CD8F4F;          /* Copper hover state */
   --el-copper-active: #9D5F23;         /* Copper active state */
   --el-steel: #6B6B6B;                  /* Steel - secondary elements */
@@ -18,11 +18,11 @@
 
   /* Text */
   --el-text: #F5F5F5;                   /* Off-white primary text */
-  --el-text-muted: #A0A0A0;            /* Muted text */
-  --el-text-subtle: #707070;           /* Subtle text */
+  --el-text-muted: #bac2c6;
+  --el-text-subtle: #99a5ac;
 
   /* Borders */
-  --el-border: #3F3F3F;                /* Default border -- panel/control outlines */
+  --el-border: #394247;
   --el-border-focus: #B87333;          /* Focused border (copper) */
   /* Internal separator -- a row divider inside a panel (or between rail
      sections) reads quieter than the panel's own outline; a flat
@@ -78,11 +78,12 @@
   --el-rail-width: 220px;
   --el-rail-width-collapsed: 72px;
   --el-content-max: 1200px;
+  --el-page-padding: clamp(20px, 3.5vw, 48px);
   --el-disabled-opacity: 0.5;
 
   /* Condensed uppercase label treatment -- used for nav items, section
      labels, table headers, badges: the "instrument panel" texture called
      for in the visual direction. */
-  --el-label-tracking: 0.08em;
+  --el-label-tracking: 0;
   --el-label-weight: 600;
 }

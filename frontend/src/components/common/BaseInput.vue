@@ -11,16 +11,21 @@
       :required="required"
       :disabled="disabled"
       :autocomplete="autocomplete"
+      v-bind="$attrs"
+      :aria-invalid="error ? 'true' : undefined"
+      :aria-describedby="error ? `${id}-error` : $attrs['aria-describedby']"
       class="base-input"
       :class="{ 'base-input--error': error }"
       @input="$emit('update:modelValue', $event.target.value)"
     />
-    <p v-if="error" class="base-input-error">{{ error }}</p>
+    <p v-if="error" :id="`${id}-error`" class="base-input-error" role="alert">{{ error }}</p>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { useId } from 'vue'
+
+defineOptions({ inheritAttrs: false })
 
 const props = defineProps({
   modelValue: String,
@@ -38,9 +43,7 @@ const props = defineProps({
 
 defineEmits(['update:modelValue'])
 
-const id = computed(() => {
-  return `input-${Math.random().toString(36).substr(2, 9)}`
-})
+const id = `input-${useId()}`
 </script>
 
 <style scoped>

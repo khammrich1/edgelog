@@ -1,4 +1,5 @@
 <script setup>
+import WorkspaceHeader from '@/components/common/WorkspaceHeader.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useJournalStore } from '@/stores/journal'
@@ -16,6 +17,21 @@ const newChecklistLabel = ref('')
 const biasChartObjectUrl = ref(null)
 const uploadError = ref(null)
 const activeTab = ref('mood')
+function navigateTabs(event) {
+  const tabs = ['mood', 'trades', 'overview']
+  const index = tabs.indexOf(activeTab.value)
+  let next
+  if (event.key === 'ArrowRight') next = (index + 1) % tabs.length
+  else if (event.key === 'ArrowLeft') next = (index + tabs.length - 1) % tabs.length
+  else if (event.key === 'Home') next = 0
+  else if (event.key === 'End') next = tabs.length - 1
+  else return
+  event.preventDefault()
+  activeTab.value = tabs[next]
+  event.currentTarget.querySelectorAll('[role="tab"]')[next]?.focus()
+}
+const loading = ref(true)
+const loadError = ref(null)
 
 const day = computed(() => journalStore.currentDay)
 const isLocked = computed(() => day.value?.status === 'locked')
@@ -101,10 +117,18 @@ const formattedDate = computed(() => {
 })
 
 async function loadDay() {
-  await journalStore.fetchChecklistItems()
-  const data = await journalStore.fetchDay(route.params.date)
-  marketBiasDraft.value = data.market_bias ?? ''
-  await refreshBiasChartPreview()
+  loading.value = true
+  loadError.value = null
+  try {
+    await journalStore.fetchChecklistItems()
+    const data = await journalStore.fetchDay(route.params.date)
+    marketBiasDraft.value = data.market_bias ?? ''
+    await refreshBiasChartPreview()
+  } catch (e) {
+    loadError.value = e.response?.data?.detail || 'Could not load this journal.'
+  } finally {
+    loading.value = false
+  }
 }
 
 async function refreshBiasChartPreview() {
@@ -193,31 +217,35 @@ onBeforeUnmount(revokeBiasChartPreview)
 </script>
 
 <template>
-  <div v-if="day" class="journal-day">
+  <div v-if="loading" class="journal-day el-page el-empty-state" role="status">Loading journal...</div>
+  <div v-else-if="loadError" class="journal-day el-page"><p class="el-error-state" role="alert">{{ loadError }}</p><button class="btn-chip" @click="loadDay">Try again</button></div>
+  <div v-else-if="day" class="journal-day el-page">
     <button class="back-link" @click="backToCalendar">&lsaquo; Back to Calendar</button>
 
-    <div class="workspace-header">
-      <div class="workspace-title-group">
-        <h1>{{ formattedDate }}</h1>
+    <WorkspaceHeader :title="formattedDate" eyebrow="Daily journal">
+      <template #status>
         <span class="status-badge" :class="isLocked ? 'status-badge--locked' : 'status-badge--draft'">
           {{ isLocked ? 'Locked' : 'Draft' }}
         </span>
-      </div>
-      <div class="workspace-header-actions">
+      </template>
+      <template #actions>
         <button class="week-link" @click="viewTradesThisWeek">View trades this week &rsaquo;</button>
         <button class="lock-button" :class="{ 'lock-button--locked': isLocked }" @click="toggleLock">
           {{ isLocked ? 'Unlock' : 'Lock' }}
         </button>
-      </div>
-    </div>
+      </template>
+    </WorkspaceHeader>
 
     <p v-if="isLocked" class="locked-hint">This day is locked. Unlock it to make changes.</p>
 
-    <div class="day-tabs" role="tablist">
+    <div class="day-tabs" role="tablist" aria-label="Journal sections" @keydown="navigateTabs">
       <button
         role="tab"
         class="day-tab"
         :class="{ 'day-tab--active': activeTab === 'mood' }"
+        id="mood-tab"
+        aria-controls="preparation-panel"
+        :tabindex="activeTab === 'mood' ? 0 : -1"
         :aria-selected="activeTab === 'mood'"
         @click="activeTab = 'mood'"
       >
@@ -227,6 +255,9 @@ onBeforeUnmount(revokeBiasChartPreview)
         role="tab"
         class="day-tab"
         :class="{ 'day-tab--active': activeTab === 'trades' }"
+        id="trades-tab"
+        aria-controls="trades-panel"
+        :tabindex="activeTab === 'trades' ? 0 : -1"
         :aria-selected="activeTab === 'trades'"
         @click="activeTab = 'trades'"
       >
@@ -236,6 +267,9 @@ onBeforeUnmount(revokeBiasChartPreview)
         role="tab"
         class="day-tab"
         :class="{ 'day-tab--active': activeTab === 'overview' }"
+        id="overview-tab"
+        aria-controls="overview-panel"
+        :tabindex="activeTab === 'overview' ? 0 : -1"
         :aria-selected="activeTab === 'overview'"
         @click="activeTab = 'overview'"
       >
@@ -243,7 +277,7 @@ onBeforeUnmount(revokeBiasChartPreview)
       </button>
     </div>
 
-    <div v-show="activeTab === 'mood'" class="prep-grid">
+    <div v-show="activeTab === 'mood'" id="preparation-panel" role="tabpanel" aria-labelledby="mood-tab" tabindex="0" class="prep-grid">
       <div class="prep-column">
         <section class="el-workstation">
           <div class="el-workstation-header">
@@ -259,6 +293,8 @@ onBeforeUnmount(revokeBiasChartPreview)
                   class="scale-button"
                   :class="{ 'scale-button--selected': day.sleep_quality === value }"
                   :disabled="isLocked"
+                  :aria-label="`Sleep quality ${value} of 5`"
+                  :aria-pressed="day.sleep_quality === value"
                   @click="setSleepQuality(value)"
                 >
                   {{ value }}
@@ -274,6 +310,8 @@ onBeforeUnmount(revokeBiasChartPreview)
                   class="scale-button"
                   :class="{ 'scale-button--selected': day.mood === value }"
                   :disabled="isLocked"
+                  :aria-label="`Mood ${value} of 5`"
+                  :aria-pressed="day.mood === value"
                   @click="setMood(value)"
                 >
                   {{ value }}
@@ -314,6 +352,7 @@ onBeforeUnmount(revokeBiasChartPreview)
               v-model="newChecklistLabel"
               type="text"
               placeholder="Add a checklist item"
+              aria-label="New checklist item"
               :disabled="isLocked"
               maxlength="200"
             />
@@ -331,6 +370,7 @@ onBeforeUnmount(revokeBiasChartPreview)
             v-model="marketBiasDraft"
             rows="5"
             placeholder="What's the plan today?"
+            aria-label="Market bias and thesis"
             :disabled="isLocked"
           ></textarea>
           <button
@@ -367,11 +407,11 @@ onBeforeUnmount(revokeBiasChartPreview)
       </div>
     </div>
 
-    <div v-show="activeTab === 'trades'">
+    <div v-show="activeTab === 'trades'" id="trades-panel" role="tabpanel" aria-labelledby="trades-tab" tabindex="0">
       <TradesSection :date="route.params.date" :locked="isLocked" />
     </div>
 
-    <div v-show="activeTab === 'overview'" class="day-overview">
+    <div v-show="activeTab === 'overview'" id="overview-panel" role="tabpanel" aria-labelledby="overview-tab" tabindex="0" class="day-overview">
       <section class="el-workstation">
         <div class="el-workstation-header">
           <span class="el-workstation-title">Day Summary</span>
@@ -477,27 +517,11 @@ onBeforeUnmount(revokeBiasChartPreview)
   color: var(--el-copper);
 }
 
-.workspace-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--el-space-3);
-  margin-bottom: var(--el-space-2);
-}
 
 /* One joined action pill (same construction as the tabs/toggles
    elsewhere) rather than two independently-floating controls -- reads as
    a single "workspace actions" area with a divider between its two
    actions, not two unrelated buttons that happen to be near each other. */
-.workspace-header-actions {
-  display: flex;
-  align-items: stretch;
-  background-color: var(--el-surface);
-  border: 1px solid var(--el-border);
-  border-radius: var(--el-radius-md);
-  overflow: hidden;
-}
 
 .week-link {
   display: flex;
@@ -516,16 +540,7 @@ onBeforeUnmount(revokeBiasChartPreview)
   background-color: var(--el-surface-raised);
 }
 
-.workspace-title-group {
-  display: flex;
-  align-items: center;
-  gap: var(--el-space-3);
-}
 
-.workspace-header h1 {
-  font-size: var(--el-text-2xl);
-  margin: 0;
-}
 
 .status-badge {
   font-size: var(--el-text-xs);
@@ -578,19 +593,22 @@ onBeforeUnmount(revokeBiasChartPreview)
 .day-tabs {
   display: flex;
   gap: var(--el-space-2);
-  background-color: var(--el-surface);
-  border: 1px solid var(--el-border);
-  border-radius: var(--el-radius-md);
-  padding: var(--el-space-2);
+  border-bottom: 1px solid var(--el-border);
+  padding: 0;
   margin: var(--el-space-5) 0 var(--el-space-6);
-  width: fit-content;
+  width: 100%;
+  background: var(--el-surface-sunken);
 }
 
 .day-tab {
-  padding: var(--el-space-2) var(--el-space-6);
+  padding: 12px 20px;
+  min-height: 44px;
   background: none;
   border: none;
-  border-radius: var(--el-radius-sm);
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  flex: 0 1 auto;
+  white-space: nowrap;
   color: var(--el-text-muted);
   font-size: var(--el-text-sm);
   font-weight: 500;
@@ -605,8 +623,8 @@ onBeforeUnmount(revokeBiasChartPreview)
 }
 
 .day-tab--active {
-  color: var(--el-bg);
-  background-color: var(--el-copper);
+  color: var(--el-text);
+  border-bottom-color: var(--el-copper);
   font-weight: 600;
 }
 
@@ -623,7 +641,11 @@ onBeforeUnmount(revokeBiasChartPreview)
   display: flex;
   flex-direction: column;
   gap: var(--el-space-6);
+  min-width: 0;
 }
+
+.prep-column > .el-workstation,
+.day-overview > .el-workstation { margin-bottom: 0; }
 
 .readiness-row {
   display: flex;
@@ -816,6 +838,7 @@ onBeforeUnmount(revokeBiasChartPreview)
 .scale-buttons {
   display: flex;
   gap: var(--el-space-2);
+  max-width: 100%;
 }
 
 .scale-button {
@@ -826,6 +849,7 @@ onBeforeUnmount(revokeBiasChartPreview)
   border: 1px solid var(--el-border);
   border-radius: var(--el-radius-sm);
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .scale-button:disabled {
@@ -891,6 +915,9 @@ onBeforeUnmount(revokeBiasChartPreview)
 }
 
 @media (max-width: 640px) {
+  .day-tab { padding: 12px 16px; }
+  .workspace-header-actions { max-width: 100%; }
+  .workspace-header h1 { font-size: 22px; overflow-wrap: anywhere; }
   .journal-day {
     padding: var(--el-space-4);
   }
@@ -921,4 +948,5 @@ onBeforeUnmount(revokeBiasChartPreview)
     grid-area: result;
   }
 }
+@media (max-width: 400px) { .day-tab { padding-inline: 12px; flex: 1; } }
 </style>
