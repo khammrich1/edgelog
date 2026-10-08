@@ -47,8 +47,10 @@ input[type='checkbox'], input[type='radio'] { accent-color: var(--el-copper); }
   width: 100%;
   max-width: var(--el-content-max);
   margin-inline: auto;
-  padding: 32px var(--el-page-padding);
+  padding: 36px var(--el-page-padding) 48px;
 }
+
+.el-page-header + .el-workstation { border-top: none; padding-top: 0; }
 
 .el-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .el-toolbar > button, .el-toolbar > input { min-height: 40px; }
@@ -58,12 +60,13 @@ input[type='checkbox'], input[type='radio'] { accent-color: var(--el-copper); }
   background: var(--el-surface);
   border: 1px solid var(--el-border);
   border-radius: var(--el-radius-md);
-  box-shadow: var(--el-shadow-sm);
+  box-shadow: var(--el-shadow-panel);
 }
 
 @media (max-width: 640px) { .el-page { padding: 20px 16px; } }
 
 h1, h2, h3, h4, h5, h6 {
+  font-family: var(--el-font-heading);
   font-weight: 600;
   line-height: 1.2;
   color: var(--el-text);
@@ -116,7 +119,7 @@ select {
   font-family: inherit;
   font-size: var(--el-text-sm);
   color: var(--el-text);
-  background-color: var(--el-surface);
+  background-color: var(--el-surface-sunken);
   border: 1px solid var(--el-border);
   border-radius: var(--el-radius-sm);
   padding: var(--el-space-2) var(--el-space-3);
@@ -272,7 +275,8 @@ form.el-workstation {
   background: var(--el-surface);
   border: 1px solid var(--el-border);
   border-radius: var(--el-radius-md);
-  padding: var(--el-space-5);
+  padding: var(--el-space-6);
+  box-shadow: var(--el-shadow-panel);
 }
 
 .el-workstation-title {
@@ -295,7 +299,7 @@ form.el-workstation {
 }
 
 .el-field-label {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: var(--el-label-weight);
   text-transform: uppercase;
   letter-spacing: var(--el-label-tracking);
@@ -415,7 +419,9 @@ form.el-workstation {
   padding: var(--el-space-3) var(--el-space-6);
   background-color: var(--el-copper);
   color: var(--el-bg);
-  border: none;
+  border: 1px solid transparent;
+  box-shadow: inset 0 1px rgba(255, 255, 255, .16);
+  min-height: 44px;
   border-radius: var(--el-radius-md);
   font-weight: 600;
   font-size: var(--el-text-sm);

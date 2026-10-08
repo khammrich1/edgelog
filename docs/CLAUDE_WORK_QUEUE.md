@@ -1,5 +1,13 @@
 # Claude Open-Issue Work Queue
 
+## Visual follow-up - October 8, 2026 (Pacific)
+
+PR #49 is merged; PR #43 was closed as superseded and #50 is closed.
+Issue #51 scopes the owner's new visual improvement pass. It preserves the
+accepted workspace layout and requires fresh DEV owner acceptance before merge.
+Production deployment remains a separate owner decision. Older candidate
+status statements below are historical. Strategy Trader remains parked.
+
 ## Owner revision - October 7, 2026 (Pacific)
 
 Owner subsequently selected PR #49 as the preferred workspace candidate.

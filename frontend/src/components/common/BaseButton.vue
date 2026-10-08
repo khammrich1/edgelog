@@ -33,7 +33,8 @@ defineEmits(['click'])
 .base-button {
   padding: var(--el-space-3) var(--el-space-6);
   border-radius: var(--el-radius-md);
-  font-weight: 500;
+  min-height: 44px;
+  font-weight: 600;
   font-size: var(--el-text-base);
   transition: all var(--el-transition-fast);
   cursor: pointer;
@@ -48,6 +49,7 @@ defineEmits(['click'])
 /* Primary - Copper */
 .base-button--primary {
   background-color: var(--el-copper);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .16);
   color: var(--el-bg);
 }
 
