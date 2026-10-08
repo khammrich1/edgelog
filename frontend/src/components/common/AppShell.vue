@@ -52,13 +52,14 @@ async function handleLogout() {
       </button>
     </header>
     <nav id="workspace-navigation" class="app-rail" :class="{ 'app-rail--open': menuOpen }" aria-label="Main navigation">
-      <router-link to="/dashboard" class="rail-brand"><EdgeLogLogo /></router-link>
+      <div class="rail-identity"><router-link to="/dashboard" class="rail-brand"><EdgeLogLogo /></router-link><p class="rail-tagline">Trade. Reflect. Improve.</p></div>
       <div class="rail-section"><span class="rail-caption el-label">Workspace</span>
         <router-link v-for="link in links" :key="link.label" :to="link.to" class="rail-link" :class="{ 'rail-link--active': isActive(link) }" :aria-current="isActive(link) ? 'page' : undefined">
           <component :is="link.icon" :size="18" aria-hidden="true" />{{ link.label }}
         </router-link>
       </div>
       <div class="rail-section rail-section--secondary">
+        <span class="rail-caption el-label">Account & support</span>
         <router-link to="/feedback" class="rail-link" :class="{ 'rail-link--active': route.path === '/feedback' }" :aria-current="route.path === '/feedback' ? 'page' : undefined"><MessageSquare :size="18" />Feedback</router-link>
         <router-link v-if="authStore.user?.is_admin" to="/admin" class="rail-link" :class="{ 'rail-link--active': route.path === '/admin' }" :aria-current="route.path === '/admin' ? 'page' : undefined"><Shield :size="18" />Admin</router-link>
         <router-link to="/settings" class="rail-link" :class="{ 'rail-link--active': route.path === '/settings' }" :aria-current="route.path === '/settings' ? 'page' : undefined"><Settings :size="18" />Settings</router-link>
@@ -72,14 +73,15 @@ async function handleLogout() {
 
 <style scoped>
 .app-shell { min-height: 100vh; display: flex; }
-.app-rail { position: sticky; top: 0; width: var(--el-rail-width); height: 100dvh; flex: 0 0 var(--el-rail-width); padding: 28px 14px 16px; display: flex; flex-direction: column; gap: 32px; background: var(--el-surface-sunken); border-right: 1px solid var(--el-border); overflow-y: auto; }
+.app-rail { position: sticky; top: 0; width: var(--el-rail-width); height: 100dvh; flex: 0 0 var(--el-rail-width); padding: 28px 14px 16px; display: flex; flex-direction: column; gap: 40px; background: #121719; border-right: 1px solid var(--el-divider); overflow-y: auto; }
 .rail-caption { padding: 0 12px 8px; font-size: 10px; letter-spacing: .12em; }
+.rail-tagline { margin: 12px 12px 0; color: var(--el-text-subtle); font-size: 11px; letter-spacing: .035em; }
 .rail-brand { padding: 0 12px; display: flex; }
 .rail-section { display: flex; flex-direction: column; gap: 4px; }
-.rail-link { display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 10px 12px; color: var(--el-text-muted); border-radius: 4px; font-size: 14px; font-weight: 500; text-align: left; }
+.rail-link { display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 10px 12px; color: var(--el-text-muted); border-radius: 6px; font-size: 14px; font-weight: 500; text-align: left; }
 .rail-link:hover { background: var(--el-surface-raised); color: var(--el-text); }
-.rail-link--active { background: var(--el-surface-raised); color: var(--el-copper); box-shadow: inset 3px 0 var(--el-copper); }
-.rail-section--secondary { margin-top: auto; padding-top: 20px; border-top: 1px solid var(--el-border); }
+.rail-link--active { background: var(--el-accent-wash); color: var(--el-copper); box-shadow: inset 2px 0 var(--el-copper); }
+.rail-section--secondary { margin-top: auto; padding-top: 20px; border-top: 1px solid var(--el-divider); }
 .rail-account { display: flex; align-items: center; gap: 10px; padding: 0 12px; font-size: 12px; }
 .rail-account strong, .rail-account span { display: block; }
 .rail-account div span { color: var(--el-text-subtle); }
@@ -94,6 +96,6 @@ async function handleLogout() {
   .menu-toggle { display: grid; place-items: center; width: 40px; height: 40px; }
   .app-rail { display: none; position: fixed; top: 64px; left: 0; bottom: 0; z-index: 30; width: 100%; height: calc(100dvh - 64px); padding: 16px; gap: 24px; }
   .app-rail--open { display: flex; }
-  .rail-brand { display: none; }
+  .rail-identity { display: none; }
 }
 </style>

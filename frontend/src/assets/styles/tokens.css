@@ -2,15 +2,15 @@
 
 :root {
   /* Colors - Copper + Graphite + Steel + Onyx */
-  --el-bg: #111416;                    /* Workspace canvas */
+  --el-bg: #101315;                    /* Workspace canvas */
   /* Structural plane (level 1) -- chrome that extends the canvas (nav rail,
      table/section header strips) rather than sitting on it as content.
      Distinct from --el-surface so structure and content stop reading as
      "the same graphite rectangle" (P3.5 visual system). */
-  --el-surface-sunken: #181c1f;
-  --el-surface: #1e2326;
-  --el-surface-raised: #292f33;
-  --el-copper: #e1a568;                 /* Copper brand accent */
+  --el-surface-sunken: #151a1d;
+  --el-surface: #1c2226;
+  --el-surface-raised: #262e33;
+  --el-copper: #dea66e;                 /* Copper brand accent */
   --el-copper-hover: #CD8F4F;          /* Copper hover state */
   --el-copper-active: #9D5F23;         /* Copper active state */
   --el-steel: #6B6B6B;                  /* Steel - secondary elements */
@@ -22,7 +22,7 @@
   --el-text-subtle: #99a5ac;
 
   /* Borders */
-  --el-border: #394247;
+  --el-border: #333e45;
   --el-border-focus: #B87333;          /* Focused border (copper) */
   /* Internal separator -- a row divider inside a panel (or between rail
      sections) reads quieter than the panel's own outline; a flat
@@ -49,6 +49,7 @@
 
   /* Typography */
   --el-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --el-font-heading: 'Bahnschrift', 'DIN Alternate', 'Arial Narrow', var(--el-font-sans);
   --el-font-mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Consolas', monospace;
 
   --el-text-xs: 0.75rem;    /* 12px */
@@ -63,6 +64,11 @@
   --el-radius-sm: 4px;
   --el-radius-md: 6px;
   --el-radius-lg: 8px;
+
+  /* Surface highlights define hierarchy without decorative gradients. */
+  --el-surface-highlight: rgba(255, 255, 255, 0.045);
+  --el-accent-wash: rgba(222, 166, 110, 0.09);
+  --el-shadow-panel: 0 8px 24px rgb(0 0 0 / 0.14), inset 0 1px var(--el-surface-highlight);
 
   /* Shadows */
   --el-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
@@ -84,6 +90,6 @@
   /* Condensed uppercase label treatment -- used for nav items, section
      labels, table headers, badges: the "instrument panel" texture called
      for in the visual direction. */
-  --el-label-tracking: 0;
+  --el-label-tracking: 0.06em;
   --el-label-weight: 600;
 }

@@ -540,8 +540,6 @@ onBeforeUnmount(revokeBiasChartPreview)
   background-color: var(--el-surface-raised);
 }
 
-
-
 .status-badge {
   font-size: var(--el-text-xs);
   font-weight: var(--el-label-weight);
@@ -597,7 +595,7 @@ onBeforeUnmount(revokeBiasChartPreview)
   padding: 0;
   margin: var(--el-space-5) 0 var(--el-space-6);
   width: 100%;
-  background: var(--el-surface-sunken);
+  background: transparent;
 }
 
 .day-tab {
@@ -625,6 +623,7 @@ onBeforeUnmount(revokeBiasChartPreview)
 .day-tab--active {
   color: var(--el-text);
   border-bottom-color: var(--el-copper);
+  background: var(--el-accent-wash);
   font-weight: 600;
 }
 
@@ -634,7 +633,7 @@ onBeforeUnmount(revokeBiasChartPreview)
 .prep-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--el-space-6);
+  gap: var(--el-space-8);
 }
 
 .prep-column {
@@ -650,7 +649,7 @@ onBeforeUnmount(revokeBiasChartPreview)
 .readiness-row {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--el-space-8);
+  gap: var(--el-space-6);
 }
 
 .day-overview {
@@ -844,7 +843,7 @@ onBeforeUnmount(revokeBiasChartPreview)
 .scale-button {
   width: 40px;
   height: 40px;
-  background-color: var(--el-surface);
+  background-color: var(--el-surface-sunken);
   color: var(--el-text);
   border: 1px solid var(--el-border);
   border-radius: var(--el-radius-sm);
@@ -860,7 +859,7 @@ onBeforeUnmount(revokeBiasChartPreview)
 .scale-button--selected {
   border-color: var(--el-copper);
   color: var(--el-copper);
-  background-color: rgba(184, 115, 51, 0.1);
+  background-color: var(--el-accent-wash);
 }
 
 .el-workstation textarea {
@@ -916,8 +915,6 @@ onBeforeUnmount(revokeBiasChartPreview)
 
 @media (max-width: 640px) {
   .day-tab { padding: 12px 16px; }
-  .workspace-header-actions { max-width: 100%; }
-  .workspace-header h1 { font-size: 22px; overflow-wrap: anywhere; }
   .journal-day {
     padding: var(--el-space-4);
   }
