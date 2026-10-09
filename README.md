@@ -1,5 +1,8 @@
 # EdgeLog
 
+> **October 8, 2026 owner direction:** EdgeLog is one integrated product for trader-defined strategies, journal-based evidence/validation, planning, local Practice execution and deliberate reflection—not just a journal. Existing confluence grades do not prove statistical edge. **Highest priority is moving the WEB app to DigitalOcean App Platform** (#57), with DEV acceptance before separately approved PROD cutover; the Windows execution agent and credentials stay local. See [product vision and execution specification](docs/PRODUCT_VISION_AND_EXECUTION_2026-10-08.md). Current status below includes historical context; no migration or Practice end-to-end completion is claimed.
+
+
 **Trade. Reflect. Improve.**
 
 EdgeLog is a manual-first trading journal built to help traders document their process, review execution, understand behavioral patterns, and identify their actual trading edge.
