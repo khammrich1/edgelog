@@ -1,5 +1,8 @@
 # EdgeLog Product Specification
 
+> **Owner update — 2026-10-08:** EdgeLog is **one integrated strategy-development, journal-based validation, planning and local execution product**, not merely a standalone journal or a second Strategy Trader product. The trader defines a setup hypothesis; data validates whether it deserves an evidence-based A+ rating. The existing #32 confluence-count A+ is a **setup-match/checklist grade**, not proof of statistical edge. Automatic provider event recording reduces clerical work; the trader still authors reflection. **Highest immediate engineering priority: migrate the WEB app to DigitalOcean App Platform (#57), DEV first, explicit gated PROD cutover.** The local Windows TopstepX agent never moves to cloud and cloud cannot originate/relay orders. Full authoritative vision: [docs/PRODUCT_VISION_AND_EXECUTION_2026-10-08.md](docs/PRODUCT_VISION_AND_EXECUTION_2026-10-08.md). ST1 #33 and #53–#56 are not accepted/shipped.
+
+
 ## Identity
 
 **EdgeLog** is a standalone trading journal.
