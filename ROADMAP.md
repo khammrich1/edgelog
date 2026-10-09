@@ -1,5 +1,10 @@
 # EdgeLog Vertical Slice Roadmap
 
+## Owner priority override — October 8, 2026 (Pacific)
+
+**P0: DigitalOcean App Platform migration for the EdgeLog web application — issue #57.** Audit and deploy isolated DEV first, preserve droplet production until separately approved cutover with backup/rollback. Local Windows trading agent stays local. This **supersedes earlier 'P3.5 first' sequencing**, without merging/closing existing P3.5 #43/#49 candidates. The owner also confirmed **one unified EdgeLog product** built on journal-based strategy validation and local Practice execution; see [product vision](docs/PRODUCT_VISION_AND_EXECUTION_2026-10-08.md). Execution follow-on #53–#56 are scoped issues, not delivered. ST1 #33 requires owner Practice acceptance. Do not mistake checklist A+ for empirically validated edge.
+
+
 ## Owner review - October 7, 2026 (Pacific)
 
 The owner requested a shared-workspace rebuild after reviewing DEV PR #49.
