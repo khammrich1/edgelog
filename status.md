@@ -1,5 +1,17 @@
 # EdgeLog Status
 
+## Current reconciliation — October 9, 2026 (Pacific)
+
+Highest priority: web App Platform migration #57, DEV first, using the existing repository. Kyle reported today that /health works after build troubleshooting. This is owner-reported backend smoke success; exact App Platform revision, frontend/API/auth/database acceptance and production cutover are not established. Keep existing droplet production operating until a separate approved cutover.
+
+#49 is merged (`a2b3141`) and owner workspace acceptance is recorded in issue #51 and the October 8 conversation. The prior board's blanket refusal to recognize that acceptance is superseded. #43 is CLOSED WITHOUT MERGE, superseded by the shared workspace; it is no longer an open acceptance gate. #52 (`4dacf48`) remains open for its own DEV visual/functional check. ST1 #33 remains open/parked and not accepted.
+
+Product direction is now one integrated strategy-definition, journal-evidence/validation, planning, local Practice execution and reflection product; see product repo docs/PRODUCT_VISION_AND_EXECUTION_2026-10-08.md. This supersedes the journal-only scheduling language below. A confluence checklist grade is not statistical proof of edge. Execution companion #53–#56 are specifications, not delivered capabilities. All actual order origination, modification/cancellation and credentials stay on the personal Windows computer; cloud is not an order relay. Deliberate psychology/reflection remains manual.
+
+Next: finish #57 DEV frontend/API routing, environment/database/migrations, login/refresh/logout, journal persistence/uploads and exact revision checks; preserve #52 for later acceptance. Migration does not authorize a rebrand/rebuild or production cutover. Tilt #45, missed-day recovery #46 and touch counterfactual #48 remain scoped.
+
+## Historical coordination — superseded where conflicting
+
 ## Current coordination — October 4, 2026 (Pacific)
 
 P1 #36 and P2 #38 are accepted/merged. P3 #40 is merged with the recorded functional pass. P3.5A #42 is merged; **P3.5B #43 is open for DEV owner acceptance**, covering Dashboard, Daily Journal and Calendar. P3.5C remains follow-up under #41. Check the exact DEV revision before testing; no fresh production deployment is claimed.
