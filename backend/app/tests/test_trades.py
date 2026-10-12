@@ -60,6 +60,58 @@ async def test_create_long_trade(client: AsyncClient):
     assert data["status"] == "open"
     assert data["remaining_quantity"] == 5
     assert data["exits"] == []
+    # Issue #64: a trade logged without going through screenshot extraction
+    # must default to the manual provenance, with no extraction audit trail.
+    assert data["price_source"] == "manual"
+    assert data["extraction_snapshot"] is None
+    assert data["extracted_at"] is None
+    assert data["price_edited_after_extraction"] is False
+
+
+@pytest.mark.asyncio
+async def test_create_trade_with_image_extracted_source_persists_snapshot(client: AsyncClient):
+    headers = await _register_and_auth_headers(client)
+    day = await _open_day(client, headers)
+    snapshot = {
+        "symbol": "MNQ",
+        "direction": "long",
+        "entry_price": "24500",
+        "stop_price": None,
+        "target_price": None,
+        "initial_quantity": 5,
+        "notes": None,
+    }
+
+    response = await client.post(
+        f"/api/v1/journal/days/{day}/trades",
+        headers=headers,
+        json=_base_trade_payload(
+            price_source="image_extracted",
+            extraction_snapshot=snapshot,
+            extracted_at="2026-02-01T09:29:00Z",
+        ),
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["price_source"] == "image_extracted"
+    assert data["extraction_snapshot"] == snapshot
+    assert data["extracted_at"] is not None
+    assert data["price_edited_after_extraction"] is False
+
+
+@pytest.mark.asyncio
+async def test_create_trade_image_extracted_requires_snapshot_and_timestamp(client: AsyncClient):
+    headers = await _register_and_auth_headers(client)
+    day = await _open_day(client, headers)
+
+    response = await client.post(
+        f"/api/v1/journal/days/{day}/trades",
+        headers=headers,
+        json=_base_trade_payload(price_source="image_extracted"),
+    )
+
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio
@@ -167,6 +219,71 @@ async def test_update_trade(client: AsyncClient):
     assert Decimal(data["stop_price"]) == Decimal("24480")
     assert data["notes"] == "Broke out of the opening range"
     assert data["setup"] == "ORB"
+
+
+@pytest.mark.asyncio
+async def test_update_image_extracted_trade_price_flips_edited_flag(client: AsyncClient):
+    headers = await _register_and_auth_headers(client)
+    day = await _open_day(client, headers)
+    snapshot = {
+        "symbol": "MNQ",
+        "direction": "long",
+        "entry_price": "24500",
+        "stop_price": None,
+        "target_price": None,
+        "initial_quantity": 5,
+        "notes": None,
+    }
+    create_response = await client.post(
+        f"/api/v1/journal/days/{day}/trades",
+        headers=headers,
+        json=_base_trade_payload(
+            price_source="image_extracted",
+            extraction_snapshot=snapshot,
+            extracted_at="2026-02-01T09:29:00Z",
+        ),
+    )
+    trade_id = create_response.json()["id"]
+
+    # Editing a field that isn't price-bearing (notes) must not flip the flag.
+    response = await client.put(
+        f"/api/v1/journal/days/{day}/trades/{trade_id}",
+        headers=headers,
+        json={"notes": "Double-checked against the broker fill."},
+    )
+    assert response.json()["price_edited_after_extraction"] is False
+
+    # Editing entry_price away from the extracted value must flip it, and
+    # must never rewrite the original extraction_snapshot audit trail.
+    response = await client.put(
+        f"/api/v1/journal/days/{day}/trades/{trade_id}",
+        headers=headers,
+        json={"entry_price": "24498.50"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["price_edited_after_extraction"] is True
+    assert data["extraction_snapshot"] == snapshot
+    assert Decimal(data["entry_price"]) == Decimal("24498.50")
+
+
+@pytest.mark.asyncio
+async def test_update_manual_trade_never_sets_edited_flag(client: AsyncClient):
+    headers = await _register_and_auth_headers(client)
+    day = await _open_day(client, headers)
+    create_response = await client.post(
+        f"/api/v1/journal/days/{day}/trades", headers=headers, json=_base_trade_payload()
+    )
+    trade_id = create_response.json()["id"]
+
+    response = await client.put(
+        f"/api/v1/journal/days/{day}/trades/{trade_id}",
+        headers=headers,
+        json={"entry_price": "24510"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["price_edited_after_extraction"] is False
 
 
 @pytest.mark.asyncio

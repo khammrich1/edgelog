@@ -135,3 +135,60 @@ async def test_parse_screenshot_extraction_partial_nulls_are_allowed(client: Asy
     data = response.json()
     assert data["symbol"] is None
     assert data["notes"] == "Screenshot was too blurry to read most fields."
+
+
+@pytest.mark.asyncio
+async def test_parse_screenshot_flags_tick_misaligned_price(client: AsyncClient, monkeypatch):
+    headers = await _register_and_auth_headers(client)
+
+    def fake_extract(image_bytes: bytes, content_type: str) -> dict:
+        return {
+            "symbol": "MNQ",
+            "direction": "long",
+            "entry_price": "31224.10",  # not a multiple of MNQ's 0.25 tick
+            "stop_price": "31200.00",
+            "target_price": None,
+            "initial_quantity": 1,
+            "notes": None,
+        }
+
+    monkeypatch.setattr(ai_capture, "_extract_trade_details_via_claude", fake_extract)
+
+    response = await client.post(
+        "/api/v1/trades/parse-screenshot",
+        headers=headers,
+        files={"file": ("chart.png", _tiny_png_bytes(), "image/png")},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["tick_warnings"]) == 1
+    assert "entry_price" in data["tick_warnings"][0]
+    assert "MNQ" in data["tick_warnings"][0]
+
+
+@pytest.mark.asyncio
+async def test_parse_screenshot_no_tick_warnings_for_aligned_prices(client: AsyncClient, monkeypatch):
+    headers = await _register_and_auth_headers(client)
+
+    def fake_extract(image_bytes: bytes, content_type: str) -> dict:
+        return {
+            "symbol": "MNQ",
+            "direction": "long",
+            "entry_price": "31224.25",
+            "stop_price": "31200.00",
+            "target_price": "31260.00",
+            "initial_quantity": 1,
+            "notes": None,
+        }
+
+    monkeypatch.setattr(ai_capture, "_extract_trade_details_via_claude", fake_extract)
+
+    response = await client.post(
+        "/api/v1/trades/parse-screenshot",
+        headers=headers,
+        files={"file": ("chart.png", _tiny_png_bytes(), "image/png")},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["tick_warnings"] == []

@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import TradesSection from './TradesSection.vue'
@@ -193,5 +193,92 @@ describe('TradesSection trade screenshot storage', () => {
     expect(img.attributes('src')).toBe(objectUrl)
     expect(wrapper.text()).toContain('Replace screenshot')
     expect(wrapper.text()).toContain('Remove screenshot')
+  })
+})
+
+async function pasteImage(wrapper, file) {
+  await wrapper.find('.screenshot-dropzone').trigger('paste', {
+    clipboardData: { items: [{ type: 'image/png', getAsFile: () => file }] }
+  })
+  await flushPromises()
+}
+
+describe('TradesSection AI extraction confirmation (issue #64)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('blocks submit until the extracted values are explicitly confirmed', async () => {
+    const { wrapper, tradesStore } = mountTradesSection()
+    tradesStore.parseScreenshot = vi.fn().mockResolvedValue({
+      symbol: 'MNQ',
+      direction: 'long',
+      entry_price: '31224.25',
+      stop_price: null,
+      target_price: null,
+      initial_quantity: 1,
+      notes: null,
+      tick_warnings: []
+    })
+    tradesStore.createTrade = vi.fn().mockResolvedValue({ id: 99 })
+
+    await pasteImage(wrapper, new File(['x'], 'shot.png', { type: 'image/png' }))
+
+    expect(wrapper.find('input[placeholder="Entry"]').element.value).toBe('31224.25')
+    expect(wrapper.text()).toContain('suggested by AI')
+    expect(wrapper.find('button[type="submit"]').attributes('disabled')).toBeDefined()
+
+    await wrapper.find('input[placeholder="Setup"]').setValue('Breakout')
+    await wrapper.find('.trade-form').trigger('submit')
+    expect(tradesStore.createTrade).not.toHaveBeenCalled()
+
+    await wrapper.find('.extraction-confirm-checkbox input[type="checkbox"]').setValue(true)
+    expect(wrapper.find('button[type="submit"]').attributes('disabled')).toBeUndefined()
+
+    await wrapper.find('.trade-form').trigger('submit')
+    expect(tradesStore.createTrade).toHaveBeenCalledWith(
+      '2026-01-01',
+      expect.objectContaining({
+        price_source: 'image_extracted',
+        extraction_snapshot: expect.objectContaining({ entry_price: '31224.25' }),
+        extracted_at: expect.any(String)
+      })
+    )
+  })
+
+  it('surfaces tick-size warnings from the server prominently', async () => {
+    const { wrapper, tradesStore } = mountTradesSection()
+    tradesStore.parseScreenshot = vi.fn().mockResolvedValue({
+      symbol: 'MNQ',
+      direction: 'long',
+      entry_price: '31224.10',
+      stop_price: null,
+      target_price: null,
+      initial_quantity: 1,
+      notes: null,
+      tick_warnings: ["entry_price 31224.10 is not aligned to MNQ's 0.25 tick size -- double-check this against the source for a misread digit."]
+    })
+
+    await pasteImage(wrapper, new File(['x'], 'shot.png', { type: 'image/png' }))
+
+    expect(wrapper.find('.extraction-review-warnings').text()).toContain('not aligned to')
+  })
+
+  it('does not require confirmation or send provenance fields for a manually entered trade', async () => {
+    const { wrapper, tradesStore } = mountTradesSection()
+    tradesStore.createTrade = vi.fn().mockResolvedValue({ id: 100 })
+
+    expect(wrapper.find('button[type="submit"]').attributes('disabled')).toBeUndefined()
+
+    await wrapper.find('input[placeholder="Setup"]').setValue('Breakout')
+    await wrapper.find('input[placeholder="Qty"]').setValue('2')
+    await wrapper.find('input[placeholder="Entry"]').setValue('100')
+    await wrapper.find('.trade-form').trigger('submit')
+    await flushPromises()
+
+    expect(tradesStore.createTrade).toHaveBeenCalled()
+    const payload = tradesStore.createTrade.mock.calls[0][1]
+    expect(payload.price_source).toBeUndefined()
+    expect(payload.extraction_snapshot).toBeUndefined()
   })
 })
