@@ -63,9 +63,10 @@ const pnlResultClass = computed(() => {
 .calendar-trade-card {
   display: flex;
   flex-direction: column;
-  gap: var(--el-space-1);
+  gap: 10px;
   width: 100%;
-  padding: var(--el-space-2) var(--el-space-3);
+  padding: 12px;
+  box-shadow: inset 0 1px var(--el-surface-highlight);
   background-color: var(--el-surface);
   border: 1px solid var(--el-border);
   border-radius: var(--el-radius-sm);
@@ -82,6 +83,7 @@ const pnlResultClass = computed(() => {
 
 .calendar-trade-card--selected {
   border-color: var(--el-copper);
+  background-color: var(--el-surface-raised);
   box-shadow: 0 0 0 1px var(--el-copper);
 }
 
@@ -136,10 +138,10 @@ const pnlResultClass = computed(() => {
 .calendar-trade-card__setup { min-width: 0; max-width: 100%; }
 
 .trade-direction {
-  font-size: var(--el-text-xs);
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.04em;
-  padding: 2px var(--el-space-2);
+  padding: 2px 5px;
   border-radius: var(--el-radius-sm);
 }
 

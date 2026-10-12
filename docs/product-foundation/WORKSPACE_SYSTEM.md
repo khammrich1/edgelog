@@ -1,10 +1,12 @@
 # Workspace System - P3.5 Owner Revision
 
-Scope: #41 / #50, candidate PR #49. Not yet owner-accepted.
+Baseline: #41 / #50, owner-selected PR #49 merged October 7, 2026.
+The October 8 visual follow-up is scoped by #51 and awaits its own DEV acceptance.
+See [visual polish evidence](../SITE_IMPROVEMENTS_2026-10-08.md).
 
 ## Shared Rules
 
-- Canvas: `--el-bg`; structural rail: `--el-surface-sunken`.
+- Canvas: `--el-bg`; structural rail uses a quieter graphite plane.
 - Framed data-entry forms: `form.el-workstation` on `--el-surface`.
 - Ordinary sections: unframed `.el-workstation` with a top divider.
 - Hover/selected surfaces: `--el-surface-raised`; copper identifies the active

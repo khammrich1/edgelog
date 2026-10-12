@@ -213,10 +213,6 @@ watch([weekStart, weekEnd], fetchWeek, { immediate: true })
 </template>
 
 <style scoped>
-
-
-
-
 .calendar-nav {
   display: flex;
   align-items: center;
@@ -262,7 +258,7 @@ watch([weekStart, weekEnd], fetchWeek, { immediate: true })
 .day-column {
   min-width: 0;
   overflow-wrap: anywhere;
-  min-height: 120px;
+  min-height: 240px;
   padding: var(--el-space-2);
   background-color: var(--el-surface-sunken);
 }
@@ -276,7 +272,9 @@ watch([weekStart, weekEnd], fetchWeek, { immediate: true })
   display: flex;
   align-items: baseline;
   gap: var(--el-space-2);
+  padding: 8px 0 12px;
   margin-bottom: var(--el-space-2);
+  border-bottom: 1px solid var(--el-divider);
 }
 
 .day-weekday {
@@ -307,7 +305,7 @@ watch([weekStart, weekEnd], fetchWeek, { immediate: true })
 .week-empty a { font-size: 14px; }
 .empty-day-hint { color: var(--el-text-subtle); font-size: 12px; }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .trade-calendar {
     padding: var(--el-space-4);
   }
@@ -344,6 +342,7 @@ watch([weekStart, weekEnd], fetchWeek, { immediate: true })
 
   .week-chip--focused {
     border-color: var(--el-copper);
+    background: var(--el-accent-wash);
   }
 
   .week-chip-label {

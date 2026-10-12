@@ -6,11 +6,20 @@
 
 **P0 remains #57 DEV acceptance:** owner reports DigitalOcean login page and /health work, but API route, Supabase/Alembic, auth/session, journal CRUD and uploads are not yet verified. Do not claim full DEV PASS, migration completion, or production deployment. **Next work:** finish DEV smoke tests and migrations without touching PROD; then issue-linked observe-only signal/alert proposal contract from #59. All order placement and unattended management remain separately gated (#26, #53–#56).
 
+**PR #52 (issue #51 visual polish) reconciliation — October 12, 2026:** owner authorized merging current `main` into PR #52's branch (`codex/visual-polish-pass`) to bring it forward from its `#49`-era base to current `main`, preserving this section's Oct 11 product direction and all other newer docs/routes/features/tests. See the "Visual follow-up" note below for #52's own scope; that note is now historical relative to this one.
+
 
 ## CURRENT OWNER PRIORITY — October 8, 2026 (Pacific)
 
 **P0 — DigitalOcean App Platform web migration #57 is now first.** Prepare audit and repeatable isolated DEV app; owner DEV PASS before a separately authorized production DB/DNS cutover. No claim of deployment. **Do not deploy local Windows TopstepX agent to App Platform; cloud must not originate or relay orders.** Preserve existing P3.5 candidate PRs #43/#49 without silent merge; resume their acceptance after the infrastructure priority or as explicitly authorized. Full updated one-product strategy-validation and Practice execution spec: [PRODUCT_VISION_AND_EXECUTION_2026-10-08.md](PRODUCT_VISION_AND_EXECUTION_2026-10-08.md). New backlog #53–#56 builds on #26/PR #33; no new execution code accepted. The historical 'CURRENT P3.5' and 'Strategy Trader parked' headings below are superseded for sequencing by this update.
 
+## Visual follow-up - October 8, 2026 (Pacific)
+
+PR #49 is merged; PR #43 was closed as superseded and #50 is closed.
+Issue #51 scopes the owner's new visual improvement pass. It preserves the
+accepted workspace layout and requires fresh DEV owner acceptance before merge.
+Production deployment remains a separate owner decision. Older candidate
+status statements below are historical. Strategy Trader remains parked.
 
 ## Owner revision - October 7, 2026 (Pacific)
 

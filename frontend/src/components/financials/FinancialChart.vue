@@ -157,12 +157,17 @@ function hideTooltip() {
 <style scoped>
 .chart-container {
   position: relative;
+  padding: 20px;
+  background: var(--el-surface-sunken);
+  border: 1px solid var(--el-divider);
+  border-radius: var(--el-radius-md);
 }
 
 .chart-svg {
   display: block;
   width: 100%;
   height: auto;
+  max-height: 320px;
 }
 
 .gridline {
@@ -232,5 +237,10 @@ function hideTooltip() {
 
 .legend-swatch--cost {
   background-color: var(--el-steel-light);
+}
+@media (max-width: 640px) { .chart-container { padding: 12px; } }
+@media (max-width: 480px) {
+  .axis-label, .month-label { font-size: 24px; }
+  .axis-label { transform: translateY(8px); }
 }
 </style>

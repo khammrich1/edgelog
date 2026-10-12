@@ -120,10 +120,6 @@ watch(viewedYear, fetchYear, { immediate: true })
 </template>
 
 <style scoped>
-
-
-
-
 .year-nav {
   display: flex;
   align-items: center;
@@ -160,7 +156,11 @@ watch(viewedYear, fetchYear, { immediate: true })
 .summary-tiles {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--el-space-4);
+  gap: 0;
+  background: var(--el-surface-sunken);
+  border: 1px solid var(--el-border);
+  border-radius: var(--el-radius-md);
+  overflow: hidden;
   margin-bottom: var(--el-space-6);
 }
 
@@ -169,11 +169,10 @@ watch(viewedYear, fetchYear, { immediate: true })
   display: flex;
   flex-direction: column;
   gap: var(--el-space-1);
-  padding: var(--el-space-4);
-  background-color: var(--el-surface);
-  border: 1px solid var(--el-border);
-  border-radius: var(--el-radius-md);
+  padding: 20px 24px;
 }
+
+.summary-tile + .summary-tile { border-left: 1px solid var(--el-divider); }
 
 .summary-label {
   font-size: var(--el-text-xs);
@@ -183,7 +182,8 @@ watch(viewedYear, fetchYear, { immediate: true })
 }
 
 .summary-value {
-  font-size: var(--el-text-xl);
+  font-size: 28px;
+  letter-spacing: -.03em;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--el-text);
@@ -219,6 +219,8 @@ watch(viewedYear, fetchYear, { immediate: true })
 }
 
 @media (max-width: 640px) {
+  .summary-tile { flex-basis: 100%; padding: 16px 20px; }
+  .summary-tile + .summary-tile { border-left: none; border-top: 1px solid var(--el-divider); }
   .financials-page {
     padding: var(--el-space-4);
   }

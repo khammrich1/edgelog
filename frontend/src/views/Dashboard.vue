@@ -169,7 +169,7 @@ const recentDays = computed(() => {
             </div>
             <div class="el-field">
               <span class="el-field-label">Result</span>
-              <span class="dashboard-stat" :class="summaryResultClass(todayResultSummary)">
+              <span class="dashboard-stat dashboard-stat--result" :class="summaryResultClass(todayResultSummary)">
                 {{ summaryResultLabel(todayResultSummary) ?? '—' }}
               </span>
             </div>
@@ -277,11 +277,6 @@ const recentDays = computed(() => {
 </template>
 
 <style scoped>
-
-
-
-
-
 .el-workstation {
   padding: var(--el-space-5) 0;
 }
@@ -290,8 +285,8 @@ const recentDays = computed(() => {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
   align-items: start;
-  gap: var(--el-space-5);
-  margin-bottom: var(--el-space-6);
+  gap: var(--el-space-8);
+  margin-bottom: var(--el-space-8);
 }
 
 .dashboard-focus-main,
@@ -300,12 +295,13 @@ const recentDays = computed(() => {
 }
 
 .dashboard-focus-main {
-  padding: var(--el-space-6);
+  padding: 28px;
+  border-top: 2px solid var(--el-copper);
 }
 
 .dashboard-focus-side {
   padding: var(--el-space-5) 0 var(--el-space-5) var(--el-space-5);
-  border-left: 1px solid var(--el-border);
+  border-left: 1px solid var(--el-divider);
 }
 
 .dashboard-focus-header {
@@ -337,8 +333,9 @@ const recentDays = computed(() => {
 }
 
 .dashboard-stat {
-  font-size: var(--el-text-xl);
-  font-weight: 700;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -.035em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -398,8 +395,9 @@ const recentDays = computed(() => {
 }
 
 .dashboard-snapshot-headline {
-  font-size: 26px;
-  font-weight: 700;
+  font-size: 36px;
+  font-weight: 600;
+  letter-spacing: -.04em;
   font-variant-numeric: tabular-nums;
   margin-top: var(--el-space-2);
 }
@@ -438,7 +436,8 @@ const recentDays = computed(() => {
   grid-template-columns: 140px 72px 70px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--el-space-4);
-  padding: var(--el-space-4) var(--el-space-3);
+  padding: 18px 16px;
+  border-radius: var(--el-radius-sm);
   border-bottom: 1px solid var(--el-divider);
   cursor: pointer;
   transition: background-color var(--el-transition-fast);
@@ -452,9 +451,12 @@ const recentDays = computed(() => {
   background-color: var(--el-surface-raised);
 }
 
+.dashboard-stat--result { font-size: 30px; }
+
 .dashboard-activity-date {
   font-size: var(--el-text-sm);
   color: var(--el-text);
+  font-weight: 500;
 }
 
 .dashboard-activity-trades {
@@ -498,7 +500,9 @@ const recentDays = computed(() => {
 }
 
 @media (max-width: 640px) {
-  .dashboard-stat-row { gap: 16px; }
+  .dashboard-stat-row { gap: 12px; }
+  .dashboard-stat { font-size: 24px; }
+  .dashboard-stat-row .el-field { min-width: 72px; }
   .dashboard {
     padding: var(--el-space-4);
   }

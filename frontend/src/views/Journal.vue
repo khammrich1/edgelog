@@ -123,7 +123,7 @@ onMounted(loadMonth)
         v-for="(cell, index) in calendarCells"
         :key="cell ? cell.dateKey : `blank-${index}`"
         class="day-cell"
-        :class="{ 'day-cell--blank': !cell, 'day-cell--today': cell?.isToday }"
+        :class="{ 'day-cell--blank': !cell, 'day-cell--today': cell?.isToday, 'day-cell--recorded': !!cell?.summary }"
         :role="cell ? 'link' : undefined"
         :tabindex="cell ? 0 : undefined"
         :aria-current="cell?.isToday ? 'date' : undefined"
@@ -145,6 +145,7 @@ onMounted(loadMonth)
             </span>
             <span v-if="cell.summary.has_bias_chart" class="chart-indicator" title="Bias chart attached" aria-label="Bias chart attached">↗</span>
           </div>
+          <span v-if="cell.summary" class="day-entry-label">{{ cell.summary.status === 'locked' ? 'Locked journal' : 'Draft journal' }}</span>
         </template>
       </div>
     </div>
@@ -154,10 +155,6 @@ onMounted(loadMonth)
 </template>
 
 <style scoped>
-
-
-
-
 .calendar-nav {
   display: flex;
   gap: var(--el-space-2);
@@ -183,7 +180,7 @@ onMounted(loadMonth)
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 1px;
-  background-color: var(--el-border);
+  background-color: var(--el-divider);
   border: 1px solid var(--el-border);
   border-radius: var(--el-radius-md);
   overflow: hidden;
@@ -204,13 +201,13 @@ onMounted(loadMonth)
   background-color: var(--el-surface-sunken);
   min-height: 104px;
   position: relative;
-  padding: var(--el-space-2);
+  padding: 12px;
   cursor: pointer;
   transition: background-color var(--el-transition-fast);
 }
 
 .day-cell:hover {
-  background-color: var(--el-surface);
+  background-color: var(--el-surface-raised);
 }
 
 .day-cell--blank {
@@ -222,7 +219,9 @@ onMounted(loadMonth)
   background-color: var(--el-bg);
 }
 
+.day-cell--recorded { background: var(--el-surface); }
 .day-cell--today { box-shadow: inset 0 2px var(--el-copper); }
+.day-entry-label { display: block; font-size: 11px; color: var(--el-text-subtle); margin-top: 12px; }
 .day-cell:focus-visible { outline-offset: -3px; z-index: 1; }
 
 .day-cell--today .day-number {
@@ -264,10 +263,13 @@ onMounted(loadMonth)
     padding: var(--el-space-4);
   }
 
+  .day-entry-label { display: none; }
   .day-cell {
-    min-height: 56px;
+    padding: 8px 4px;
+    min-height: 64px;
   }
 }
+@media (min-width: 641px) and (max-width: 1000px) { .day-entry-label { display: none; } }
 .calendar-legend { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; font-size: 12px; color: var(--el-text-subtle); margin-bottom: 16px; }
 .calendar-legend span { display: inline-flex; gap: 8px; align-items: center; }
 .calendar-note { color: var(--el-text-subtle); font-size: 12px; margin-top: 16px; }
