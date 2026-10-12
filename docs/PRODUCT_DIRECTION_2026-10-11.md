@@ -43,3 +43,15 @@ These are **proposed interface concepts**, not existing UI or approved final nam
 ## Product and safety boundaries
 
 Never guarantee profit, infer fills, label self-declared A+ as validated, silently change a strategy or plan, place an order merely because a signal appeared, or auto-complete the user's reflective journal. Use broker-authoritative data and safe failure behavior. Human entry approval and emergency intervention remain available.
+
+## Owner emphasis — October 11: trust the edge without watching charts
+
+**The central user outcome is to track the edge without staring at a chart.** LockedIn should answer two questions at a glance: **Is my edge working? Am I following it?** The trader should trust evidence and a preapproved process, not be asked to trust an unproven strategy blindly.
+
+- **Edge health dashboard:** per strategy/version, show qualified opportunities (including skipped/no-trade signals), realized and forward-observed results, net expectancy in R after costs, win rate, drawdown, sample size, uncertainty, market-regime changes and current validity status. Do not hide poor performance or conflate a winning streak with an edge.
+- **Low-stimulation active view:** no default live candles or rapidly flashing P&L; display approved plan, order/protection status, remaining risk, rule adherence and connection freshness. Charts remain accessible by deliberate choice.
+- **Meaningful alerts only:** setup qualified and awaiting entry approval; proposal expired/invalidated; protection failed; risk limit hit; connectivity/reconciliation fault; strategy health changed. Avoid tick-by-tick noise.
+- **Trust through controls:** no automatic entries, no discretionary AI modifications, hard loss/risk limits, broker-authoritative reconciliation, clear emergency intervention and auditable deviations. Trade management automation is not considered safe until #55 passes supervised Practice acceptance.
+- **Learning loop:** compare edge performance separately from intervention behavior (#48), including whether unnecessary touches improved or harmed outcomes when data permits. Preserve manual reflection.
+
+Proposed product language: **Track your edge. Trust your plan. Leave the charts alone.** Branding and tagline remain unapproved until owner explicitly decides.
