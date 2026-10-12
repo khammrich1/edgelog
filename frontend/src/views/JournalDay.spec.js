@@ -246,3 +246,32 @@ describe('JournalDay tab navigation', () => {
     expect(wrapper.find('.overview-trades-panel').text()).not.toContain('MGC')
   })
 })
+
+describe('JournalDay shared workspace width (issue #66/#68 regression guard)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  // jsdom doesn't run a real CSS cascade, so it can't catch a scoped CSS
+  // rule silently out-specificity-ing a global one (that class of bug was
+  // only caught by measuring the live rendered page with Playwright -- see
+  // PR #67/#68). What this test *can* guard is the easy way to reintroduce
+  // it: a page-root class or inline style that competes with `.el-page`
+  // for width/margin/padding. Today must rely on `.el-page` alone, exactly
+  // like every other workspace page (Dashboard, Calendar, Trades,
+  // Financials, Stats).
+  it('root element carries only journal-day/el-page classes, no competing width override', async () => {
+    const wrapper = await mountJournalDay()
+    const root = wrapper.element
+
+    expect(root.classList.contains('el-page')).toBe(true)
+    expect(root.getAttribute('style')).toBeFalsy()
+    // Any class beyond journal-day/el-page/el-empty-state/el-error-state is
+    // a candidate for a new shadowing width rule -- fail loudly so it gets
+    // a second look instead of silently reintroducing #66/#68.
+    const allowedClasses = new Set(['journal-day', 'el-page', 'el-empty-state', 'el-error-state'])
+    for (const cls of root.classList) {
+      expect(allowedClasses.has(cls)).toBe(true)
+    }
+  })
+})
