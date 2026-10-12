@@ -493,15 +493,6 @@ onBeforeUnmount(revokeBiasChartPreview)
 </template>
 
 <style scoped>
-.journal-day {
-  /* Same composition language approved for the Dashboard in P2: a
-     controlled content width with a deliberate side gutter, instead of a
-     narrow form floating in the middle of a mostly-empty canvas. */
-  padding: var(--el-space-8) var(--el-space-12);
-  max-width: 1100px;
-  margin: 0 auto;
-}
-
 .back-link {
   display: inline-block;
   background: none;
@@ -915,9 +906,6 @@ onBeforeUnmount(revokeBiasChartPreview)
 
 @media (max-width: 640px) {
   .day-tab { padding: 12px 16px; }
-  .journal-day {
-    padding: var(--el-space-4);
-  }
 
   .overview-trade-row {
     grid-template-columns: 1fr auto;
