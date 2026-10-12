@@ -1,5 +1,28 @@
 # EdgeLog Vertical Slice Roadmap
 
+## Proposed LockedIn vertical slices — October 11, 2026 (owner review)
+
+**EdgeLog is the working name; LockedIn is a candidate only.** This is the next product sequence, not a claim of shipped functionality. Core outcome: **track and trust an evidence-backed edge without watching charts**. Human approves each entry; cloud never relays broker orders. Existing historical VS numbering below is preserved for traceability; these **LI-VS** identifiers distinguish the proposed next phase.
+
+| Slice | Deliverable / acceptance gate | Existing issues |
+|---|---|---|
+| **LI-VS0 — DEV platform** | DigitalOcean DEV API, Supabase Alembic, registration/login/refresh, journal CRUD, uploads and health verified; owner DEV PASS; no PROD cutover | #57 |
+| **LI-VS1 — Define Your Edge** | Versioned strategy definitions, confluences, risk/invalidation; no claims of proven A+ from checklist | #32 |
+| **LI-VS2 — Edge Analytics** | Net expectancy in R, costs, sample size, win/loss, drawdown, regime splits and uncertainty; distinguish in/out-of-sample | #30, #48 |
+| **LI-VS3 — Recognize (observe only)** | Deterministic setup detection, data freshness, signal/no-trade history, forward-observation; no orders | #27, #59 |
+| **LI-VS4 — Opportunity Alert** | Time-bounded proposal with setup evidence, entry/stop/target/risk and explicit Approve/Reject/Edit; no automatic entry | #59, #54 |
+| **LI-VS5 — Local Practice Approval/Execution** | Windows agent independently authorizes one bounded TopstepX Practice limit order; provider event reconciliation, duplicate and kill tests | #26, #33, #53, #54 |
+| **LI-VS6 — Plan-Based Management** | Provider-verified protection, partial exits, stop moves, restart/disconnect/fault controls; supervised Practice PASS before unattended use | #55, #28 |
+| **LI-VS7 — Trust Your Edge** | Low-stimulation plan/status screen, strategy health and meaningful alerts, plan-vs-actual and intervention analysis, deliberate reflection | #48, #56, #29 |
+
+**Immediate order:** complete LI-VS0 before beginning order-connected work. Implement each slice as an issue-linked Claude PR → exact DEV/local testing → owner PASS/FAIL → merge; separately authorize any PROD change. #52 visual polish and #33 Practice PR remain open independent gates. Do not duplicate canonical trade storage or imply statistical edge is guaranteed.
+
+
+## Owner priority override — October 8, 2026 (Pacific)
+
+**P0: DigitalOcean App Platform migration for the EdgeLog web application — issue #57.** Audit and deploy isolated DEV first, preserve droplet production until separately approved cutover with backup/rollback. Local Windows trading agent stays local. This **supersedes earlier 'P3.5 first' sequencing**, without merging/closing existing P3.5 #43/#49 candidates. The owner also confirmed **one unified EdgeLog product** built on journal-based strategy validation and local Practice execution; see [product vision](docs/PRODUCT_VISION_AND_EXECUTION_2026-10-08.md). Execution follow-on #53–#56 are scoped issues, not delivered. ST1 #33 requires owner Practice acceptance. Do not mistake checklist A+ for empirically validated edge.
+
+
 ## Owner review - October 7, 2026 (Pacific)
 
 The owner requested a shared-workspace rebuild after reviewing DEV PR #49.

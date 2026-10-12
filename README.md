@@ -1,5 +1,11 @@
 # EdgeLog
 
+> **October 11, 2026 product clarification:** The long-term product is an integrated plan-first trading decision platform: discover and validate edges, recognize setups, **alert the trader and require explicit approval before each entry**, then execute locally in TopstepX Practice and manage under predefined rules only when tested. **LockedIn / lockedin.trade is a name candidate, not a completed rebrand.** DigitalOcean DEV login and /health have been observed working, but Supabase migrations, full API/auth/journal tests and DEV acceptance remain pending. See [current owner direction](docs/PRODUCT_DIRECTION_2026-10-11.md) and [#59](https://github.com/khammrich1/edgelog/issues/59). This supersedes older manual-journal-only positioning as future product scope; deliberate trader-authored reflection remains essential. No autonomous entries, cloud order relay, or live trading authorization.
+
+
+> **October 8, 2026 owner direction:** EdgeLog is one integrated product for trader-defined strategies, journal-based evidence/validation, planning, local Practice execution and deliberate reflection—not just a journal. Existing confluence grades do not prove statistical edge. **Highest priority is moving the WEB app to DigitalOcean App Platform** (#57), with DEV acceptance before separately approved PROD cutover; the Windows execution agent and credentials stay local. See [product vision and execution specification](docs/PRODUCT_VISION_AND_EXECUTION_2026-10-08.md). Current status below includes historical context; no migration or Practice end-to-end completion is claimed.
+
+
 **Trade. Reflect. Improve.**
 
 EdgeLog is a manual-first trading journal built to help traders document their process, review execution, understand behavioral patterns, and identify their actual trading edge.

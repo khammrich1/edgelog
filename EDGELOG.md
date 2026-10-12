@@ -1,5 +1,8 @@
 # EdgeLog Product Specification
 
+> **Owner update — 2026-10-08:** EdgeLog is **one integrated strategy-development, journal-based validation, planning and local execution product**, not merely a standalone journal or a second Strategy Trader product. The trader defines a setup hypothesis; data validates whether it deserves an evidence-based A+ rating. The existing #32 confluence-count A+ is a **setup-match/checklist grade**, not proof of statistical edge. Automatic provider event recording reduces clerical work; the trader still authors reflection. **Highest immediate engineering priority: migrate the WEB app to DigitalOcean App Platform (#57), DEV first, explicit gated PROD cutover.** The local Windows TopstepX agent never moves to cloud and cloud cannot originate/relay orders. Full authoritative vision: [docs/PRODUCT_VISION_AND_EXECUTION_2026-10-08.md](docs/PRODUCT_VISION_AND_EXECUTION_2026-10-08.md). ST1 #33 and #53–#56 are not accepted/shipped.
+
+
 ## Identity
 
 **EdgeLog** is a standalone trading journal.
@@ -142,6 +145,22 @@ Execution North Star:
 Order origination must remain on the trader's personal device. TopstepX credentials remain local. EdgeLog cloud may handle planning, configuration/status, journaling, analytics, and execution results, but is not an order relay.
 
 Even when execution integration knows a trade occurred, it may prefill objective facts only. The trader still deliberately completes the journal/review.
+
+## Future strategy-driven trading workflow
+
+**Plan → Log → Execute → Review.**
+
+Long-term vision: EdgeLog is the trader's planning and decision workspace, not a chart-watching terminal. The trader reviews a strategy, defines the setup and risk, and records the plan in EdgeLog. A **local desktop execution agent** receives an explicitly authorized, bounded plan and places/manages orders on the trader's own machine. The plan may trigger or expire without execution; the trader can review the result later instead of continuously watching charts.
+
+- **Plan:** specify strategy/version, instrument, direction, entry conditions, stop, targets, sizing, invalidation, expiry and maximum risk. Visual charts can assist planning but should not be required for constant monitoring.
+- **Log:** preserve an immutable pre-execution plan and subsequent changes, including a no-trade outcome. Do not confuse plan logging with a completed post-trade journal.
+- **Execute:** desktop-only order origination, local credentials, explicit user authorization and limits, broker/platform checks, kill switch, rejection/error states, no silent order relay through EdgeLog cloud.
+- **Review:** show executed/not executed, fills, realized outcome, plan adherence, discretionary touches, and require deliberate trader reflection.
+- **Evidence-based A+ suggestions:** evaluate live candidate conditions against **the trader's own versioned setup/confluences and historical outcomes**; show evidence, sample size, confidence/uncertainty, and a reasoned candidate A+ rating. No universal A+ claim or guarantee. A suggested A+ trade does **not** itself authorize order placement; user-defined automation permissions and risk gates are separate.
+- Build progressively: observe-only candidate identification → user-approved plan → local Practice execution → carefully gated live execution if separately authorized.
+- Historical data must distinguish setup quality, execution quality, interventions, missed opportunities, and no-trade plans. Never invent performance or fill results.
+
+This is a **future direction, not currently shipped or authorized implementation**. It does not override the active product-foundation sequence or the manual-first journaling doctrine.
 
 ## Development model
 
