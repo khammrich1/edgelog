@@ -126,6 +126,22 @@ def _compute_trade_math(trade: Trade, exits: list[TradeExit], entries: list[Trad
         if multiplier is not None:
             planned_risk_dollars = planned_risk_points * multiplier
 
+    # DF-VS1 (issue #78): risk computed from the immutable plan snapshot
+    # (planned_stop_price/planned_quantity), not the live stop/quantity --
+    # this is the one that stays "what was the plan" even after the trader
+    # moves the stop (e.g. to breakeven), which planned_risk_points above
+    # deliberately does not. Known scope limitation: this still uses the
+    # trade's live entry_price (no separate planned_entry_price snapshot
+    # exists), so it does not guard against entry_price itself being edited
+    # after the fact -- only against the stop/quantity moving.
+    original_planned_risk_points: Optional[Decimal] = None
+    original_planned_risk_dollars: Optional[Decimal] = None
+    if trade.planned_stop_price is not None and trade.planned_quantity is not None:
+        original_risk_per_unit = (trade.entry_price - trade.planned_stop_price) * sign
+        original_planned_risk_points = original_risk_per_unit * trade.planned_quantity
+        if multiplier is not None:
+            original_planned_risk_dollars = original_planned_risk_points * multiplier
+
     return {
         "total_quantity": total_quantity,
         "average_entry_price": average_entry_price,
@@ -135,6 +151,8 @@ def _compute_trade_math(trade: Trade, exits: list[TradeExit], entries: list[Trad
         "realized_pnl": realized_pnl,
         "planned_risk_points": planned_risk_points,
         "planned_risk_dollars": planned_risk_dollars,
+        "original_planned_risk_points": original_planned_risk_points,
+        "original_planned_risk_dollars": original_planned_risk_dollars,
         "multiplier_known": multiplier is not None,
     }
 
@@ -164,6 +182,8 @@ def _serialize_trade(trade: Trade, exits: list[TradeExit], entries: list[TradeEn
         realized_pnl=math["realized_pnl"],
         planned_risk_points=math["planned_risk_points"],
         planned_risk_dollars=math["planned_risk_dollars"],
+        original_planned_risk_points=math["original_planned_risk_points"],
+        original_planned_risk_dollars=math["original_planned_risk_dollars"],
         multiplier_known=math["multiplier_known"],
         has_screenshot=trade.screenshot_path is not None,
         price_source=trade.price_source,
@@ -172,6 +192,14 @@ def _serialize_trade(trade: Trade, exits: list[TradeExit], entries: list[TradeEn
         ),
         extracted_at=trade.extracted_at,
         price_edited_after_extraction=trade.price_edited_after_extraction,
+        planned_stop_price=trade.planned_stop_price,
+        planned_target_price=trade.planned_target_price,
+        planned_quantity=trade.planned_quantity,
+        plan_rationale=trade.plan_rationale,
+        plan_verified_at=trade.plan_verified_at,
+        rule_adherence=trade.rule_adherence,
+        rule_adherence_note=trade.rule_adherence_note,
+        reflection_notes=trade.reflection_notes,
         created_at=trade.created_at,
         updated_at=trade.updated_at,
     )
@@ -309,6 +337,18 @@ async def create_trade(
             else None
         ),
         extracted_at=payload.extracted_at,
+        # DF-VS1 (issue #78): the plan snapshot is fixed here, at creation,
+        # and nowhere else -- update_trade never touches these fields.
+        # planned_quantity is always auto-derived from initial_quantity so
+        # it can't be submitted inconsistently with it. plan_verified_at is
+        # stamped from this request's own clock, only when the trader
+        # affirmed the plan was recorded before execution; a retrospective
+        # entry leaves it null regardless of whether planned_* were filled in.
+        planned_stop_price=payload.planned_stop_price,
+        planned_target_price=payload.planned_target_price,
+        planned_quantity=payload.initial_quantity,
+        plan_rationale=payload.plan_rationale,
+        plan_verified_at=datetime.now(timezone.utc) if payload.plan_verified else None,
     )
     db.add(trade)
     await db.flush()
@@ -389,6 +429,15 @@ async def update_trade(
         trade.setup = payload.setup
     if payload.notes is not None:
         trade.notes = payload.notes
+    # Outcome (DF-VS1): editable after the fact. Note what's deliberately
+    # absent from TradeUpdate and so can never appear here: planned_*,
+    # plan_rationale, plan_verified_at -- the plan snapshot stays fixed.
+    if payload.rule_adherence is not None:
+        trade.rule_adherence = payload.rule_adherence
+    if payload.rule_adherence_note is not None:
+        trade.rule_adherence_note = payload.rule_adherence_note
+    if payload.reflection_notes is not None:
+        trade.reflection_notes = payload.reflection_notes
 
     await db.flush()
     math = _compute_trade_math(trade, exits, entries)

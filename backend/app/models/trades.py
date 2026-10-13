@@ -38,6 +38,21 @@ class Trade(Base):
     extraction_snapshot = Column(Text, nullable=True)  # JSON string, set once at creation, never edited
     extracted_at = Column(DateTime(timezone=True), nullable=True)
     price_edited_after_extraction = Column(Boolean, nullable=False, default=False)
+    # Plan (DF-VS1, issue #78): the original intended stop/target/quantity
+    # and rationale, set once at creation and never touched by update_trade
+    # -- mirrors extraction_snapshot's immutability. plan_verified_at is
+    # stamped from the server's own clock, never trader-supplied, only when
+    # the trader affirms the plan was recorded before execution; null means
+    # the trade was journaled retrospectively.
+    planned_stop_price = Column(Numeric(PRICE_PRECISION, PRICE_SCALE), nullable=True)
+    planned_target_price = Column(Numeric(PRICE_PRECISION, PRICE_SCALE), nullable=True)
+    planned_quantity = Column(Integer, nullable=True)
+    plan_rationale = Column(Text, nullable=True)
+    plan_verified_at = Column(DateTime(timezone=True), nullable=True)
+    # Outcome (DF-VS1): judged after the fact, editable like notes.
+    rule_adherence = Column(String, nullable=True)  # yes | no | unknown
+    rule_adherence_note = Column(Text, nullable=True)
+    reflection_notes = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

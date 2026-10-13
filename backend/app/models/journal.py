@@ -29,6 +29,10 @@ class TradingDay(Base):
     mood = Column(Integer, nullable=True)  # 1-5
     market_bias = Column(Text, nullable=True)
     bias_chart_path = Column(String, nullable=True)
+    # DF-VS1 (issue #78): explicit no-trade-day marker and end-of-day
+    # reflection, distinct from market_bias (pre-market) and sleep/mood.
+    intended_to_trade = Column(Boolean, nullable=True)
+    eod_reflection = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

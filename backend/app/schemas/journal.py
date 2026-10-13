@@ -38,6 +38,10 @@ class TradingDayUpdate(BaseModel):
     sleep_quality: Optional[int] = Field(default=None, ge=1, le=5)
     mood: Optional[int] = Field(default=None, ge=1, le=5)
     market_bias: Optional[str] = Field(default=None, max_length=4000)
+    # DF-VS1 (issue #78): explicit no-trade-day marker and end-of-day
+    # reflection, distinct from market_bias (pre-market).
+    intended_to_trade: Optional[bool] = None
+    eod_reflection: Optional[str] = Field(default=None, max_length=4000)
 
 
 class TradingDayRead(BaseModel):
@@ -48,6 +52,8 @@ class TradingDayRead(BaseModel):
     mood: Optional[int]
     market_bias: Optional[str]
     has_bias_chart: bool
+    intended_to_trade: Optional[bool]
+    eod_reflection: Optional[str]
     checklist: list[ChecklistCompletionRead]
     created_at: datetime
     updated_at: datetime

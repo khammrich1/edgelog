@@ -175,6 +175,10 @@ async def update_trading_day(
         trading_day.mood = payload.mood
     if payload.market_bias is not None:
         trading_day.market_bias = payload.market_bias
+    if payload.intended_to_trade is not None:
+        trading_day.intended_to_trade = payload.intended_to_trade
+    if payload.eod_reflection is not None:
+        trading_day.eod_reflection = payload.eod_reflection
 
     await db.flush()
     await db.refresh(trading_day)
@@ -372,6 +376,8 @@ async def _serialize_trading_day(db: AsyncSession, trading_day: TradingDay) -> T
         mood=trading_day.mood,
         market_bias=trading_day.market_bias,
         has_bias_chart=trading_day.bias_chart_path is not None,
+        intended_to_trade=trading_day.intended_to_trade,
+        eod_reflection=trading_day.eod_reflection,
         checklist=checklist,
         created_at=trading_day.created_at,
         updated_at=trading_day.updated_at,
