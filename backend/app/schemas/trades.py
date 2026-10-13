@@ -80,16 +80,26 @@ class TradeCreate(BaseModel):
     # Plan (DF-VS1, issue #78): the trader's original intended stop/target
     # and rationale, captured only at creation -- see TradeUpdate, which
     # deliberately excludes these so the plan can never be rewritten.
-    # planned_quantity isn't accepted here -- the server always snapshots
-    # it from initial_quantity below, so it can't be submitted out of sync.
+    # planned_entry_price/planned_quantity aren't accepted here -- the
+    # server always snapshots them from entry_price/initial_quantity below,
+    # so a later correction to the live entry_price or quantity (e.g. a
+    # typo fix) can never silently drift the original risk-at-entry math.
     planned_stop_price: Optional[Decimal] = Field(default=None, gt=0)
     planned_target_price: Optional[Decimal] = Field(default=None, gt=0)
     plan_rationale: Optional[str] = Field(default=None, max_length=4000)
     # Write-only: tells the server to stamp plan_verified_at from its own
     # clock, affirming this plan was recorded before execution. The server
     # timestamp is the only thing that ever sets plan_verified_at -- a
-    # trader can never backdate or directly supply it, so a retrospective
-    # entry can never be mislabeled as verified pre-trade evidence.
+    # trader can never backdate or directly supply it. This alone can't
+    # stop someone from checking the box on a trade they're logging long
+    # after the fact, so create_trade additionally only honors this flag
+    # when entry_time falls within a plausible window of the request's own
+    # clock (see PLAN_VERIFICATION_MAX_AGE/_FUTURE_TOLERANCE in trades.py)
+    # -- an obviously backdated or not-yet-happened entry can never be
+    # mislabeled as verified pre-trade evidence just because the box was
+    # checked. Within that window this is still a trader's self-attestation,
+    # not an independently provable fact -- a known, inherent limit of a
+    # single-step logging flow with no separate pre-trade submission.
     plan_verified: bool = False
 
     @model_validator(mode="after")
@@ -190,6 +200,7 @@ class TradeRead(BaseModel):
     an image_extracted trade was created -- lets the UI show "edited since
     extraction" without needing to diff against extraction_snapshot itself."""
     # Plan (DF-VS1): set once at creation, immutable thereafter.
+    planned_entry_price: Optional[Decimal]
     planned_stop_price: Optional[Decimal]
     planned_target_price: Optional[Decimal]
     planned_quantity: Optional[int]

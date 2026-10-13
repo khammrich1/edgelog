@@ -29,6 +29,7 @@ def upgrade() -> None:
     # trader affirms the plan was recorded before execution; null means the
     # trade was journaled retrospectively, so nothing here is ever labeled
     # verified pre-trade evidence unless the server's own clock says so.
+    op.add_column('trades', sa.Column('planned_entry_price', sa.Numeric(PRICE_PRECISION, PRICE_SCALE), nullable=True))
     op.add_column('trades', sa.Column('planned_stop_price', sa.Numeric(PRICE_PRECISION, PRICE_SCALE), nullable=True))
     op.add_column('trades', sa.Column('planned_target_price', sa.Numeric(PRICE_PRECISION, PRICE_SCALE), nullable=True))
     op.add_column('trades', sa.Column('planned_quantity', sa.Integer(), nullable=True))
@@ -57,3 +58,4 @@ def downgrade() -> None:
     op.drop_column('trades', 'planned_quantity')
     op.drop_column('trades', 'planned_target_price')
     op.drop_column('trades', 'planned_stop_price')
+    op.drop_column('trades', 'planned_entry_price')

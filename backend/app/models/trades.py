@@ -38,12 +38,17 @@ class Trade(Base):
     extraction_snapshot = Column(Text, nullable=True)  # JSON string, set once at creation, never edited
     extracted_at = Column(DateTime(timezone=True), nullable=True)
     price_edited_after_extraction = Column(Boolean, nullable=False, default=False)
-    # Plan (DF-VS1, issue #78): the original intended stop/target/quantity
-    # and rationale, set once at creation and never touched by update_trade
-    # -- mirrors extraction_snapshot's immutability. plan_verified_at is
-    # stamped from the server's own clock, never trader-supplied, only when
-    # the trader affirms the plan was recorded before execution; null means
-    # the trade was journaled retrospectively.
+    # Plan (DF-VS1, issue #78): the original intended entry/stop/target/
+    # quantity and rationale, set once at creation and never touched by
+    # update_trade -- mirrors extraction_snapshot's immutability. Freezing
+    # planned_entry_price here too (not just stop/target) means a later
+    # correction to the live entry_price can never silently drift the
+    # original risk-at-entry math. plan_verified_at is stamped from the
+    # server's own clock, never trader-supplied, and only honored when the
+    # claim is plausible (see create_trade's entry-time window check);
+    # null means the trade was journaled retrospectively, or the "verified
+    # pre-trade" claim was rejected as implausible.
+    planned_entry_price = Column(Numeric(PRICE_PRECISION, PRICE_SCALE), nullable=True)
     planned_stop_price = Column(Numeric(PRICE_PRECISION, PRICE_SCALE), nullable=True)
     planned_target_price = Column(Numeric(PRICE_PRECISION, PRICE_SCALE), nullable=True)
     planned_quantity = Column(Integer, nullable=True)

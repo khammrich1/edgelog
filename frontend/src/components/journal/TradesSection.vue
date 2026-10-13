@@ -18,6 +18,12 @@ const expandedTradeId = ref(null)
 const editingTradeId = ref(null)
 const editingExitId = ref(null)
 const submitError = ref(null)
+// DF-VS1 (issue #78): the server only honors plan_verified when entry_time
+// is close enough to "now" to be plausible -- it can silently leave
+// plan_verified_at null even though the box was checked. Surface that so
+// the trader isn't left wondering why the "Verified pre-trade" badge
+// didn't appear.
+const planVerificationNotice = ref(null)
 // 'preset' shows the symbol dropdown; 'custom' shows a free-text field for
 // any symbol not in SYMBOL_PRESETS -- the backend accepts either.
 const symbolEntryMode = ref('preset')
@@ -400,6 +406,7 @@ async function loadTrades() {
 
 async function submitNewTrade() {
   submitError.value = null
+  planVerificationNotice.value = null
   // Belt-and-suspenders alongside the required select/input in the
   // template (and the backend's own required-field validation): a setup
   // is mandatory for every newly logged trade now that trades are
@@ -442,6 +449,10 @@ async function submitNewTrade() {
   }
   try {
     const created = await tradesStore.createTrade(props.date, payload)
+    if (tradeForm.plan_verified && !created.plan_verified_at) {
+      planVerificationNotice.value =
+        "This trade's entry time was too far from now for the plan to be marked verified pre-trade -- it was saved as retrospective/unverified instead."
+    }
     if (screenshotFile.value) {
       try {
         await tradesStore.uploadTradeScreenshot(props.date, created.id, screenshotFile.value)
@@ -795,6 +806,7 @@ onUnmounted(revokeAllTradeScreenshots)
       </div>
 
       <p v-if="submitError" class="submit-error">{{ submitError }}</p>
+      <p v-if="planVerificationNotice" class="plan-verification-notice">{{ planVerificationNotice }}</p>
     </form>
     <p v-else-if="trades.length === 0" class="locked-hint">This day is locked. Unlock it to log trades.</p>
 
@@ -867,7 +879,10 @@ onUnmounted(revokeAllTradeScreenshots)
             </div>
           </div>
 
-          <div v-if="trade.plan_rationale || trade.plan_verified_at" class="trade-card__section">
+          <div
+            v-if="trade.plan_rationale || trade.plan_verified_at || trade.planned_stop_price || trade.planned_target_price"
+            class="trade-card__section"
+          >
             <div class="trade-card__section-label">
               Plan
               <span class="plan-verified-badge" :class="{ 'plan-verified-badge--verified': trade.plan_verified_at }">
@@ -1681,6 +1696,12 @@ onUnmounted(revokeAllTradeScreenshots)
 
 .submit-error {
   color: var(--el-negative);
+  font-size: var(--el-text-sm);
+  margin: var(--el-space-2) 0 0;
+}
+
+.plan-verification-notice {
+  color: var(--el-text-muted);
   font-size: var(--el-text-sm);
   margin: var(--el-space-2) 0 0;
 }

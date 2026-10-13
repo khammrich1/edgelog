@@ -1,6 +1,6 @@
 """DF-VS1 (issue #78): plan-vs-outcome evidence capture on the existing,
 single canonical Trade/TradingDay rows -- no parallel trade lifecycle."""
-from datetime import date as date_type
+from datetime import date as date_type, datetime, timedelta, timezone
 
 import pytest
 from httpx import AsyncClient
@@ -18,6 +18,20 @@ async def _register_and_auth_headers(client: AsyncClient, email: str = "planner@
 async def _open_day(client: AsyncClient, headers: dict, day: str = "2026-02-01"):
     await client.get(f"/api/v1/journal/days/{day}", headers=headers)
     return day
+
+
+def _iso(dt: datetime) -> str:
+    return dt.isoformat().replace("+00:00", "Z")
+
+
+def _recent_entry_time() -> str:
+    """Comfortably inside the plan-verification plausibility window (see
+    PLAN_VERIFICATION_MAX_AGE in trades.py) -- used whenever a test expects
+    plan_verified_at to actually get set. The fixed 2026-02-01 date used
+    elsewhere in this file is a fine *trading day* label, but is long past
+    relative to wall-clock "now" and would be correctly rejected as an
+    implausible "verified pre-trade" claim."""
+    return _iso(datetime.now(timezone.utc) - timedelta(minutes=5))
 
 
 def _base_trade_payload(**overrides):
@@ -45,6 +59,7 @@ async def test_plan_snapshot_immutable_after_stop_moved(client: AsyncClient):
         f"/api/v1/journal/days/{day}/trades",
         headers=headers,
         json=_base_trade_payload(
+            entry_time=_recent_entry_time(),
             stop_price="24450",
             target_price="24600",
             planned_stop_price="24450",
@@ -56,6 +71,7 @@ async def test_plan_snapshot_immutable_after_stop_moved(client: AsyncClient):
     assert create_resp.status_code == 201
     created = create_resp.json()
     trade_id = created["id"]
+    assert created["planned_entry_price"] == "24500.000000"
     assert created["planned_stop_price"] == "24450.000000"
     assert created["planned_quantity"] == 5
     assert created["plan_verified_at"] is not None
@@ -84,6 +100,118 @@ async def test_plan_snapshot_immutable_after_stop_moved(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_original_planned_risk_survives_entry_price_correction(client: AsyncClient):
+    """The owner's concern: if entry_price itself is edited after the fact
+    (e.g. a data-entry correction), the frozen planned_entry_price snapshot
+    must keep the original risk-at-entry figure from drifting -- only the
+    live, current-stop risk should move."""
+    headers = await _register_and_auth_headers(client)
+    day = await _open_day(client, headers)
+
+    create_resp = await client.post(
+        f"/api/v1/journal/days/{day}/trades",
+        headers=headers,
+        json=_base_trade_payload(
+            entry_price="24500",
+            stop_price="24450",
+            planned_stop_price="24450",
+            plan_verified=True,
+            entry_time=_recent_entry_time(),
+        ),
+    )
+    trade_id = create_resp.json()["id"]
+    # entry 24500, stop 24450, qty 5 -> 250.
+    assert create_resp.json()["original_planned_risk_points"] == "250.000000"
+
+    update_resp = await client.put(
+        f"/api/v1/journal/days/{day}/trades/{trade_id}",
+        headers=headers,
+        json={"entry_price": "24600"},
+    )
+    assert update_resp.status_code == 200
+    data = update_resp.json()
+
+    assert data["entry_price"] == "24600.000000"
+    assert data["planned_entry_price"] == "24500.000000", "the plan's entry price must never drift"
+    assert data["original_planned_risk_points"] == "250.000000", "original risk must stay fixed at 250"
+    # The live, current-stop risk figure, by contrast, legitimately moves
+    # with the corrected entry: (24600 - 24450) * 5 = 750.
+    assert data["planned_risk_points"] == "750.000000"
+
+
+@pytest.mark.asyncio
+async def test_plan_verified_rejected_for_backdated_entry_time(client: AsyncClient):
+    """The owner's other concern: checking the box must not be enough on
+    its own -- a trade whose entry_time is long past (logged well after
+    the fact) must not get plan_verified_at set just because the trader
+    checked it."""
+    headers = await _register_and_auth_headers(client)
+    day = await _open_day(client, headers)
+
+    stale_entry_time = _iso(datetime.now(timezone.utc) - timedelta(days=3))
+    create_resp = await client.post(
+        f"/api/v1/journal/days/{day}/trades",
+        headers=headers,
+        json=_base_trade_payload(
+            entry_time=stale_entry_time,
+            planned_stop_price="24450",
+            plan_rationale="Claiming this was planned ahead of time.",
+            plan_verified=True,
+        ),
+    )
+    assert create_resp.status_code == 201
+    data = create_resp.json()
+
+    assert data["plan_verified_at"] is None, "an implausibly backdated entry must not be marked verified"
+    # The plan snapshot itself is still captured -- only the verified
+    # *claim* is rejected, not the trader's ability to record a plan at all.
+    assert data["planned_stop_price"] == "24450.000000"
+    assert data["plan_rationale"] == "Claiming this was planned ahead of time."
+
+
+@pytest.mark.asyncio
+async def test_plan_verified_rejected_for_future_entry_time(client: AsyncClient):
+    """A trade whose entry_time hasn't happened yet can't have an actual
+    entry_price, so claiming it was "verified pre-trade" is incoherent --
+    must be rejected the same way a backdated one is."""
+    headers = await _register_and_auth_headers(client)
+    day = await _open_day(client, headers)
+
+    future_entry_time = _iso(datetime.now(timezone.utc) + timedelta(hours=3))
+    create_resp = await client.post(
+        f"/api/v1/journal/days/{day}/trades",
+        headers=headers,
+        json=_base_trade_payload(
+            entry_time=future_entry_time, planned_stop_price="24450", plan_verified=True
+        ),
+    )
+    assert create_resp.status_code == 201
+    assert create_resp.json()["plan_verified_at"] is None
+
+
+@pytest.mark.asyncio
+async def test_plan_verified_accepted_within_plausible_window(client: AsyncClient):
+    headers = await _register_and_auth_headers(client)
+    day = await _open_day(client, headers)
+
+    # 2 hours old and 10 minutes in the future both fall comfortably
+    # inside the plausibility window and must be honored.
+    for entry_time in [
+        _iso(datetime.now(timezone.utc) - timedelta(hours=2)),
+        _iso(datetime.now(timezone.utc) + timedelta(minutes=10)),
+    ]:
+        create_resp = await client.post(
+            f"/api/v1/journal/days/{day}/trades",
+            headers=headers,
+            json=_base_trade_payload(
+                entry_time=entry_time, planned_stop_price="24450", plan_verified=True
+            ),
+        )
+        assert create_resp.status_code == 201
+        assert create_resp.json()["plan_verified_at"] is not None
+
+
+@pytest.mark.asyncio
 async def test_trade_update_schema_cannot_edit_plan_fields(client: AsyncClient):
     """TradeUpdate has no planned_* fields at all -- even sending them
     should have zero effect, never silently coerced or accepted."""
@@ -93,7 +221,9 @@ async def test_trade_update_schema_cannot_edit_plan_fields(client: AsyncClient):
     create_resp = await client.post(
         f"/api/v1/journal/days/{day}/trades",
         headers=headers,
-        json=_base_trade_payload(planned_stop_price="24450", plan_verified=True),
+        json=_base_trade_payload(
+            planned_stop_price="24450", plan_verified=True, entry_time=_recent_entry_time()
+        ),
     )
     trade_id = create_resp.json()["id"]
 
@@ -160,9 +290,10 @@ async def test_trade_with_no_plan_recorded_has_null_plan_fields(client: AsyncCli
     assert data["rule_adherence"] is None
     assert data["rule_adherence_note"] is None
     assert data["reflection_notes"] is None
-    # planned_quantity is still always snapshotted, independent of whether
-    # a stop/target plan was recorded -- it's free, derived from a field
-    # that's already required on every trade.
+    # planned_entry_price/planned_quantity are still always snapshotted,
+    # independent of whether a stop/target plan was recorded -- they're
+    # free, derived from fields that are already required on every trade.
+    assert data["planned_entry_price"] == "24500.000000"
     assert data["planned_quantity"] == 5
 
 
