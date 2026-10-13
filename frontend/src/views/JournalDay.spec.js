@@ -285,6 +285,34 @@ describe('JournalDay loadDay request parallelism (issue #71)', () => {
   })
 })
 
+// The real journalStore.updateDay() has a side effect that matters a lot
+// here: on success it replaces the *entire* currentDay with the server's
+// response (`currentDay.value = data`). A mock that only resolves to a
+// value -- without performing that same blanket replacement -- can't
+// reproduce the actual bug class these tests exist to catch (a stale
+// response clobbering a newer optimistic value via that replacement).
+// This helper makes every mocked save behave like the real one: resolving
+// merges the payload into whatever currentDay holds *at resolution time*
+// and performs the same assignment, with timing fully controlled by the
+// caller via the returned resolve/reject functions.
+function mockUpdateDayWithRealSideEffect(journalStore) {
+  const calls = []
+  journalStore.updateDay = vi.fn().mockImplementation((date, payload) => {
+    return new Promise((resolve, reject) => {
+      calls.push({
+        payload,
+        resolve: () => {
+          const data = { ...journalStore.currentDay, ...payload }
+          journalStore.currentDay = data
+          resolve(data)
+        },
+        reject
+      })
+    })
+  })
+  return calls
+}
+
 describe('JournalDay Mood/Sleep optimistic selection (issue #73)', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
@@ -300,8 +328,7 @@ describe('JournalDay Mood/Sleep optimistic selection (issue #73)', () => {
   it('highlights the clicked sleep-quality button immediately, before the save resolves', async () => {
     const wrapper = await mountJournalDay()
     const journalStore = useJournalStore()
-    let resolveSave
-    journalStore.updateDay = vi.fn().mockImplementation(() => new Promise((resolve) => { resolveSave = resolve }))
+    const calls = mockUpdateDayWithRealSideEffect(journalStore)
 
     await sleepButton(wrapper, 4).trigger('click')
     await wrapper.vm.$nextTick()
@@ -309,7 +336,7 @@ describe('JournalDay Mood/Sleep optimistic selection (issue #73)', () => {
     expect(sleepButton(wrapper, 4).classes()).toContain('scale-button--selected')
     expect(journalStore.updateDay).toHaveBeenCalledWith('2026-01-01', { sleep_quality: 4 })
 
-    resolveSave({ ...FAKE_DAY, sleep_quality: 4 })
+    calls[0].resolve()
     await flushPromises()
     expect(sleepButton(wrapper, 4).classes()).toContain('scale-button--selected')
   })
@@ -317,14 +344,13 @@ describe('JournalDay Mood/Sleep optimistic selection (issue #73)', () => {
   it('rolls back and shows an error when the save fails', async () => {
     const wrapper = await mountJournalDay({ mood: 2 })
     const journalStore = useJournalStore()
-    let rejectSave
-    journalStore.updateDay = vi.fn().mockImplementation(() => new Promise((_, reject) => { rejectSave = reject }))
+    const calls = mockUpdateDayWithRealSideEffect(journalStore)
 
     await moodButton(wrapper, 5).trigger('click')
     await wrapper.vm.$nextTick()
     expect(moodButton(wrapper, 5).classes()).toContain('scale-button--selected')
 
-    rejectSave({ response: { data: { detail: 'Network error' } } })
+    calls[0].reject({ response: { data: { detail: 'Network error' } } })
     await flushPromises()
 
     // Rolled back to the pre-click value, and the original selection is
@@ -337,27 +363,34 @@ describe('JournalDay Mood/Sleep optimistic selection (issue #73)', () => {
   it('rapid clicks: the latest click wins even if its response arrives before an earlier one', async () => {
     const wrapper = await mountJournalDay()
     const journalStore = useJournalStore()
-    const resolvers = []
-    journalStore.updateDay = vi.fn().mockImplementation(
-      () => new Promise((resolve) => resolvers.push(resolve))
-    )
+    const calls = mockUpdateDayWithRealSideEffect(journalStore)
 
     await sleepButton(wrapper, 2).trigger('click')
     await sleepButton(wrapper, 5).trigger('click')
     await wrapper.vm.$nextTick()
 
     // The second click is the latest intent -- must be the one shown,
-    // immediately, regardless of what either save ends up returning.
+    // immediately, regardless of what either save ends up returning. The
+    // second click must NOT have fired its own overlapping request yet --
+    // saves for one field are serialized, so only the 1 request has gone
+    // out so far.
     expect(sleepButton(wrapper, 5).classes()).toContain('scale-button--selected')
+    expect(journalStore.updateDay).toHaveBeenCalledTimes(1)
+    expect(journalStore.updateDay).toHaveBeenCalledWith('2026-01-01', { sleep_quality: 2 })
 
     // The *first* (now-stale) request resolves after the second: it must
-    // not be allowed to visually override the newer click.
-    resolvers[0]({ ...FAKE_DAY, sleep_quality: 2 })
+    // not be allowed to visually override the newer click, even via its
+    // own blanket currentDay replacement.
+    calls[0].resolve()
     await flushPromises()
     expect(sleepButton(wrapper, 5).classes()).toContain('scale-button--selected')
     expect(sleepButton(wrapper, 2).classes()).not.toContain('scale-button--selected')
+    // Only once the first save settles does the queued (latest) value get
+    // its own, separate request -- never two in flight at once.
+    expect(journalStore.updateDay).toHaveBeenCalledTimes(2)
+    expect(journalStore.updateDay).toHaveBeenLastCalledWith('2026-01-01', { sleep_quality: 5 })
 
-    resolvers[1]({ ...FAKE_DAY, sleep_quality: 5 })
+    calls[1].resolve()
     await flushPromises()
     expect(sleepButton(wrapper, 5).classes()).toContain('scale-button--selected')
   })
@@ -365,16 +398,112 @@ describe('JournalDay Mood/Sleep optimistic selection (issue #73)', () => {
   it('sleep-quality and mood saves are independent -- an error on one does not touch the other', async () => {
     const wrapper = await mountJournalDay()
     const journalStore = useJournalStore()
-    journalStore.updateDay = vi.fn().mockImplementation(async (date, payload) => {
-      if ('sleep_quality' in payload) throw { response: { data: { detail: 'Could not save.' } } }
-      return { ...FAKE_DAY, ...payload }
-    })
+    const calls = mockUpdateDayWithRealSideEffect(journalStore)
 
     await sleepButton(wrapper, 3).trigger('click')
     await moodButton(wrapper, 4).trigger('click')
+    calls.find((c) => 'sleep_quality' in c.payload).reject({ response: { data: { detail: 'Could not save.' } } })
+    calls.find((c) => 'mood' in c.payload).resolve()
     await flushPromises()
 
     expect(sleepButton(wrapper, 3).classes()).not.toContain('scale-button--selected')
     expect(moodButton(wrapper, 4).classes()).toContain('scale-button--selected')
+  })
+})
+
+describe('JournalDay Mood/Sleep write serialization (issue #75 follow-up)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  function sleepButton(wrapper, value) {
+    return wrapper.find(`button[aria-label="Sleep quality ${value} of 5"]`)
+  }
+  function moodButton(wrapper, value) {
+    return wrapper.find(`button[aria-label="Mood ${value} of 5"]`)
+  }
+
+  it('never shows an intermediate value: the display matches the latest click at every settling point, not just at the end', async () => {
+    const wrapper = await mountJournalDay()
+    const journalStore = useJournalStore()
+    const calls = mockUpdateDayWithRealSideEffect(journalStore)
+
+    await sleepButton(wrapper, 1).trigger('click')
+    await sleepButton(wrapper, 3).trigger('click')
+    await sleepButton(wrapper, 5).trigger('click')
+    await wrapper.vm.$nextTick()
+
+    // Only the very latest click (5) is ever displayed, and only its
+    // eventual request matters -- the in-between click (3) is coalesced
+    // away entirely, never sent and never shown.
+    expect(sleepButton(wrapper, 5).classes()).toContain('scale-button--selected')
+    expect(sleepButton(wrapper, 1).classes()).not.toContain('scale-button--selected')
+    expect(sleepButton(wrapper, 3).classes()).not.toContain('scale-button--selected')
+
+    // First (stale) request resolves -- its own blanket currentDay
+    // replacement (sleep_quality: 1) must not be visible even transiently.
+    calls[0].resolve()
+    await flushPromises()
+    expect(sleepButton(wrapper, 5).classes()).toContain('scale-button--selected')
+    expect(sleepButton(wrapper, 1).classes()).not.toContain('scale-button--selected')
+    expect(sleepButton(wrapper, 3).classes()).not.toContain('scale-button--selected')
+
+    // Exactly 2 requests total: the first click, then the coalesced
+    // latest click -- the skipped middle click never gets its own call.
+    expect(journalStore.updateDay).toHaveBeenCalledTimes(2)
+    expect(journalStore.updateDay).toHaveBeenNthCalledWith(1, '2026-01-01', { sleep_quality: 1 })
+    expect(journalStore.updateDay).toHaveBeenNthCalledWith(2, '2026-01-01', { sleep_quality: 5 })
+
+    calls[1].resolve()
+    await flushPromises()
+    expect(sleepButton(wrapper, 5).classes()).toContain('scale-button--selected')
+  })
+
+  it('a stale response for one field never clobbers the other field while it is still saving', async () => {
+    const wrapper = await mountJournalDay()
+    const journalStore = useJournalStore()
+    const calls = mockUpdateDayWithRealSideEffect(journalStore)
+
+    await sleepButton(wrapper, 4).trigger('click')
+    await moodButton(wrapper, 2).trigger('click')
+    await wrapper.vm.$nextTick()
+
+    // Mood's response lands first. Its blanket currentDay replacement
+    // carries whatever currentDay held *at that moment* merged with
+    // { mood: 2 } -- which already includes the optimistic sleep_quality
+    // value, per the real store's actual merge semantics -- but must not
+    // regress it even so.
+    const moodCall = calls.find((c) => 'mood' in c.payload)
+    moodCall.resolve()
+    await flushPromises()
+
+    expect(moodButton(wrapper, 2).classes()).toContain('scale-button--selected')
+    expect(sleepButton(wrapper, 4).classes()).toContain('scale-button--selected')
+
+    const sleepCall = calls.find((c) => 'sleep_quality' in c.payload)
+    sleepCall.resolve()
+    await flushPromises()
+    expect(sleepButton(wrapper, 4).classes()).toContain('scale-button--selected')
+    expect(moodButton(wrapper, 2).classes()).toContain('scale-button--selected')
+  })
+
+  it('the final persisted request always carries the last-clicked value, confirmed by re-fetching the day', async () => {
+    const wrapper = await mountJournalDay()
+    const journalStore = useJournalStore()
+    const calls = mockUpdateDayWithRealSideEffect(journalStore)
+
+    await sleepButton(wrapper, 2).trigger('click')
+    await sleepButton(wrapper, 5).trigger('click')
+    await wrapper.vm.$nextTick()
+    calls[0].resolve()
+    await flushPromises()
+    calls[1].resolve()
+    await flushPromises()
+
+    // Simulate reloading the day from the server after both writes have
+    // settled -- the canonical source of truth must show the last click.
+    journalStore.currentDay = { ...FAKE_DAY, sleep_quality: 5 }
+    await wrapper.vm.$nextTick()
+    expect(sleepButton(wrapper, 5).classes()).toContain('scale-button--selected')
   })
 })
