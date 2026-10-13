@@ -151,12 +151,49 @@ function revokeBiasChartPreview() {
   }
 }
 
-async function setSleepQuality(value) {
-  await journalStore.updateDay(route.params.date, { sleep_quality: value })
+// Issue #73: the Mood/Sleep scale buttons used to highlight only once the
+// save round-trip finished (700-1250ms in DEV), which reads as a stuck/
+// unresponsive click. These now flip the selected button immediately and
+// persist in the background. requestSeq/lastRequestedValue guard against a
+// slow, now-superseded response clobbering a newer click's selection (the
+// field's own display always reflects the user's latest click, win or
+// lose) -- the server round-trip only needs to settle eventually, not in
+// click order.
+const fieldSaveError = ref({ sleep_quality: null, mood: null })
+const requestSeq = { sleep_quality: 0, mood: 0 }
+const lastRequestedValue = { sleep_quality: null, mood: null }
+
+async function setDayField(field, value) {
+  const seq = ++requestSeq[field]
+  const previousValue = day.value[field]
+  lastRequestedValue[field] = value
+  journalStore.currentDay = { ...journalStore.currentDay, [field]: value }
+  fieldSaveError.value = { ...fieldSaveError.value, [field]: null }
+  try {
+    await journalStore.updateDay(route.params.date, { [field]: value })
+    if (seq !== requestSeq[field]) {
+      // A newer click already fired its own request for this field, so
+      // whatever this (now-stale) response just committed isn't
+      // necessarily the latest intent -- reassert it rather than leave a
+      // slower earlier response visually winning over a newer click.
+      journalStore.currentDay = { ...journalStore.currentDay, [field]: lastRequestedValue[field] }
+    }
+  } catch (e) {
+    if (seq !== requestSeq[field]) return
+    journalStore.currentDay = { ...journalStore.currentDay, [field]: previousValue }
+    fieldSaveError.value = {
+      ...fieldSaveError.value,
+      [field]: e.response?.data?.detail || `Could not save ${field === 'mood' ? 'mood' : 'sleep quality'}.`
+    }
+  }
 }
 
-async function setMood(value) {
-  await journalStore.updateDay(route.params.date, { mood: value })
+function setSleepQuality(value) {
+  return setDayField('sleep_quality', value)
+}
+
+function setMood(value) {
+  return setDayField('mood', value)
 }
 
 async function saveMarketBias() {
@@ -306,6 +343,7 @@ onBeforeUnmount(revokeBiasChartPreview)
                   {{ value }}
                 </button>
               </div>
+              <p v-if="fieldSaveError.sleep_quality" class="field-save-error">{{ fieldSaveError.sleep_quality }}</p>
             </div>
             <div class="el-field">
               <span class="el-field-label">Mood</span>
@@ -323,6 +361,7 @@ onBeforeUnmount(revokeBiasChartPreview)
                   {{ value }}
                 </button>
               </div>
+              <p v-if="fieldSaveError.mood" class="field-save-error">{{ fieldSaveError.mood }}</p>
             </div>
           </div>
         </section>
@@ -857,6 +896,12 @@ onBeforeUnmount(revokeBiasChartPreview)
   border-color: var(--el-copper);
   color: var(--el-copper);
   background-color: var(--el-accent-wash);
+}
+
+.field-save-error {
+  color: var(--el-negative);
+  font-size: var(--el-text-sm);
+  margin: var(--el-space-2) 0 0;
 }
 
 .el-workstation textarea {

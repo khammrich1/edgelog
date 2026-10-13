@@ -284,3 +284,97 @@ describe('JournalDay loadDay request parallelism (issue #71)', () => {
     await flushPromises()
   })
 })
+
+describe('JournalDay Mood/Sleep optimistic selection (issue #73)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  function sleepButton(wrapper, value) {
+    return wrapper.find(`button[aria-label="Sleep quality ${value} of 5"]`)
+  }
+  function moodButton(wrapper, value) {
+    return wrapper.find(`button[aria-label="Mood ${value} of 5"]`)
+  }
+
+  it('highlights the clicked sleep-quality button immediately, before the save resolves', async () => {
+    const wrapper = await mountJournalDay()
+    const journalStore = useJournalStore()
+    let resolveSave
+    journalStore.updateDay = vi.fn().mockImplementation(() => new Promise((resolve) => { resolveSave = resolve }))
+
+    await sleepButton(wrapper, 4).trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(sleepButton(wrapper, 4).classes()).toContain('scale-button--selected')
+    expect(journalStore.updateDay).toHaveBeenCalledWith('2026-01-01', { sleep_quality: 4 })
+
+    resolveSave({ ...FAKE_DAY, sleep_quality: 4 })
+    await flushPromises()
+    expect(sleepButton(wrapper, 4).classes()).toContain('scale-button--selected')
+  })
+
+  it('rolls back and shows an error when the save fails', async () => {
+    const wrapper = await mountJournalDay({ mood: 2 })
+    const journalStore = useJournalStore()
+    let rejectSave
+    journalStore.updateDay = vi.fn().mockImplementation(() => new Promise((_, reject) => { rejectSave = reject }))
+
+    await moodButton(wrapper, 5).trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(moodButton(wrapper, 5).classes()).toContain('scale-button--selected')
+
+    rejectSave({ response: { data: { detail: 'Network error' } } })
+    await flushPromises()
+
+    // Rolled back to the pre-click value, and the original selection is
+    // the only one highlighted again.
+    expect(moodButton(wrapper, 5).classes()).not.toContain('scale-button--selected')
+    expect(moodButton(wrapper, 2).classes()).toContain('scale-button--selected')
+    expect(wrapper.text()).toContain('Network error')
+  })
+
+  it('rapid clicks: the latest click wins even if its response arrives before an earlier one', async () => {
+    const wrapper = await mountJournalDay()
+    const journalStore = useJournalStore()
+    const resolvers = []
+    journalStore.updateDay = vi.fn().mockImplementation(
+      () => new Promise((resolve) => resolvers.push(resolve))
+    )
+
+    await sleepButton(wrapper, 2).trigger('click')
+    await sleepButton(wrapper, 5).trigger('click')
+    await wrapper.vm.$nextTick()
+
+    // The second click is the latest intent -- must be the one shown,
+    // immediately, regardless of what either save ends up returning.
+    expect(sleepButton(wrapper, 5).classes()).toContain('scale-button--selected')
+
+    // The *first* (now-stale) request resolves after the second: it must
+    // not be allowed to visually override the newer click.
+    resolvers[0]({ ...FAKE_DAY, sleep_quality: 2 })
+    await flushPromises()
+    expect(sleepButton(wrapper, 5).classes()).toContain('scale-button--selected')
+    expect(sleepButton(wrapper, 2).classes()).not.toContain('scale-button--selected')
+
+    resolvers[1]({ ...FAKE_DAY, sleep_quality: 5 })
+    await flushPromises()
+    expect(sleepButton(wrapper, 5).classes()).toContain('scale-button--selected')
+  })
+
+  it('sleep-quality and mood saves are independent -- an error on one does not touch the other', async () => {
+    const wrapper = await mountJournalDay()
+    const journalStore = useJournalStore()
+    journalStore.updateDay = vi.fn().mockImplementation(async (date, payload) => {
+      if ('sleep_quality' in payload) throw { response: { data: { detail: 'Could not save.' } } }
+      return { ...FAKE_DAY, ...payload }
+    })
+
+    await sleepButton(wrapper, 3).trigger('click')
+    await moodButton(wrapper, 4).trigger('click')
+    await flushPromises()
+
+    expect(sleepButton(wrapper, 3).classes()).not.toContain('scale-button--selected')
+    expect(moodButton(wrapper, 4).classes()).toContain('scale-button--selected')
+  })
+})
