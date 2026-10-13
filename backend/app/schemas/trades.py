@@ -3,10 +3,11 @@ from datetime import date as date_type, datetime
 from decimal import Decimal
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 Direction = Literal["long", "short"]
 TradeStatus = Literal["open", "closed", "canceled"]
+PriceSource = Literal["manual", "image_extracted"]
 
 
 class TradeExitCreate(BaseModel):
@@ -66,6 +67,25 @@ class TradeCreate(BaseModel):
     # load and render.
     setup: str = Field(min_length=1, max_length=200)
     notes: Optional[str] = Field(default=None, max_length=4000)
+    # Issue #64: set by the client when entry/stop/target/quantity were
+    # prefilled from AI screenshot extraction and the trader confirmed them
+    # (edited or not) before submitting. extraction_snapshot/extracted_at
+    # are required together with price_source="image_extracted" so there's
+    # always an immutable record of exactly what was extracted, distinct
+    # from whatever the trader actually submitted.
+    price_source: PriceSource = "manual"
+    extraction_snapshot: Optional[dict] = None
+    extracted_at: Optional[datetime] = None
+
+    @model_validator(mode="after")
+    def _require_snapshot_for_extracted(self) -> "TradeCreate":
+        if self.price_source == "image_extracted" and (
+            self.extraction_snapshot is None or self.extracted_at is None
+        ):
+            raise ValueError(
+                "extraction_snapshot and extracted_at are required when price_source is image_extracted"
+            )
+        return self
 
 
 class TradeUpdate(BaseModel):
@@ -128,6 +148,15 @@ class TradeRead(BaseModel):
     planned_risk_dollars: Optional[Decimal]
     multiplier_known: bool
     has_screenshot: bool
+    price_source: PriceSource
+    extraction_snapshot: Optional[dict]
+    """The original AI-extracted values at creation time, verbatim and
+    immutable. Only present when price_source is image_extracted."""
+    extracted_at: Optional[datetime]
+    price_edited_after_extraction: bool
+    """True once any of entry/stop/target/quantity has been changed since
+    an image_extracted trade was created -- lets the UI show "edited since
+    extraction" without needing to diff against extraction_snapshot itself."""
     created_at: datetime
     updated_at: datetime
 

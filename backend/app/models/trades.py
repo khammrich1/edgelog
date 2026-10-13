@@ -30,6 +30,14 @@ class Trade(Base):
     status = Column(String, nullable=False, default="open")  # open | closed | canceled
     canceled_at = Column(DateTime(timezone=True), nullable=True)
     screenshot_path = Column(String, nullable=True)
+    # Provenance (issue #64): where entry/stop/target/quantity originally
+    # came from. "image_extracted" trades carry an immutable snapshot of
+    # exactly what the AI returned, so later edits can be audited against
+    # the original unverified suggestion rather than silently overwriting it.
+    price_source = Column(String, nullable=False, default="manual")  # manual | image_extracted
+    extraction_snapshot = Column(Text, nullable=True)  # JSON string, set once at creation, never edited
+    extracted_at = Column(DateTime(timezone=True), nullable=True)
+    price_edited_after_extraction = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

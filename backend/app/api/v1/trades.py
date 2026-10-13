@@ -1,4 +1,5 @@
 """Trade lifecycle endpoints (VS3): manually-logged trades and their exits."""
+import json
 import uuid
 from collections import defaultdict
 from decimal import Decimal
@@ -165,6 +166,12 @@ def _serialize_trade(trade: Trade, exits: list[TradeExit], entries: list[TradeEn
         planned_risk_dollars=math["planned_risk_dollars"],
         multiplier_known=math["multiplier_known"],
         has_screenshot=trade.screenshot_path is not None,
+        price_source=trade.price_source,
+        extraction_snapshot=(
+            json.loads(trade.extraction_snapshot) if trade.extraction_snapshot is not None else None
+        ),
+        extracted_at=trade.extracted_at,
+        price_edited_after_extraction=trade.price_edited_after_extraction,
         created_at=trade.created_at,
         updated_at=trade.updated_at,
     )
@@ -295,6 +302,13 @@ async def create_trade(
         setup=payload.setup,
         notes=payload.notes,
         status="open",
+        price_source=payload.price_source,
+        extraction_snapshot=(
+            json.dumps(payload.extraction_snapshot, default=str)
+            if payload.extraction_snapshot is not None
+            else None
+        ),
+        extracted_at=payload.extracted_at,
     )
     db.add(trade)
     await db.flush()
@@ -341,6 +355,21 @@ async def update_trade(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot set quantity below the {exited_qty} contracts/shares already exited",
         )
+
+    # Issue #64: an image_extracted trade keeps its original extraction_snapshot
+    # forever (set once at creation, never touched here) as an audit trail --
+    # this flag just records that *something* price-bearing changed since then,
+    # so the UI can show "edited since extraction" without diffing the snapshot.
+    price_bearing_fields_changed = any(
+        [
+            payload.entry_price is not None and payload.entry_price != trade.entry_price,
+            payload.initial_quantity is not None and payload.initial_quantity != trade.initial_quantity,
+            payload.stop_price is not None and payload.stop_price != trade.stop_price,
+            payload.target_price is not None and payload.target_price != trade.target_price,
+        ]
+    )
+    if trade.price_source == "image_extracted" and price_bearing_fields_changed:
+        trade.price_edited_after_extraction = True
 
     if payload.symbol is not None:
         trade.symbol = payload.symbol.strip().upper()

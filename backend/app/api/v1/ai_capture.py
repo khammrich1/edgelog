@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
 from app.api.deps import get_current_user
 from app.core.config import settings
+from app.core.instruments import tick_alignment_warning
 from app.models.user import User
 from app.schemas.ai_capture import ScreenshotTradeExtraction
 
@@ -139,4 +140,16 @@ async def parse_trade_screenshot(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image is too large (max 5MB)")
 
     extracted = _extract_trade_details_via_claude(contents, file.content_type)
-    return ScreenshotTradeExtraction(**extracted)
+    result = ScreenshotTradeExtraction(**extracted)
+
+    if result.symbol:
+        for label, price in (
+            ("entry_price", result.entry_price),
+            ("stop_price", result.stop_price),
+            ("target_price", result.target_price),
+        ):
+            warning = tick_alignment_warning(result.symbol, label, price)
+            if warning:
+                result.tick_warnings.append(warning)
+
+    return result

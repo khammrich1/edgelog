@@ -43,6 +43,18 @@ const extractionHint = ref(null)
 const dragActive = ref(false)
 const fileInput = ref(null)
 
+// Issue #64: extraction is an unverified AI suggestion, never a confirmed
+// fill. extractionSnapshot holds exactly what the server returned (prefilled
+// into tradeForm below) and extractionConfirmed tracks whether the trader
+// has explicitly reviewed it -- the form cannot be submitted from a pending,
+// unconfirmed extraction. Any tick/scale warnings the server flagged ride
+// along in extractionSnapshot.tick_warnings.
+const extractionSnapshot = ref(null)
+const extractedAt = ref(null)
+const extractionConfirmed = ref(false)
+const hasPendingExtraction = computed(() => extractionSnapshot.value !== null)
+const extractionTickWarnings = computed(() => extractionSnapshot.value?.tick_warnings || [])
+
 // Per-trade stored setup screenshots (separate from the new-trade dropzone
 // above) -- object URLs are fetched lazily when a card is expanded and
 // revoked when replaced or when this component goes away.
@@ -113,6 +125,9 @@ function applyExtraction(extracted) {
     targetMode.value = 'price'
   }
   extractionHint.value = extracted.notes || null
+  extractionSnapshot.value = extracted
+  extractedAt.value = new Date().toISOString()
+  extractionConfirmed.value = false
 }
 
 async function handleScreenshotFile(file) {
@@ -363,6 +378,10 @@ async function submitNewTrade() {
     submitError.value = 'Select or enter a setup before adding this trade.'
     return
   }
+  if (hasPendingExtraction.value && !extractionConfirmed.value) {
+    submitError.value = 'Review the AI-extracted values and check the confirmation box before saving.'
+    return
+  }
   const payload = {
     symbol: tradeForm.symbol.trim(),
     direction: tradeForm.direction,
@@ -372,7 +391,14 @@ async function submitNewTrade() {
     stop_price: effectiveStopPrice.value,
     target_price: effectiveTargetPrice.value,
     setup: tradeForm.setup.trim(),
-    notes: tradeForm.notes || null
+    notes: tradeForm.notes || null,
+    ...(hasPendingExtraction.value
+      ? {
+          price_source: 'image_extracted',
+          extraction_snapshot: extractionSnapshot.value,
+          extracted_at: extractedAt.value
+        }
+      : {})
   }
   try {
     const created = await tradesStore.createTrade(props.date, payload)
@@ -394,6 +420,9 @@ async function submitNewTrade() {
     extractionHint.value = null
     screenshotError.value = null
     screenshotFile.value = null
+    extractionSnapshot.value = null
+    extractedAt.value = null
+    extractionConfirmed.value = false
   } catch (error) {
     submitError.value = error.response?.data?.detail || 'Could not save that trade.'
   }
@@ -545,6 +574,22 @@ onUnmounted(revokeAllTradeScreenshots)
         <button type="button" class="toggle-more-button" @click="screenshotFile = null">Remove</button>
       </p>
 
+      <div v-if="hasPendingExtraction" class="extraction-review">
+        <p class="extraction-review-title">
+          Fields below were suggested by AI from your screenshot -- it is not a confirmed broker fill.
+          Check every value against your source before saving.
+        </p>
+        <ul v-if="extractionTickWarnings.length" class="extraction-review-warnings">
+          <li v-for="warning in extractionTickWarnings" :key="warning" class="el-badge el-badge--warning">
+            {{ warning }}
+          </li>
+        </ul>
+        <label class="extraction-confirm-checkbox">
+          <input type="checkbox" v-model="extractionConfirmed" />
+          I've checked these values against the source and confirm they're correct.
+        </label>
+      </div>
+
       <div class="ticket-grid">
         <div class="el-field ticket-field--symbol">
           <label class="el-field-label">Symbol</label>
@@ -686,7 +731,13 @@ onUnmounted(revokeAllTradeScreenshots)
           <template v-if="riskRewardPreview.rrRatio !== null"> | R:R {{ riskRewardPreview.rrRatio.toFixed(1) }}</template>
         </p>
         <div class="el-ticket-footer-actions">
-          <button type="submit" class="el-btn-primary">Add Trade</button>
+          <button
+            type="submit"
+            class="el-btn-primary"
+            :disabled="hasPendingExtraction && !extractionConfirmed"
+          >
+            Add Trade
+          </button>
         </div>
       </div>
 
@@ -1262,6 +1313,38 @@ onUnmounted(revokeAllTradeScreenshots)
   color: var(--el-text-muted);
   font-size: var(--el-text-sm);
   margin: 0 0 var(--el-space-3);
+}
+
+.extraction-review {
+  border: 1px solid var(--el-border);
+  border-radius: var(--el-radius-sm);
+  padding: var(--el-space-3);
+  margin: 0 0 var(--el-space-4);
+  background: var(--el-surface-sunken);
+}
+
+.extraction-review-title {
+  margin: 0 0 var(--el-space-2);
+  font-size: var(--el-text-sm);
+  color: var(--el-text);
+}
+
+.extraction-review-warnings {
+  list-style: none;
+  margin: 0 0 var(--el-space-2);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--el-space-2);
+}
+
+.extraction-confirm-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--el-space-2);
+  font-size: var(--el-text-sm);
+  color: var(--el-text);
+  cursor: pointer;
 }
 
 /* New-trade ticket grid -- six labeled fields (symbol/direction/qty/

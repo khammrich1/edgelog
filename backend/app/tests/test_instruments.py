@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 from httpx import AsyncClient
 
-from app.core.instruments import INSTRUMENT_MULTIPLIERS, get_multiplier
+from app.core.instruments import INSTRUMENT_MULTIPLIERS, get_multiplier, get_tick_size, tick_alignment_warning
 
 
 async def _register_and_auth_headers(client: AsyncClient, email: str = "trader@example.com") -> dict:
@@ -55,3 +55,33 @@ def test_get_multiplier_resolves_dated_futures_contract_to_its_root():
 def test_get_multiplier_returns_none_for_unknown_symbol_and_unknown_dated_contract():
     assert get_multiplier("XYZ") is None
     assert get_multiplier("XYZZ26") is None
+
+
+def test_get_tick_size_resolves_bare_root_and_dated_contract():
+    assert get_tick_size("MNQ") == Decimal("0.25")
+    assert get_tick_size("MNQZ26") == Decimal("0.25")
+    assert get_tick_size("MGC") == Decimal("0.1")
+
+
+def test_get_tick_size_returns_none_for_unknown_symbol():
+    assert get_tick_size("XYZ") is None
+
+
+def test_tick_alignment_warning_none_for_tick_aligned_price():
+    # Both the journal's and the broker's reported entries from issue #62
+    # are, in fact, 0.25-aligned -- a reminder that tick alignment alone
+    # can't catch every misread; this test documents that known limit.
+    assert tick_alignment_warning("MNQ", "entry_price", Decimal("31224.25")) is None
+    assert tick_alignment_warning("MNQ", "entry_price", Decimal("31226.50")) is None
+
+
+def test_tick_alignment_warning_flags_misaligned_price():
+    warning = tick_alignment_warning("MNQ", "entry_price", Decimal("31224.10"))
+    assert warning is not None
+    assert "MNQ" in warning
+    assert "0.25" in warning
+
+
+def test_tick_alignment_warning_none_for_unknown_symbol_or_missing_price():
+    assert tick_alignment_warning("XYZ", "entry_price", Decimal("100.10")) is None
+    assert tick_alignment_warning("MNQ", "entry_price", None) is None
