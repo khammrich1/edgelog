@@ -151,41 +151,108 @@ function revokeBiasChartPreview() {
   }
 }
 
-// Issue #73: the Mood/Sleep scale buttons used to highlight only once the
-// save round-trip finished (700-1250ms in DEV), which reads as a stuck/
-// unresponsive click. These now flip the selected button immediately and
-// persist in the background. requestSeq/lastRequestedValue guard against a
-// slow, now-superseded response clobbering a newer click's selection (the
-// field's own display always reflects the user's latest click, win or
-// lose) -- the server round-trip only needs to settle eventually, not in
-// click order.
+// Issue #73 + #75 follow-up: the Mood/Sleep scale buttons used to
+// highlight only once the save round-trip finished (700-1250ms in DEV),
+// which reads as a stuck/unresponsive click. #73 fixed that with an
+// optimistic update, but a sequence-number guard that only reasserted the
+// latest value *after* a stale response had already landed still let a
+// slower, now-superseded response (a) briefly flip the displayed
+// selection back before the correction ran, and (b), worse, let the
+// *persisted* value end up being whichever request's response the server
+// happened to finish last rather than whichever was actually clicked
+// last.
+//
+// The fix: serialize each field's own saves so at most one PUT for that
+// field is ever in flight at a time. A click that arrives mid-save is
+// queued (only the latest queued value survives a burst -- intermediate
+// clicks are coalesced away); it's sent only once the current save
+// settles. That makes "latest click wins" structurally true for the
+// server write itself, not just the display, which also eliminates the
+// flicker: no response can ever be "stale" relative to a concurrently
+// in-flight one, because there never is a concurrent one.
 const fieldSaveError = ref({ sleep_quality: null, mood: null })
-const requestSeq = { sleep_quality: 0, mood: 0 }
-const lastRequestedValue = { sleep_quality: null, mood: null }
+const fieldSaving = { sleep_quality: false, mood: false }
+const pendingFieldValue = { sleep_quality: undefined, mood: undefined }
+// The value currently being persisted for this field (the request actually
+// in flight right now) -- used to reassert against a same-burst value,
+// distinct from confirmedFieldValue below (the pre-burst baseline, used
+// only for rolling back a burst that ultimately fails outright).
+const inFlightValue = { sleep_quality: undefined, mood: undefined }
+// The last value this field is actually confirmed to hold on the server,
+// captured once per save-burst (not per click) so a failed burst rolls
+// all the way back to real, known-good data rather than an intermediate,
+// never-confirmed click.
+const confirmedFieldValue = { sleep_quality: undefined, mood: undefined }
 
-async function setDayField(field, value) {
-  const seq = ++requestSeq[field]
-  const previousValue = day.value[field]
-  lastRequestedValue[field] = value
-  journalStore.currentDay = { ...journalStore.currentDay, [field]: value }
-  fieldSaveError.value = { ...fieldSaveError.value, [field]: null }
-  try {
-    await journalStore.updateDay(route.params.date, { [field]: value })
-    if (seq !== requestSeq[field]) {
-      // A newer click already fired its own request for this field, so
-      // whatever this (now-stale) response just committed isn't
-      // necessarily the latest intent -- reassert it rather than leave a
-      // slower earlier response visually winning over a newer click.
-      journalStore.currentDay = { ...journalStore.currentDay, [field]: lastRequestedValue[field] }
-    }
-  } catch (e) {
-    if (seq !== requestSeq[field]) return
-    journalStore.currentDay = { ...journalStore.currentDay, [field]: previousValue }
-    fieldSaveError.value = {
-      ...fieldSaveError.value,
-      [field]: e.response?.data?.detail || `Could not save ${field === 'mood' ? 'mood' : 'sleep quality'}.`
+// A field's own in-progress/queued save can still be transiently
+// overwritten by the *other* field's updateDay() response, since every
+// response replaces the whole currentDay object. Reassert whichever
+// field(s) currently have an unsettled optimistic value immediately after
+// any response lands, regardless of which field triggered it.
+function reassertUnsettledFields(excludeField) {
+  if (!journalStore.currentDay) return
+  const patch = {}
+  for (const field of ['sleep_quality', 'mood']) {
+    if (field === excludeField) continue
+    if (pendingFieldValue[field] !== undefined) {
+      patch[field] = pendingFieldValue[field]
+    } else if (fieldSaving[field]) {
+      patch[field] = inFlightValue[field]
     }
   }
+  if (Object.keys(patch).length) {
+    journalStore.currentDay = { ...journalStore.currentDay, ...patch }
+  }
+}
+
+async function persistField(field, value) {
+  fieldSaving[field] = true
+  inFlightValue[field] = value
+  try {
+    await journalStore.updateDay(route.params.date, { [field]: value })
+    confirmedFieldValue[field] = value
+    // This field's own value is only already correct if nothing newer is
+    // queued -- if a click arrived while this request was in flight, this
+    // response is for an *older* value and must not be left displayed
+    // over the queued one (that was the source of the flicker: this
+    // field's own blanket currentDay replacement winning transiently over
+    // a newer, not-yet-sent click).
+    reassertUnsettledFields(pendingFieldValue[field] === undefined ? field : undefined)
+  } catch (e) {
+    // A newer click is already queued -- it supersedes this failure
+    // entirely and will get its own success/failure outcome next.
+    if (pendingFieldValue[field] === undefined) {
+      journalStore.currentDay = { ...journalStore.currentDay, [field]: confirmedFieldValue[field] }
+      fieldSaveError.value = {
+        ...fieldSaveError.value,
+        [field]: e.response?.data?.detail || `Could not save ${field === 'mood' ? 'mood' : 'sleep quality'}.`
+      }
+      reassertUnsettledFields(field)
+    } else {
+      reassertUnsettledFields()
+    }
+  } finally {
+    fieldSaving[field] = false
+    const next = pendingFieldValue[field]
+    if (next !== undefined) {
+      pendingFieldValue[field] = undefined
+      await persistField(field, next)
+    }
+  }
+}
+
+async function setDayField(field, value) {
+  if (!fieldSaving[field]) {
+    confirmedFieldValue[field] = day.value[field]
+  }
+  fieldSaveError.value = { ...fieldSaveError.value, [field]: null }
+  journalStore.currentDay = { ...journalStore.currentDay, [field]: value }
+
+  if (fieldSaving[field]) {
+    pendingFieldValue[field] = value
+    return
+  }
+  await persistField(field, value)
 }
 
 function setSleepQuality(value) {
