@@ -246,3 +246,41 @@ describe('JournalDay tab navigation', () => {
     expect(wrapper.find('.overview-trades-panel').text()).not.toContain('MGC')
   })
 })
+
+describe('JournalDay loadDay request parallelism (issue #71)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('fetches checklist items and the day record concurrently, not one after the other', async () => {
+    setActivePinia(createPinia())
+
+    let resolveChecklist
+    const journalStore = useJournalStore()
+    journalStore.fetchChecklistItems = vi.fn().mockImplementation(
+      () => new Promise((resolve) => { resolveChecklist = resolve })
+    )
+    journalStore.fetchDay = vi.fn().mockImplementation(async () => {
+      journalStore.currentDay = { ...FAKE_DAY }
+      return FAKE_DAY
+    })
+
+    const tradesStore = useTradesStore()
+    tradesStore.fetchTrades = vi.fn().mockResolvedValue([])
+    tradesStore.fetchSetups = vi.fn().mockResolvedValue([])
+    const instrumentsStore = useInstrumentsStore()
+    instrumentsStore.fetchMultipliers = vi.fn().mockResolvedValue({})
+
+    mount(JournalDay)
+    await flushPromises()
+
+    // fetchChecklistItems is still pending (never resolved) -- if the two
+    // calls were serialized (await fetchChecklistItems() before calling
+    // fetchDay()), fetchDay would never have been reached yet.
+    expect(journalStore.fetchChecklistItems).toHaveBeenCalledTimes(1)
+    expect(journalStore.fetchDay).toHaveBeenCalledTimes(1)
+
+    resolveChecklist([])
+    await flushPromises()
+  })
+})

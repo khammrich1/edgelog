@@ -120,8 +120,14 @@ async function loadDay() {
   loading.value = true
   loadError.value = null
   try {
-    await journalStore.fetchChecklistItems()
-    const data = await journalStore.fetchDay(route.params.date)
+    // checklist-items (the user's configured checklist labels) and this
+    // day's own record have no data dependency on each other -- awaiting
+    // them one after another only adds a full network round-trip to every
+    // page load for no reason. Run them concurrently instead (issue #71).
+    const [, data] = await Promise.all([
+      journalStore.fetchChecklistItems(),
+      journalStore.fetchDay(route.params.date)
+    ])
     marketBiasDraft.value = data.market_bias ?? ''
     await refreshBiasChartPreview()
   } catch (e) {
