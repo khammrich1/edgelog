@@ -7,7 +7,11 @@ from pydantic import BaseModel, Field, model_validator
 
 Direction = Literal["long", "short"]
 TradeStatus = Literal["open", "closed", "canceled"]
-PriceSource = Literal["manual", "image_extracted"]
+# DF-VS1.5a (issue #80): csv_import/api_sync aren't accepted by any route
+# yet -- added now so the later import/sync slices don't need to touch this
+# enum (which would mean touching every place that already pattern-matches
+# on price_source).
+PriceSource = Literal["manual", "image_extracted", "csv_import", "api_sync"]
 RuleAdherence = Literal["yes", "no", "unknown"]
 
 
@@ -15,12 +19,16 @@ class TradeExitCreate(BaseModel):
     quantity: int = Field(gt=0)
     exit_price: Decimal = Field(gt=0)
     exit_time: datetime
+    commission: Optional[Decimal] = Field(default=None, ge=0)
+    fees: Optional[Decimal] = Field(default=None, ge=0)
 
 
 class TradeExitUpdate(BaseModel):
     quantity: Optional[int] = Field(default=None, gt=0)
     exit_price: Optional[Decimal] = Field(default=None, gt=0)
     exit_time: Optional[datetime] = None
+    commission: Optional[Decimal] = Field(default=None, ge=0)
+    fees: Optional[Decimal] = Field(default=None, ge=0)
 
 
 class TradeExitRead(BaseModel):
@@ -28,6 +36,8 @@ class TradeExitRead(BaseModel):
     quantity: int
     exit_price: Decimal
     exit_time: datetime
+    commission: Optional[Decimal]
+    fees: Optional[Decimal]
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -39,6 +49,8 @@ class TradeEntryCreate(BaseModel):
     quantity: int = Field(gt=0)
     entry_price: Decimal = Field(gt=0)
     entry_time: datetime
+    commission: Optional[Decimal] = Field(default=None, ge=0)
+    fees: Optional[Decimal] = Field(default=None, ge=0)
 
 
 class TradeEntryRead(BaseModel):
@@ -46,6 +58,8 @@ class TradeEntryRead(BaseModel):
     quantity: int
     entry_price: Decimal
     entry_time: datetime
+    commission: Optional[Decimal]
+    fees: Optional[Decimal]
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -68,6 +82,21 @@ class TradeCreate(BaseModel):
     # load and render.
     setup: str = Field(min_length=1, max_length=200)
     notes: Optional[str] = Field(default=None, max_length=4000)
+    # DF-VS1.5a (issue #80): commission/fees for the original entry fill.
+    commission: Optional[Decimal] = Field(default=None, ge=0)
+    fees: Optional[Decimal] = Field(default=None, ge=0)
+    # One-submission completed-trade entry (issue #80's "convenient manual
+    # completed-trade entry" ask): when all three are supplied, create_trade
+    # also creates a single TradeExit in the same request, instead of
+    # requiring entry-then-separate-exit. All three are required together
+    # (see the validator below) -- a partial set is almost certainly a
+    # client mistake, not a valid "no exit yet" state (that's just omitting
+    # all three).
+    exit_price: Optional[Decimal] = Field(default=None, gt=0)
+    exit_quantity: Optional[int] = Field(default=None, gt=0)
+    exit_time: Optional[datetime] = None
+    exit_commission: Optional[Decimal] = Field(default=None, ge=0)
+    exit_fees: Optional[Decimal] = Field(default=None, ge=0)
     # Issue #64: set by the client when entry/stop/target/quantity were
     # prefilled from AI screenshot extraction and the trader confirmed them
     # (edited or not) before submitting. extraction_snapshot/extracted_at
@@ -112,6 +141,17 @@ class TradeCreate(BaseModel):
             )
         return self
 
+    @model_validator(mode="after")
+    def _require_full_exit_leg_together(self) -> "TradeCreate":
+        exit_fields = (self.exit_price, self.exit_quantity, self.exit_time)
+        if any(f is not None for f in exit_fields) and not all(f is not None for f in exit_fields):
+            raise ValueError(
+                "exit_price, exit_quantity, and exit_time must be supplied together to log a completed trade in one submission"
+            )
+        if self.exit_quantity is not None and self.exit_quantity > self.initial_quantity:
+            raise ValueError("exit_quantity cannot exceed initial_quantity")
+        return self
+
 
 class TradeUpdate(BaseModel):
     symbol: Optional[str] = Field(default=None, min_length=1, max_length=20)
@@ -123,6 +163,11 @@ class TradeUpdate(BaseModel):
     target_price: Optional[Decimal] = Field(default=None, gt=0)
     setup: Optional[str] = Field(default=None, max_length=200)
     notes: Optional[str] = Field(default=None, max_length=4000)
+    # DF-VS1.5a (issue #80): fact/cost data, not plan data -- editable here
+    # like notes, since a trader may not know the exact commission/fees at
+    # the moment of first logging a trade.
+    commission: Optional[Decimal] = Field(default=None, ge=0)
+    fees: Optional[Decimal] = Field(default=None, ge=0)
     # Outcome (DF-VS1): judged after the fact, so these stay editable here.
     # Deliberately NOT included: planned_stop_price, planned_target_price,
     # planned_quantity, plan_rationale, plan_verified_at -- the plan is set
@@ -189,6 +234,25 @@ class TradeRead(BaseModel):
     distinctly from planned_risk_points' "what is the risk now"."""
     original_planned_risk_dollars: Optional[Decimal]
     multiplier_known: bool
+    # Commission/fees (DF-VS1.5a, issue #80). commission/fees here are just
+    # the original entry fill's own, straight off the Trade row; total_*
+    # sum this plus every TradeEntry/TradeExit's own commission/fees.
+    commission: Optional[Decimal]
+    fees: Optional[Decimal]
+    total_commission: Decimal
+    total_fees: Decimal
+    net_pnl: Optional[Decimal]
+    """realized_pnl minus total_commission/total_fees. Fields left blank
+    are treated as zero cost for this computation, not unknown cost -- if
+    no commission/fees have been recorded anywhere on this trade, net_pnl
+    will equal gross realized_pnl until real cost data is entered. Null
+    exactly when realized_pnl itself is null (multiplier unknown)."""
+    external_trade_id: Optional[str]
+    external_order_id: Optional[str]
+    account_id: Optional[str]
+    account_label: Optional[str]
+    """Unused by any route in this slice -- always null today. Exists so
+    DF-VS1.5b/c don't require a second migration; see issue #80."""
     has_screenshot: bool
     price_source: PriceSource
     extraction_snapshot: Optional[dict]

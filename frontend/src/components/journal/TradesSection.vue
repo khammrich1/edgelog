@@ -226,7 +226,17 @@ function emptyTradeForm() {
     setup: '',
     notes: '',
     plan_rationale: '',
-    plan_verified: false
+    plan_verified: false,
+    // DF-VS1.5a (issue #80): commission/fees for the original entry fill,
+    // plus an optional one-submission completed-trade exit leg.
+    commission: '',
+    fees: '',
+    log_as_completed: false,
+    exit_price: '',
+    exit_quantity: '',
+    exit_time: nowForDateTimeLocal(),
+    exit_commission: '',
+    exit_fees: ''
   }
 }
 
@@ -289,14 +299,26 @@ function toggleExitForm(tradeId) {
 
 function exitFormFor(tradeId) {
   if (!exitForms[tradeId]) {
-    exitForms[tradeId] = { quantity: '', exit_price: '', exit_time: nowForDateTimeLocal() }
+    exitForms[tradeId] = {
+      quantity: '',
+      exit_price: '',
+      exit_time: nowForDateTimeLocal(),
+      commission: '',
+      fees: ''
+    }
   }
   return exitForms[tradeId]
 }
 
 function entryFormFor(tradeId) {
   if (!entryForms[tradeId]) {
-    entryForms[tradeId] = { quantity: '', entry_price: '', entry_time: nowForDateTimeLocal() }
+    entryForms[tradeId] = {
+      quantity: '',
+      entry_price: '',
+      entry_time: nowForDateTimeLocal(),
+      commission: '',
+      fees: ''
+    }
   }
   return entryForms[tradeId]
 }
@@ -328,6 +350,21 @@ async function submitEditExit(trade, exit) {
   } catch (error) {
     window.alert(error.response?.data?.detail || 'Could not update that trim.')
   }
+}
+
+// DF-VS1.5a (issue #80): a trade with zero plan fields at all (exactly
+// what a broker-imported or otherwise never-planned execution looks like)
+// must still show a conspicuous "Unplanned" label here -- distinct from
+// "Retrospective / unverified", which means a plan WAS recorded but not
+// affirmed as pre-trade. Never silently render nothing.
+function planStatus(trade) {
+  if (trade.plan_verified_at) {
+    return { label: 'Verified pre-trade', modifier: 'verified' }
+  }
+  if (trade.plan_rationale || trade.planned_stop_price || trade.planned_target_price) {
+    return { label: 'Retrospective / unverified', modifier: 'unverified' }
+  }
+  return { label: 'Unplanned / No pre-trade plan recorded', modifier: 'unplanned' }
 }
 
 // DF-VS1 (issue #78): the Outcome fields (rule adherence, reflection) are
@@ -371,7 +408,9 @@ function startEditTrade(trade) {
     stop_price: trade.stop_price !== null ? Number(trade.stop_price) : '',
     target_price: trade.target_price !== null ? Number(trade.target_price) : '',
     setup: trade.setup ?? '',
-    notes: trade.notes ?? ''
+    notes: trade.notes ?? '',
+    commission: trade.commission !== null ? Number(trade.commission) : '',
+    fees: trade.fees !== null ? Number(trade.fees) : ''
   }
   editingTradeId.value = trade.id
 }
@@ -392,7 +431,9 @@ async function submitEditTrade(trade) {
       stop_price: form.stop_price || null,
       target_price: form.target_price || null,
       setup: form.setup || null,
-      notes: form.notes || null
+      notes: form.notes || null,
+      commission: form.commission || null,
+      fees: form.fees || null
     })
     editingTradeId.value = null
   } catch (error) {
@@ -439,6 +480,17 @@ async function submitNewTrade() {
     planned_target_price: effectiveTargetPrice.value,
     plan_rationale: tradeForm.plan_rationale || null,
     plan_verified: tradeForm.plan_verified,
+    commission: tradeForm.commission || null,
+    fees: tradeForm.fees || null,
+    ...(tradeForm.log_as_completed
+      ? {
+          exit_price: tradeForm.exit_price,
+          exit_quantity: Number(tradeForm.exit_quantity),
+          exit_time: new Date(tradeForm.exit_time).toISOString(),
+          exit_commission: tradeForm.exit_commission || null,
+          exit_fees: tradeForm.exit_fees || null
+        }
+      : {}),
     ...(hasPendingExtraction.value
       ? {
           price_source: 'image_extracted',
@@ -494,7 +546,9 @@ async function submitExit(trade) {
     await tradesStore.addExit(props.date, trade.id, {
       quantity: Number(form.quantity),
       exit_price: form.exit_price,
-      exit_time: new Date(form.exit_time).toISOString()
+      exit_time: new Date(form.exit_time).toISOString(),
+      commission: form.commission || null,
+      fees: form.fees || null
     })
     delete exitForms[trade.id]
     exitFormOpenId.value = null
@@ -514,7 +568,9 @@ async function submitEntry(trade) {
     await tradesStore.addEntry(props.date, trade.id, {
       quantity: Number(form.quantity),
       entry_price: form.entry_price,
-      entry_time: new Date(form.entry_time).toISOString()
+      entry_time: new Date(form.entry_time).toISOString(),
+      commission: form.commission || null,
+      fees: form.fees || null
     })
     delete entryForms[trade.id]
     entryFormOpenId.value = null
@@ -777,6 +833,48 @@ onUnmounted(revokeAllTradeScreenshots)
             Recording this before execution (verified pre-trade)
           </label>
         </div>
+
+        <div class="el-field ticket-field--fees">
+          <label class="el-field-label">Entry commission</label>
+          <input v-model="tradeForm.commission" type="number" step="any" min="0" placeholder="0.00" />
+        </div>
+        <div class="el-field ticket-field--fees">
+          <label class="el-field-label">Entry fees</label>
+          <input v-model="tradeForm.fees" type="number" step="any" min="0" placeholder="0.00" />
+        </div>
+
+        <div class="el-field ticket-field--completed">
+          <label class="plan-verified-checkbox">
+            <input type="checkbox" v-model="tradeForm.log_as_completed" />
+            Already closed -- log the exit now too
+          </label>
+          <div v-if="tradeForm.log_as_completed" class="completed-exit-fields">
+            <input
+              v-model="tradeForm.exit_price"
+              type="number"
+              step="any"
+              placeholder="Exit price"
+              required
+            />
+            <input
+              v-model="tradeForm.exit_quantity"
+              type="number"
+              min="1"
+              :max="tradeForm.initial_quantity || undefined"
+              placeholder="Exit qty"
+              required
+            />
+            <input v-model="tradeForm.exit_time" type="datetime-local" required />
+            <input
+              v-model="tradeForm.exit_commission"
+              type="number"
+              step="any"
+              min="0"
+              placeholder="Exit commission"
+            />
+            <input v-model="tradeForm.exit_fees" type="number" step="any" min="0" placeholder="Exit fees" />
+          </div>
+        </div>
       </div>
 
       <div class="el-ticket-footer">
@@ -877,16 +975,20 @@ onUnmounted(revokeAllTradeScreenshots)
                 <template v-else>{{ formatPrice(trade.original_planned_risk_points) }} pts</template>
               </span>
             </div>
+            <div
+              v-if="trade.multiplier_known && trade.net_pnl !== null && Number(trade.net_pnl) !== Number(trade.realized_pnl)"
+              class="info-item"
+            >
+              <span class="info-label">Net P&amp;L</span>
+              <span class="info-value" :class="resultClass(trade.net_pnl)">{{ formatSignedDollars(trade.net_pnl) }}</span>
+            </div>
           </div>
 
-          <div
-            v-if="trade.plan_rationale || trade.plan_verified_at || trade.planned_stop_price || trade.planned_target_price"
-            class="trade-card__section"
-          >
+          <div class="trade-card__section">
             <div class="trade-card__section-label">
               Plan
-              <span class="plan-verified-badge" :class="{ 'plan-verified-badge--verified': trade.plan_verified_at }">
-                {{ trade.plan_verified_at ? 'Verified pre-trade' : 'Retrospective / unverified' }}
+              <span class="plan-verified-badge" :class="`plan-verified-badge--${planStatus(trade).modifier}`">
+                {{ planStatus(trade).label }}
               </span>
             </div>
             <p v-if="trade.plan_rationale" class="trade-notes">{{ trade.plan_rationale }}</p>
@@ -1017,6 +1119,14 @@ onUnmounted(revokeAllTradeScreenshots)
                 required
               />
               <input v-model="entryFormFor(trade.id).entry_time" type="datetime-local" required />
+              <input
+                v-model="entryFormFor(trade.id).commission"
+                type="number"
+                step="any"
+                min="0"
+                placeholder="Commission"
+              />
+              <input v-model="entryFormFor(trade.id).fees" type="number" step="any" min="0" placeholder="Fees" />
               <button type="submit">Add contracts</button>
             </form>
 
@@ -1031,6 +1141,14 @@ onUnmounted(revokeAllTradeScreenshots)
               />
               <input v-model="exitFormFor(trade.id).exit_price" type="number" step="any" placeholder="Exit price" required />
               <input v-model="exitFormFor(trade.id).exit_time" type="datetime-local" required />
+              <input
+                v-model="exitFormFor(trade.id).commission"
+                type="number"
+                step="any"
+                min="0"
+                placeholder="Commission"
+              />
+              <input v-model="exitFormFor(trade.id).fees" type="number" step="any" min="0" placeholder="Fees" />
               <button type="submit">Add trim</button>
             </form>
 
@@ -1064,6 +1182,14 @@ onUnmounted(revokeAllTradeScreenshots)
               <input v-model="editTradeForms[trade.id].stop_price" type="number" step="any" placeholder="Stop" />
               <input v-model="editTradeForms[trade.id].target_price" type="number" step="any" placeholder="Target" />
               <input v-model="editTradeForms[trade.id].setup" type="text" placeholder="Setup" maxlength="200" />
+              <input
+                v-model="editTradeForms[trade.id].commission"
+                type="number"
+                step="any"
+                min="0"
+                placeholder="Commission"
+              />
+              <input v-model="editTradeForms[trade.id].fees" type="number" step="any" min="0" placeholder="Fees" />
               <textarea v-model="editTradeForms[trade.id].notes" rows="2" placeholder="Notes"></textarea>
             </div>
             <div class="trade-card__edit-actions">
@@ -1330,6 +1456,11 @@ onUnmounted(revokeAllTradeScreenshots)
   color: var(--el-positive);
 }
 
+.plan-verified-badge--unplanned {
+  color: var(--el-negative);
+  font-weight: 600;
+}
+
 .outcome-form {
   display: flex;
   flex-direction: column;
@@ -1526,6 +1657,21 @@ onUnmounted(revokeAllTradeScreenshots)
 .ticket-field--plan textarea {
   width: 100%;
   resize: vertical;
+}
+
+.ticket-field--completed {
+  grid-column: 1 / -1;
+}
+
+.completed-exit-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--el-space-2);
+  margin-top: var(--el-space-2);
+}
+
+.completed-exit-fields input {
+  flex: 1 1 140px;
 }
 
 .plan-verified-checkbox {

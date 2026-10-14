@@ -6,6 +6,8 @@ from app.core.database import Base
 
 PRICE_PRECISION = 18
 PRICE_SCALE = 6
+AMOUNT_PRECISION = 14
+AMOUNT_SCALE = 2
 
 
 class Trade(Base):
@@ -58,6 +60,20 @@ class Trade(Base):
     rule_adherence = Column(String, nullable=True)  # yes | no | unknown
     rule_adherence_note = Column(Text, nullable=True)
     reflection_notes = Column(Text, nullable=True)
+    # Commission/fees for the original entry fill (DF-VS1.5a, issue #80).
+    # TradeEntry/TradeExit carry their own -- this is Trade's own because
+    # the original entry lives on this row, not a synthetic TradeEntry.
+    # Left null (not defaulted to 0) when not recorded -- see
+    # _compute_trade_math's net_pnl comment for what that means for net P&L.
+    commission = Column(Numeric(AMOUNT_PRECISION, AMOUNT_SCALE), nullable=True)
+    fees = Column(Numeric(AMOUNT_PRECISION, AMOUNT_SCALE), nullable=True)
+    # External/account identifiers (DF-VS1.5b/c groundwork, issue #80).
+    # Unused by any route yet -- exist so later import/sync slices don't
+    # need a second migration. Provider-agnostic string IDs, not FKs.
+    external_trade_id = Column(String, nullable=True)
+    external_order_id = Column(String, nullable=True)
+    account_id = Column(String, nullable=True)
+    account_label = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
@@ -88,6 +104,8 @@ class TradeExit(Base):
     quantity = Column(Integer, nullable=False)
     exit_price = Column(Numeric(PRICE_PRECISION, PRICE_SCALE), nullable=False)
     exit_time = Column(DateTime(timezone=True), nullable=False)
+    commission = Column(Numeric(AMOUNT_PRECISION, AMOUNT_SCALE), nullable=True)
+    fees = Column(Numeric(AMOUNT_PRECISION, AMOUNT_SCALE), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
@@ -104,4 +122,6 @@ class TradeEntry(Base):
     quantity = Column(Integer, nullable=False)
     entry_price = Column(Numeric(PRICE_PRECISION, PRICE_SCALE), nullable=False)
     entry_time = Column(DateTime(timezone=True), nullable=False)
+    commission = Column(Numeric(AMOUNT_PRECISION, AMOUNT_SCALE), nullable=True)
+    fees = Column(Numeric(AMOUNT_PRECISION, AMOUNT_SCALE), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
