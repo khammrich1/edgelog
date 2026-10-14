@@ -77,6 +77,16 @@ class TraderAgentService:
         self._provider.disconnect()
         audit(self.logger, "agent.stopped")
 
+    def list_accounts(self) -> list[Account]:
+        """Authenticates and returns every account visible to this login,
+        without resolving a contract or opening the realtime connection --
+        deliberately lighter-weight than start(), since account discovery
+        (issue #83) shouldn't require MNQ to be resolvable to work."""
+        audit(self.logger, "agent.starting")
+        self._provider.authenticate()
+        audit(self.logger, "agent.authenticated")
+        return self._provider.list_accounts()
+
     def status(self) -> AgentStatus:
         current_price = self._provider.get_current_price(self._contract.id) if self._contract else None
         return AgentStatus(

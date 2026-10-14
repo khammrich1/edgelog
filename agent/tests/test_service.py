@@ -116,6 +116,20 @@ def test_status_reports_account_contract_and_current_price():
     assert status.is_execution_capable is True
 
 
+def test_list_accounts_authenticates_without_resolving_contract_or_connecting_realtime():
+    """Issue #83: account discovery must work even if MNQ isn't resolvable
+    yet, so list_accounts() is deliberately lighter-weight than start()."""
+    account = Account(id=1, name="Practice", is_practice=True)
+    other_account = Account(id=2, name="Live Funded", is_practice=False)
+    provider = _FakeProvider(accounts=[account, other_account], raise_on_resolve_contract=True)
+    service = TraderAgentService(_config(), provider)
+
+    accounts = service.list_accounts()
+
+    assert accounts == [account, other_account]
+    assert provider.calls == ["authenticate", "list_accounts"]
+
+
 def test_stop_disconnects_the_provider():
     contract = Contract(id="CON.F.US.MNQ.Z25", name="MNQZ5", description="", symbol_id="F.US.MNQ", active=True)
     provider = _FakeProvider(accounts=[], contract=contract)

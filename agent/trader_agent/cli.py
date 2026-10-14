@@ -1,9 +1,12 @@
 """Command-line entrypoint: `python -m trader_agent <command>`.
 
-start   -- authenticate, resolve the contract, connect real-time, and run
-           until interrupted (Ctrl+C), printing status periodically.
-status  -- one-shot authenticate + resolve + connect, print status, exit.
-           Useful for verifying setup without leaving the agent running.
+start    -- authenticate, resolve the contract, connect real-time, and run
+            until interrupted (Ctrl+C), printing status periodically.
+status   -- one-shot authenticate + resolve + connect, print status, exit.
+            Useful for verifying setup without leaving the agent running.
+accounts -- list every account visible to this login and interactively
+            select one or more to persist locally (issue #83). Does not
+            resolve a contract or open the realtime connection.
 """
 from __future__ import annotations
 
@@ -11,8 +14,10 @@ import argparse
 import signal
 import sys
 import time
+from pathlib import Path
 
-from trader_agent.config import ConfigError
+from trader_agent.account_selection import AccountSelectionError, run_interactive_selection
+from trader_agent.config import AGENT_DIR, ConfigError
 from trader_agent.service import TraderAgentService
 
 
@@ -63,11 +68,27 @@ def cmd_start(_args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_accounts(_args: argparse.Namespace) -> int:
+    service = TraderAgentService.from_local_config()
+    try:
+        accounts = service.list_accounts()
+        run_interactive_selection(accounts, agent_dir=Path(AGENT_DIR))
+    except AccountSelectionError as exc:
+        print(f"Account selection error: {exc}", file=sys.stderr)
+        return 2
+    finally:
+        service.stop()
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="trader_agent")
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("start", help="Run the agent until interrupted").set_defaults(func=cmd_start)
     subparsers.add_parser("status", help="Connect once, print status, exit").set_defaults(func=cmd_status)
+    subparsers.add_parser(
+        "accounts", help="List accounts and interactively select one or more to persist locally"
+    ).set_defaults(func=cmd_accounts)
 
     args = parser.parse_args(argv)
     try:
