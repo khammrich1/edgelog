@@ -155,6 +155,21 @@ def _compute_trade_math(trade: Trade, exits: list[TradeExit], entries: list[Trad
         if multiplier is not None:
             original_planned_risk_dollars = original_planned_risk_points * multiplier
 
+    # DF-VS1.5a (issue #80): commission/fees left blank anywhere are
+    # treated as zero cost for this sum, not unknown cost -- a trade with
+    # no cost data recorded anywhere nets to its own gross realized_pnl,
+    # which is the honest "no cost known yet" value, not a claim that the
+    # cost was actually zero. net_pnl stays null exactly when realized_pnl
+    # itself is null (multiplier unknown), same null-propagation as every
+    # other dollar figure here.
+    total_commission = (trade.commission or Decimal("0")) + sum(
+        (e.commission or Decimal("0")) for e in entries
+    ) + sum((x.commission or Decimal("0")) for x in exits)
+    total_fees = (trade.fees or Decimal("0")) + sum(
+        (e.fees or Decimal("0")) for e in entries
+    ) + sum((x.fees or Decimal("0")) for x in exits)
+    net_pnl = (realized_pnl - total_commission - total_fees) if realized_pnl is not None else None
+
     return {
         "total_quantity": total_quantity,
         "average_entry_price": average_entry_price,
@@ -167,6 +182,9 @@ def _compute_trade_math(trade: Trade, exits: list[TradeExit], entries: list[Trad
         "original_planned_risk_points": original_planned_risk_points,
         "original_planned_risk_dollars": original_planned_risk_dollars,
         "multiplier_known": multiplier is not None,
+        "total_commission": total_commission,
+        "total_fees": total_fees,
+        "net_pnl": net_pnl,
     }
 
 
@@ -214,6 +232,15 @@ def _serialize_trade(trade: Trade, exits: list[TradeExit], entries: list[TradeEn
         rule_adherence=trade.rule_adherence,
         rule_adherence_note=trade.rule_adherence_note,
         reflection_notes=trade.reflection_notes,
+        commission=trade.commission,
+        fees=trade.fees,
+        total_commission=math["total_commission"],
+        total_fees=math["total_fees"],
+        net_pnl=math["net_pnl"],
+        external_trade_id=trade.external_trade_id,
+        external_order_id=trade.external_order_id,
+        account_id=trade.account_id,
+        account_label=trade.account_label,
         created_at=trade.created_at,
         updated_at=trade.updated_at,
     )
@@ -383,11 +410,33 @@ async def create_trade(
         planned_quantity=payload.initial_quantity,
         plan_rationale=payload.plan_rationale,
         plan_verified_at=now if (payload.plan_verified and plan_verification_plausible) else None,
+        commission=payload.commission,
+        fees=payload.fees,
     )
     db.add(trade)
     await db.flush()
+
+    # DF-VS1.5a (issue #80): one-submission completed-trade entry -- the
+    # schema validator already guarantees these three arrive together or
+    # not at all, and that exit_quantity <= initial_quantity.
+    exits: list[TradeExit] = []
+    if payload.exit_price is not None:
+        exit_row = TradeExit(
+            trade_id=trade.id,
+            quantity=payload.exit_quantity,
+            exit_price=payload.exit_price,
+            exit_time=payload.exit_time,
+            commission=payload.exit_commission,
+            fees=payload.exit_fees,
+        )
+        db.add(exit_row)
+        await db.flush()
+        exits.append(exit_row)
+        trade.status = "closed" if payload.exit_quantity >= payload.initial_quantity else "open"
+        await db.flush()
+
     await db.refresh(trade)
-    return _serialize_trade(trade, [], [])
+    return _serialize_trade(trade, exits, [])
 
 
 @router.get("/days/{day}/trades/{trade_id}", response_model=TradeRead)
@@ -463,6 +512,10 @@ async def update_trade(
         trade.setup = payload.setup
     if payload.notes is not None:
         trade.notes = payload.notes
+    if payload.commission is not None:
+        trade.commission = payload.commission
+    if payload.fees is not None:
+        trade.fees = payload.fees
     # Outcome (DF-VS1): editable after the fact. Note what's deliberately
     # absent from TradeUpdate and so can never appear here: planned_*,
     # plan_rationale, plan_verified_at -- the plan snapshot stays fixed.
@@ -560,6 +613,8 @@ async def create_entry(
         quantity=payload.quantity,
         entry_price=payload.entry_price,
         entry_time=payload.entry_time,
+        commission=payload.commission,
+        fees=payload.fees,
     )
     db.add(entry_row)
     await db.flush()
@@ -632,6 +687,8 @@ async def create_exit(
         quantity=payload.quantity,
         exit_price=payload.exit_price,
         exit_time=payload.exit_time,
+        commission=payload.commission,
+        fees=payload.fees,
     )
     db.add(exit_row)
     await db.flush()
@@ -679,6 +736,10 @@ async def update_exit(
         exit_row.exit_price = payload.exit_price
     if payload.exit_time is not None:
         exit_row.exit_time = payload.exit_time
+    if payload.commission is not None:
+        exit_row.commission = payload.commission
+    if payload.fees is not None:
+        exit_row.fees = payload.fees
 
     await db.flush()
 
