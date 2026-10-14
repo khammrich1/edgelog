@@ -5,7 +5,7 @@ import TradesSection from './TradesSection.vue'
 import { useTradesStore } from '@/stores/trades'
 import { useInstrumentsStore } from '@/stores/instruments'
 
-function mountTradesSection({ trades = [] } = {}) {
+function mountTradesSection({ trades = [], tickSizes = {} } = {}) {
   setActivePinia(createPinia())
 
   const tradesStore = useTradesStore()
@@ -15,6 +15,8 @@ function mountTradesSection({ trades = [] } = {}) {
   tradesStore.fetchTrades = vi.fn().mockResolvedValue(trades)
   tradesStore.fetchSetups = vi.fn().mockResolvedValue([])
   instrumentsStore.fetchMultipliers = vi.fn().mockResolvedValue({})
+  instrumentsStore.fetchTickSizes = vi.fn().mockResolvedValue({})
+  instrumentsStore.tickSizes = tickSizes
   if (trades.length) {
     tradesStore.tradesByDate = { '2026-01-01': trades }
   }
@@ -145,6 +147,82 @@ describe('TradesSection add-contracts / add-trim forms', () => {
 
     await toggle.trigger('click')
     expect(wrapper.find('input[placeholder="Entry price"]').exists()).toBe(false)
+  })
+})
+
+describe('TradesSection breakeven exit (issue #61)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  async function mountExpandedOpenTrade(tickSizes) {
+    const result = mountTradesSection({ trades: [openTrade()], tickSizes })
+    await result.wrapper.vm.$nextTick()
+    await result.wrapper.find('.trade-card__header').trigger('click')
+    return result
+  }
+
+  it('shows a B/E button when the symbol has a known tick size', async () => {
+    const { wrapper } = await mountExpandedOpenTrade({ MNQ: 0.25 })
+    expect(wrapper.text()).toContain('B/E')
+  })
+
+  it('hides the B/E button when the symbol has no known tick size, rather than fabricating a price', async () => {
+    const { wrapper } = await mountExpandedOpenTrade({})
+    const buttons = wrapper.findAll('.toggle-more-button')
+    expect(buttons.some((b) => b.text() === 'B/E')).toBe(false)
+  })
+
+  it('records a tick-rounded breakeven exit for the remaining quantity on confirm', async () => {
+    const { wrapper, tradesStore } = await mountExpandedOpenTrade({ MNQ: 0.25 })
+    tradesStore.addExit = vi.fn().mockResolvedValue(openTrade())
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    const beButton = wrapper.findAll('.toggle-more-button').find((b) => b.text() === 'B/E')
+    await beButton.trigger('click')
+    await flushPromises()
+
+    // openTrade()'s average_entry_price is 29780, already tick-aligned.
+    expect(tradesStore.addExit).toHaveBeenCalledWith(
+      '2026-01-01',
+      1,
+      expect.objectContaining({ quantity: 5, exit_price: 29780 })
+    )
+  })
+
+  it('does not record an exit when the trader cancels the confirmation', async () => {
+    const { wrapper, tradesStore } = await mountExpandedOpenTrade({ MNQ: 0.25 })
+    tradesStore.addExit = vi.fn().mockResolvedValue(openTrade())
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+    const beButton = wrapper.findAll('.toggle-more-button').find((b) => b.text() === 'B/E')
+    await beButton.trigger('click')
+    await flushPromises()
+
+    expect(tradesStore.addExit).not.toHaveBeenCalled()
+  })
+
+  it('rounds a non-tick-aligned weighted-average cost basis before recording the exit', async () => {
+    const tradeWithScaleIn = {
+      ...openTrade(),
+      average_entry_price: '29780.1' // not a 0.25-aligned price
+    }
+    const { wrapper, tradesStore } = mountTradesSection({ trades: [tradeWithScaleIn], tickSizes: { MNQ: 0.25 } })
+    await wrapper.vm.$nextTick()
+    await wrapper.find('.trade-card__header').trigger('click')
+    tradesStore.addExit = vi.fn().mockResolvedValue(tradeWithScaleIn)
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    const beButton = wrapper.findAll('.toggle-more-button').find((b) => b.text() === 'B/E')
+    await beButton.trigger('click')
+    await flushPromises()
+
+    // 29780.1 / 0.25 = 119120.4 -> rounds to 119120 ticks -> 29780.0
+    expect(tradesStore.addExit).toHaveBeenCalledWith(
+      '2026-01-01',
+      1,
+      expect.objectContaining({ exit_price: 29780 })
+    )
   })
 })
 

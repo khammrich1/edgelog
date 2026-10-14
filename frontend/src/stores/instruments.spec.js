@@ -43,3 +43,31 @@ describe('instruments store getMultiplier', () => {
     expect(store.getMultiplier(undefined)).toBeNull()
   })
 })
+
+describe('instruments store getTickSize (issue #61)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  function mountWithTickSizes(tickSizes) {
+    const store = useInstrumentsStore()
+    store.tickSizes = tickSizes
+    return store
+  }
+
+  it('resolves a bare root symbol', () => {
+    const store = mountWithTickSizes({ MNQ: 0.25, MGC: 0.1 })
+    expect(store.getTickSize('MNQ')).toBe(0.25)
+    expect(store.getTickSize(' mgc ')).toBe(0.1)
+  })
+
+  it('resolves a dated futures contract to its root', () => {
+    const store = mountWithTickSizes({ MNQ: 0.25 })
+    expect(store.getTickSize('MNQZ26')).toBe(0.25)
+  })
+
+  it('returns null for an unknown symbol, never a fabricated default', () => {
+    const store = mountWithTickSizes({ MNQ: 0.25 })
+    expect(store.getTickSize('XYZ')).toBeNull()
+  })
+})

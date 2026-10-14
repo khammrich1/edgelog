@@ -8,6 +8,7 @@ import api from '@/services/api'
 // through Vue components.
 export const useInstrumentsStore = defineStore('instruments', () => {
   const multipliers = ref({})
+  const tickSizes = ref({})
 
   async function fetchMultipliers() {
     const { data } = await api.get('/instruments/multipliers')
@@ -19,6 +20,20 @@ export const useInstrumentsStore = defineStore('instruments', () => {
     return parsed
   }
 
+  // Issue #61: tick size is needed to compute a tick-aligned breakeven
+  // exit price. Same centralized-table/no-fabrication pattern as the
+  // multiplier fetch above -- a symbol absent here has no verified tick
+  // size, full stop, never a guessed default.
+  async function fetchTickSizes() {
+    const { data } = await api.get('/instruments/tick-sizes')
+    const parsed = {}
+    for (const [symbol, value] of Object.entries(data)) {
+      parsed[symbol] = Number(value)
+    }
+    tickSizes.value = parsed
+    return parsed
+  }
+
   // Mirrors backend/app/core/instruments.py's _DATED_CONTRACT_RE: a dated
   // futures contract like "MNQZ26" is root "MNQ" + single-letter month code
   // + 1-4 digit year. Only this parsing pattern is duplicated here -- the
@@ -26,19 +41,27 @@ export const useInstrumentsStore = defineStore('instruments', () => {
   // the one source of truth for those.
   const DATED_CONTRACT_RE = /^([A-Z]{1,3})[FGHJKMNQUVXZ]\d{1,4}$/
 
-  function getMultiplier(symbol) {
+  function _resolve(table, symbol) {
     if (!symbol) return null
     const normalized = symbol.trim().toUpperCase()
-    const known = multipliers.value[normalized]
+    const known = table[normalized]
     if (known !== undefined) return known
 
     const match = normalized.match(DATED_CONTRACT_RE)
     if (match) {
-      const rootKnown = multipliers.value[match[1]]
+      const rootKnown = table[match[1]]
       if (rootKnown !== undefined) return rootKnown
     }
     return null
   }
 
-  return { multipliers, fetchMultipliers, getMultiplier }
+  function getMultiplier(symbol) {
+    return _resolve(multipliers.value, symbol)
+  }
+
+  function getTickSize(symbol) {
+    return _resolve(tickSizes.value, symbol)
+  }
+
+  return { multipliers, tickSizes, fetchMultipliers, fetchTickSizes, getMultiplier, getTickSize }
 })

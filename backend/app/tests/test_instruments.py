@@ -4,7 +4,13 @@ from decimal import Decimal
 import pytest
 from httpx import AsyncClient
 
-from app.core.instruments import INSTRUMENT_MULTIPLIERS, get_multiplier, get_tick_size, tick_alignment_warning
+from app.core.instruments import (
+    INSTRUMENT_MULTIPLIERS,
+    INSTRUMENT_TICK_SIZES,
+    get_multiplier,
+    get_tick_size,
+    tick_alignment_warning,
+)
 
 
 async def _register_and_auth_headers(client: AsyncClient, email: str = "trader@example.com") -> dict:
@@ -34,6 +40,26 @@ async def test_multipliers_match_the_single_source_of_truth(client: AsyncClient)
     # Every table entry round-trips; the frontend must never hard-code these.
     assert set(data.keys()) == set(INSTRUMENT_MULTIPLIERS.keys())
     for symbol, value in INSTRUMENT_MULTIPLIERS.items():
+        assert data[symbol] == str(value)
+
+
+@pytest.mark.asyncio
+async def test_tick_sizes_require_auth(client: AsyncClient):
+    response = await client.get("/api/v1/instruments/tick-sizes")
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_tick_sizes_match_the_single_source_of_truth(client: AsyncClient):
+    headers = await _register_and_auth_headers(client)
+    response = await client.get("/api/v1/instruments/tick-sizes", headers=headers)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["MNQ"] == "0.25"
+    assert data["MGC"] == "0.1"
+    assert set(data.keys()) == set(INSTRUMENT_TICK_SIZES.keys())
+    for symbol, value in INSTRUMENT_TICK_SIZES.items():
         assert data[symbol] == str(value)
 
 

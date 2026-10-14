@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeRealizedR, computeRiskReward, pointsToPrice, priceToPoints } from './tradeMath'
+import { computeRealizedR, computeRiskReward, pointsToPrice, priceToPoints, roundToTick } from './tradeMath'
 
 describe('pointsToPrice', () => {
   it('LONG: stop points sit below entry', () => {
@@ -152,5 +152,35 @@ describe('computeRealizedR', () => {
   it('returns null when planned risk is missing or zero', () => {
     expect(computeRealizedR(200, null)).toBeNull()
     expect(computeRealizedR(200, 0)).toBeNull()
+  })
+})
+
+describe('roundToTick (issue #61)', () => {
+  it('rounds a weighted-average cost basis to the nearest MNQ tick', () => {
+    // The exact issue #62 scenario: avg 31221.0625 on a 0.25 tick.
+    expect(roundToTick(31221.0625, 0.25)).toBe(31221)
+  })
+
+  it('rounds up when closer to the next tick', () => {
+    expect(roundToTick(31221.2, 0.25)).toBe(31221.25)
+  })
+
+  it('leaves an already tick-aligned price unchanged', () => {
+    expect(roundToTick(31221.25, 0.25)).toBe(31221.25)
+  })
+
+  it('works for a smaller tick size (e.g. MGC 0.1)', () => {
+    expect(roundToTick(1950.37, 0.1)).toBe(1950.4)
+  })
+
+  it('returns null when price is missing', () => {
+    expect(roundToTick(null, 0.25)).toBeNull()
+    expect(roundToTick(undefined, 0.25)).toBeNull()
+  })
+
+  it('returns null when tick size is missing or not positive -- never fabricates a rounding', () => {
+    expect(roundToTick(31221, null)).toBeNull()
+    expect(roundToTick(31221, 0)).toBeNull()
+    expect(roundToTick(31221, -0.25)).toBeNull()
   })
 })

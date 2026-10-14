@@ -38,6 +38,7 @@ async function mountJournalDay(dayOverrides = {}) {
 
   const instrumentsStore = useInstrumentsStore()
   instrumentsStore.fetchMultipliers = vi.fn().mockResolvedValue({})
+  instrumentsStore.fetchTickSizes = vi.fn().mockResolvedValue({})
 
   const wrapper = mount(JournalDay)
   await flushPromises()
@@ -151,6 +152,7 @@ describe('JournalDay tab navigation', () => {
 
     const instrumentsStore = useInstrumentsStore()
     instrumentsStore.fetchMultipliers = vi.fn().mockResolvedValue({})
+    instrumentsStore.fetchTickSizes = vi.fn().mockResolvedValue({})
 
     const wrapper = mount(JournalDay)
     await flushPromises()
@@ -230,6 +232,7 @@ describe('JournalDay tab navigation', () => {
 
     const instrumentsStore = useInstrumentsStore()
     instrumentsStore.fetchMultipliers = vi.fn().mockResolvedValue({})
+    instrumentsStore.fetchTickSizes = vi.fn().mockResolvedValue({})
 
     const wrapper = mount(JournalDay)
     await flushPromises()
@@ -270,6 +273,7 @@ describe('JournalDay loadDay request parallelism (issue #71)', () => {
     tradesStore.fetchSetups = vi.fn().mockResolvedValue([])
     const instrumentsStore = useInstrumentsStore()
     instrumentsStore.fetchMultipliers = vi.fn().mockResolvedValue({})
+    instrumentsStore.fetchTickSizes = vi.fn().mockResolvedValue({})
 
     mount(JournalDay)
     await flushPromises()

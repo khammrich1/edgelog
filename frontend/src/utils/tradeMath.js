@@ -24,6 +24,23 @@ function roundPrice(value) {
 }
 
 /**
+ * Rounds a price to the nearest multiple of the instrument's tick size
+ * (issue #61's breakeven-exit action: a weighted-average cost basis like
+ * 31221.0625 isn't itself a valid MNQ price -- ticks only land on
+ * .00/.25/.50/.75). Returns null if either input is missing/not a number,
+ * or if tickSize isn't positive -- callers must treat null as "no
+ * reliable tick-aligned price available" and require an explicit price
+ * from the trader instead, never fall back to the raw unrounded value.
+ */
+export function roundToTick(price, tickSize) {
+  const p = toNumberOrNull(price)
+  const t = toNumberOrNull(tickSize)
+  if (p === null || t === null || t <= 0) return null
+  const ticks = Math.round(p / t)
+  return roundPrice(ticks * t)
+}
+
+/**
  * Converts a points distance to an absolute price, given the trade's entry
  * price, direction, and which field ('stop' | 'target') it's for.
  *

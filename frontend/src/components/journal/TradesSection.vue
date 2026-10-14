@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useTradesStore } from '@/stores/trades'
 import { useInstrumentsStore } from '@/stores/instruments'
 import { formatPrice, formatSignedDollars, formatSignedPoints, resultClass, SYMBOL_PRESETS } from '@/utils/trades'
-import { computeRiskReward, pointsToPrice, priceToPoints } from '@/utils/tradeMath'
+import { computeRiskReward, pointsToPrice, priceToPoints, roundToTick } from '@/utils/tradeMath'
 
 const props = defineProps({
   date: { type: String, required: true },
@@ -564,6 +564,41 @@ async function targetHit(trade) {
   }
 }
 
+// Issue #61: breakeven exit for the remaining contracts, at the position's
+// actual weighted cost basis (average_entry_price already accounts for
+// scale-ins -- "price B/E", excluding commissions/fees, per the issue's
+// own phased scope). Tick-rounded so the recorded exit is a price that
+// could actually trade, not a raw averaging artifact like 31221.0625.
+// Returns null (never a guessed price) whenever the instrument's tick
+// size isn't in the centralized table -- the B/E button simply doesn't
+// render in that case, and the trader can still use "+ Add trim" to enter
+// an explicit price manually.
+function breakEvenPrice(trade) {
+  const tickSize = instrumentsStore.getTickSize(trade.symbol)
+  return roundToTick(trade.average_entry_price, tickSize)
+}
+
+async function breakEvenHit(trade) {
+  const price = breakEvenPrice(trade)
+  if (price === null) return
+  if (
+    !window.confirm(
+      `Mark breakeven? This exits the remaining ${trade.remaining_quantity} @ ${price} ` +
+        `(price basis -- excludes commissions/fees).`
+    )
+  )
+    return
+  try {
+    await tradesStore.addExit(props.date, trade.id, {
+      quantity: trade.remaining_quantity,
+      exit_price: price,
+      exit_time: new Date().toISOString()
+    })
+  } catch (error) {
+    window.alert(error.response?.data?.detail || 'Could not record the breakeven exit.')
+  }
+}
+
 async function cancelTradeAction(trade) {
   if (!window.confirm(`Cancel this ${trade.symbol} trade? It will be kept but excluded from P&L.`)) return
   try {
@@ -589,6 +624,7 @@ watch(() => props.date, () => {
 onMounted(async () => {
   loadTrades()
   instrumentsStore.fetchMultipliers()
+  instrumentsStore.fetchTickSizes()
   await tradesStore.fetchSetups()
   resetSetupEntryMode()
 })
@@ -1040,6 +1076,14 @@ onUnmounted(revokeAllTradeScreenshots)
               </button>
               <button v-if="trade.stop_price" type="button" class="toggle-more-button" @click="stopHit(trade)">
                 Stop hit
+              </button>
+              <button
+                v-if="breakEvenPrice(trade) !== null"
+                type="button"
+                class="toggle-more-button"
+                @click="breakEvenHit(trade)"
+              >
+                B/E
               </button>
             </div>
           </template>
