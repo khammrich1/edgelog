@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, model_validator
 Direction = Literal["long", "short"]
 TradeStatus = Literal["open", "closed", "canceled"]
 PriceSource = Literal["manual", "image_extracted"]
+RuleAdherence = Literal["yes", "no", "unknown"]
 
 
 class TradeExitCreate(BaseModel):
@@ -76,6 +77,30 @@ class TradeCreate(BaseModel):
     price_source: PriceSource = "manual"
     extraction_snapshot: Optional[dict] = None
     extracted_at: Optional[datetime] = None
+    # Plan (DF-VS1, issue #78): the trader's original intended stop/target
+    # and rationale, captured only at creation -- see TradeUpdate, which
+    # deliberately excludes these so the plan can never be rewritten.
+    # planned_entry_price/planned_quantity aren't accepted here -- the
+    # server always snapshots them from entry_price/initial_quantity below,
+    # so a later correction to the live entry_price or quantity (e.g. a
+    # typo fix) can never silently drift the original risk-at-entry math.
+    planned_stop_price: Optional[Decimal] = Field(default=None, gt=0)
+    planned_target_price: Optional[Decimal] = Field(default=None, gt=0)
+    plan_rationale: Optional[str] = Field(default=None, max_length=4000)
+    # Write-only: tells the server to stamp plan_verified_at from its own
+    # clock, affirming this plan was recorded before execution. The server
+    # timestamp is the only thing that ever sets plan_verified_at -- a
+    # trader can never backdate or directly supply it. This alone can't
+    # stop someone from checking the box on a trade they're logging long
+    # after the fact, so create_trade additionally only honors this flag
+    # when entry_time falls within a plausible window of the request's own
+    # clock (see PLAN_VERIFICATION_MAX_AGE/_FUTURE_TOLERANCE in trades.py)
+    # -- an obviously backdated or not-yet-happened entry can never be
+    # mislabeled as verified pre-trade evidence just because the box was
+    # checked. Within that window this is still a trader's self-attestation,
+    # not an independently provable fact -- a known, inherent limit of a
+    # single-step logging flow with no separate pre-trade submission.
+    plan_verified: bool = False
 
     @model_validator(mode="after")
     def _require_snapshot_for_extracted(self) -> "TradeCreate":
@@ -98,6 +123,14 @@ class TradeUpdate(BaseModel):
     target_price: Optional[Decimal] = Field(default=None, gt=0)
     setup: Optional[str] = Field(default=None, max_length=200)
     notes: Optional[str] = Field(default=None, max_length=4000)
+    # Outcome (DF-VS1): judged after the fact, so these stay editable here.
+    # Deliberately NOT included: planned_stop_price, planned_target_price,
+    # planned_quantity, plan_rationale, plan_verified_at -- the plan is set
+    # once at creation (TradeCreate) and is never editable through this
+    # schema, so it can never be silently rewritten by a later trade edit.
+    rule_adherence: Optional[RuleAdherence] = None
+    rule_adherence_note: Optional[str] = Field(default=None, max_length=4000)
+    reflection_notes: Optional[str] = Field(default=None, max_length=4000)
 
 
 class TradeSetupCreate(BaseModel):
@@ -145,7 +178,16 @@ class TradeRead(BaseModel):
     realized_points: Decimal
     realized_pnl: Optional[Decimal]
     planned_risk_points: Optional[Decimal]
+    """Risk computed from the trade's CURRENT stop/target -- unchanged
+    behavior, recalculates if the stop is moved. See original_planned_risk_*
+    for the immutable at-entry figure."""
     planned_risk_dollars: Optional[Decimal]
+    original_planned_risk_points: Optional[Decimal]
+    """Risk computed from the immutable planned_stop_price/planned_quantity
+    snapshot, if one was recorded at creation. Never recalculates when the
+    live stop_price is later moved, so it answers "what was the plan"
+    distinctly from planned_risk_points' "what is the risk now"."""
+    original_planned_risk_dollars: Optional[Decimal]
     multiplier_known: bool
     has_screenshot: bool
     price_source: PriceSource
@@ -157,6 +199,21 @@ class TradeRead(BaseModel):
     """True once any of entry/stop/target/quantity has been changed since
     an image_extracted trade was created -- lets the UI show "edited since
     extraction" without needing to diff against extraction_snapshot itself."""
+    # Plan (DF-VS1): set once at creation, immutable thereafter.
+    planned_entry_price: Optional[Decimal]
+    planned_stop_price: Optional[Decimal]
+    planned_target_price: Optional[Decimal]
+    planned_quantity: Optional[int]
+    plan_rationale: Optional[str]
+    plan_verified_at: Optional[datetime]
+    """Set by the server, only when the trader affirmed at creation that
+    this plan was recorded before execution. Null means the trade's plan
+    fields (if any) are retrospective/unverified, never to be treated as
+    pre-trade evidence."""
+    # Outcome (DF-VS1): editable after the fact via TradeUpdate.
+    rule_adherence: Optional[RuleAdherence]
+    rule_adherence_note: Optional[str]
+    reflection_notes: Optional[str]
     created_at: datetime
     updated_at: datetime
 

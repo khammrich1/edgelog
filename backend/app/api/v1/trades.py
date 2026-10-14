@@ -3,7 +3,7 @@ import json
 import uuid
 from collections import defaultdict
 from decimal import Decimal
-from datetime import date as date_type, datetime, timezone
+from datetime import date as date_type, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -36,6 +36,17 @@ from app.schemas.trades import (
 router = APIRouter()
 
 LOCKED_DAY_DETAIL = "Day is locked. Unlock it to make changes."
+
+# DF-VS1 (issue #78): a "verified pre-trade" claim is only plausible if
+# this trade is being logged close to when it was actually taken -- a
+# trade entered days/weeks ago but journaled just now (or one that
+# supposedly hasn't happened yet) cannot have had its plan meaningfully
+# "verified before execution" at logging time, whatever the trader checks.
+# This is a backstop against the most obviously false claims, not a proof
+# of timing: within the window, honoring the flag is still trusting the
+# trader's own word that the plan predated the trade.
+PLAN_VERIFICATION_MAX_AGE = timedelta(hours=24)
+PLAN_VERIFICATION_FUTURE_TOLERANCE = timedelta(minutes=15)
 
 TRADE_SCREENSHOT_DIR = Path(__file__).resolve().parents[3] / "uploads" / "trade_screenshots"
 ALLOWED_IMAGE_TYPES = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}
@@ -126,6 +137,24 @@ def _compute_trade_math(trade: Trade, exits: list[TradeExit], entries: list[Trad
         if multiplier is not None:
             planned_risk_dollars = planned_risk_points * multiplier
 
+    # DF-VS1 (issue #78): risk computed entirely from the immutable plan
+    # snapshot (planned_entry_price/planned_stop_price/planned_quantity),
+    # never the live entry/stop/quantity -- this is the one that stays
+    # "what was the plan" even after the trader moves the stop (e.g. to
+    # breakeven) or corrects the entry price, either of which
+    # planned_risk_points above deliberately keeps reflecting live.
+    original_planned_risk_points: Optional[Decimal] = None
+    original_planned_risk_dollars: Optional[Decimal] = None
+    if (
+        trade.planned_entry_price is not None
+        and trade.planned_stop_price is not None
+        and trade.planned_quantity is not None
+    ):
+        original_risk_per_unit = (trade.planned_entry_price - trade.planned_stop_price) * sign
+        original_planned_risk_points = original_risk_per_unit * trade.planned_quantity
+        if multiplier is not None:
+            original_planned_risk_dollars = original_planned_risk_points * multiplier
+
     return {
         "total_quantity": total_quantity,
         "average_entry_price": average_entry_price,
@@ -135,6 +164,8 @@ def _compute_trade_math(trade: Trade, exits: list[TradeExit], entries: list[Trad
         "realized_pnl": realized_pnl,
         "planned_risk_points": planned_risk_points,
         "planned_risk_dollars": planned_risk_dollars,
+        "original_planned_risk_points": original_planned_risk_points,
+        "original_planned_risk_dollars": original_planned_risk_dollars,
         "multiplier_known": multiplier is not None,
     }
 
@@ -164,6 +195,8 @@ def _serialize_trade(trade: Trade, exits: list[TradeExit], entries: list[TradeEn
         realized_pnl=math["realized_pnl"],
         planned_risk_points=math["planned_risk_points"],
         planned_risk_dollars=math["planned_risk_dollars"],
+        original_planned_risk_points=math["original_planned_risk_points"],
+        original_planned_risk_dollars=math["original_planned_risk_dollars"],
         multiplier_known=math["multiplier_known"],
         has_screenshot=trade.screenshot_path is not None,
         price_source=trade.price_source,
@@ -172,6 +205,15 @@ def _serialize_trade(trade: Trade, exits: list[TradeExit], entries: list[TradeEn
         ),
         extracted_at=trade.extracted_at,
         price_edited_after_extraction=trade.price_edited_after_extraction,
+        planned_entry_price=trade.planned_entry_price,
+        planned_stop_price=trade.planned_stop_price,
+        planned_target_price=trade.planned_target_price,
+        planned_quantity=trade.planned_quantity,
+        plan_rationale=trade.plan_rationale,
+        plan_verified_at=trade.plan_verified_at,
+        rule_adherence=trade.rule_adherence,
+        rule_adherence_note=trade.rule_adherence_note,
+        reflection_notes=trade.reflection_notes,
         created_at=trade.created_at,
         updated_at=trade.updated_at,
     )
@@ -289,6 +331,22 @@ async def create_trade(
     trading_day = await _get_owned_trading_day(db, current_user.id, day)
     _require_unlocked(trading_day)
 
+    # DF-VS1 (issue #78): a "verified pre-trade" claim is only honored when
+    # entry_time is close enough to this request's own clock to be
+    # plausible -- a trade logged well after it happened (or one claiming
+    # an entry_time that hasn't occurred yet) cannot have had its plan
+    # genuinely verified before execution, no matter what the trader
+    # checked. The checkbox can request plan_verified_at; it cannot compel
+    # the server to grant it.
+    now = datetime.now(timezone.utc)
+    entry_time = payload.entry_time
+    if entry_time.tzinfo is None:
+        entry_time = entry_time.replace(tzinfo=timezone.utc)
+    age = now - entry_time
+    plan_verification_plausible = (
+        -PLAN_VERIFICATION_FUTURE_TOLERANCE <= age <= PLAN_VERIFICATION_MAX_AGE
+    )
+
     trade = Trade(
         user_id=current_user.id,
         trading_day_id=trading_day.id,
@@ -309,6 +367,22 @@ async def create_trade(
             else None
         ),
         extracted_at=payload.extracted_at,
+        # DF-VS1 (issue #78): the plan snapshot is fixed here, at creation,
+        # and nowhere else -- update_trade never touches these fields.
+        # planned_entry_price/planned_quantity are always auto-derived from
+        # entry_price/initial_quantity so they can't be submitted out of
+        # sync with (or used to game) the actual trade. plan_verified_at is
+        # stamped from this request's own clock, only when the trader
+        # affirmed the plan was recorded before execution AND entry_time
+        # makes that plausible; a retrospective entry, or one rejected by
+        # the plausibility check above, leaves it null regardless of
+        # whether planned_* were filled in.
+        planned_entry_price=payload.entry_price,
+        planned_stop_price=payload.planned_stop_price,
+        planned_target_price=payload.planned_target_price,
+        planned_quantity=payload.initial_quantity,
+        plan_rationale=payload.plan_rationale,
+        plan_verified_at=now if (payload.plan_verified and plan_verification_plausible) else None,
     )
     db.add(trade)
     await db.flush()
@@ -389,6 +463,15 @@ async def update_trade(
         trade.setup = payload.setup
     if payload.notes is not None:
         trade.notes = payload.notes
+    # Outcome (DF-VS1): editable after the fact. Note what's deliberately
+    # absent from TradeUpdate and so can never appear here: planned_*,
+    # plan_rationale, plan_verified_at -- the plan snapshot stays fixed.
+    if payload.rule_adherence is not None:
+        trade.rule_adherence = payload.rule_adherence
+    if payload.rule_adherence_note is not None:
+        trade.rule_adherence_note = payload.rule_adherence_note
+    if payload.reflection_notes is not None:
+        trade.reflection_notes = payload.reflection_notes
 
     await db.flush()
     math = _compute_trade_math(trade, exits, entries)

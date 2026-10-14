@@ -18,6 +18,12 @@ const expandedTradeId = ref(null)
 const editingTradeId = ref(null)
 const editingExitId = ref(null)
 const submitError = ref(null)
+// DF-VS1 (issue #78): the server only honors plan_verified when entry_time
+// is close enough to "now" to be plausible -- it can silently leave
+// plan_verified_at null even though the box was checked. Surface that so
+// the trader isn't left wondering why the "Verified pre-trade" badge
+// didn't appear.
+const planVerificationNotice = ref(null)
 // 'preset' shows the symbol dropdown; 'custom' shows a free-text field for
 // any symbol not in SYMBOL_PRESETS -- the backend accepts either.
 const symbolEntryMode = ref('preset')
@@ -218,7 +224,9 @@ function emptyTradeForm() {
     target_price: '',
     target_points: '',
     setup: '',
-    notes: ''
+    notes: '',
+    plan_rationale: '',
+    plan_verified: false
   }
 }
 
@@ -322,6 +330,35 @@ async function submitEditExit(trade, exit) {
   }
 }
 
+// DF-VS1 (issue #78): the Outcome fields (rule adherence, reflection) are
+// judged after the fact and stay editable independently of the core
+// "Edit trade" form above, which never touches them either.
+const outcomeForms = reactive({}) // tradeId -> { rule_adherence, rule_adherence_note, reflection_notes }
+
+function outcomeFormFor(trade) {
+  if (!outcomeForms[trade.id]) {
+    outcomeForms[trade.id] = {
+      rule_adherence: trade.rule_adherence ?? '',
+      rule_adherence_note: trade.rule_adherence_note ?? '',
+      reflection_notes: trade.reflection_notes ?? ''
+    }
+  }
+  return outcomeForms[trade.id]
+}
+
+async function submitOutcome(trade) {
+  const form = outcomeFormFor(trade)
+  try {
+    await tradesStore.updateTrade(props.date, trade.id, {
+      rule_adherence: form.rule_adherence || null,
+      rule_adherence_note: form.rule_adherence_note || null,
+      reflection_notes: form.reflection_notes || null
+    })
+  } catch (error) {
+    window.alert(error.response?.data?.detail || 'Could not save the outcome.')
+  }
+}
+
 const editTradeForms = reactive({}) // tradeId -> full trade field set
 
 function startEditTrade(trade) {
@@ -369,6 +406,7 @@ async function loadTrades() {
 
 async function submitNewTrade() {
   submitError.value = null
+  planVerificationNotice.value = null
   // Belt-and-suspenders alongside the required select/input in the
   // template (and the backend's own required-field validation): a setup
   // is mandatory for every newly logged trade now that trades are
@@ -392,6 +430,15 @@ async function submitNewTrade() {
     target_price: effectiveTargetPrice.value,
     setup: tradeForm.setup.trim(),
     notes: tradeForm.notes || null,
+    // DF-VS1 (issue #78): whatever stop/target the trader enters here, at
+    // creation, becomes the immutable plan snapshot -- no separate
+    // "planned" inputs to duplicate. plan_verified only ever affirms
+    // *this* request was made before execution; the server stamps its own
+    // clock, never trusting a client-supplied timestamp.
+    planned_stop_price: effectiveStopPrice.value,
+    planned_target_price: effectiveTargetPrice.value,
+    plan_rationale: tradeForm.plan_rationale || null,
+    plan_verified: tradeForm.plan_verified,
     ...(hasPendingExtraction.value
       ? {
           price_source: 'image_extracted',
@@ -402,6 +449,10 @@ async function submitNewTrade() {
   }
   try {
     const created = await tradesStore.createTrade(props.date, payload)
+    if (tradeForm.plan_verified && !created.plan_verified_at) {
+      planVerificationNotice.value =
+        "This trade's entry time was too far from now for the plan to be marked verified pre-trade -- it was saved as retrospective/unverified instead."
+    }
     if (screenshotFile.value) {
       try {
         await tradesStore.uploadTradeScreenshot(props.date, created.id, screenshotFile.value)
@@ -713,6 +764,19 @@ onUnmounted(revokeAllTradeScreenshots)
           <label class="el-field-label">Notes</label>
           <textarea v-model="tradeForm.notes" rows="1" placeholder="Notes"></textarea>
         </div>
+
+        <div class="el-field ticket-field--plan">
+          <label class="el-field-label">Plan rationale</label>
+          <textarea
+            v-model="tradeForm.plan_rationale"
+            rows="1"
+            placeholder="Why this trade, before you took it"
+          ></textarea>
+          <label class="plan-verified-checkbox">
+            <input type="checkbox" v-model="tradeForm.plan_verified" />
+            Recording this before execution (verified pre-trade)
+          </label>
+        </div>
       </div>
 
       <div class="el-ticket-footer">
@@ -742,6 +806,7 @@ onUnmounted(revokeAllTradeScreenshots)
       </div>
 
       <p v-if="submitError" class="submit-error">{{ submitError }}</p>
+      <p v-if="planVerificationNotice" class="plan-verification-notice">{{ planVerificationNotice }}</p>
     </form>
     <p v-else-if="trades.length === 0" class="locked-hint">This day is locked. Unlock it to log trades.</p>
 
@@ -794,15 +859,70 @@ onUnmounted(revokeAllTradeScreenshots)
               <span class="info-value">{{ trade.setup }}</span>
             </div>
             <div v-if="trade.planned_risk_dollars || trade.planned_risk_points" class="info-item">
-              <span class="info-label">Planned risk</span>
+              <span class="info-label">Current risk</span>
               <span class="info-value">
                 <template v-if="trade.planned_risk_dollars">${{ formatPrice(trade.planned_risk_dollars) }}</template>
                 <template v-else>{{ formatPrice(trade.planned_risk_points) }} pts</template>
               </span>
             </div>
+            <div
+              v-if="trade.original_planned_risk_dollars || trade.original_planned_risk_points"
+              class="info-item"
+            >
+              <span class="info-label">Risk at entry (plan)</span>
+              <span class="info-value">
+                <template v-if="trade.original_planned_risk_dollars"
+                  >${{ formatPrice(trade.original_planned_risk_dollars) }}</template
+                >
+                <template v-else>{{ formatPrice(trade.original_planned_risk_points) }} pts</template>
+              </span>
+            </div>
+          </div>
+
+          <div
+            v-if="trade.plan_rationale || trade.plan_verified_at || trade.planned_stop_price || trade.planned_target_price"
+            class="trade-card__section"
+          >
+            <div class="trade-card__section-label">
+              Plan
+              <span class="plan-verified-badge" :class="{ 'plan-verified-badge--verified': trade.plan_verified_at }">
+                {{ trade.plan_verified_at ? 'Verified pre-trade' : 'Retrospective / unverified' }}
+              </span>
+            </div>
+            <p v-if="trade.plan_rationale" class="trade-notes">{{ trade.plan_rationale }}</p>
           </div>
 
           <p v-if="trade.notes" class="trade-notes">{{ trade.notes }}</p>
+
+          <div class="trade-card__section">
+            <div class="trade-card__section-label">Outcome</div>
+            <div v-if="!locked" class="outcome-form">
+              <select v-model="outcomeFormFor(trade).rule_adherence" aria-label="Rule adherence">
+                <option value="">Rule adherence…</option>
+                <option value="yes">Followed the rules</option>
+                <option value="no">Did not follow the rules</option>
+                <option value="unknown">Unknown</option>
+              </select>
+              <textarea
+                v-model="outcomeFormFor(trade).rule_adherence_note"
+                rows="1"
+                placeholder="Rule adherence note (optional)"
+              ></textarea>
+              <textarea
+                v-model="outcomeFormFor(trade).reflection_notes"
+                rows="2"
+                placeholder="Post-trade reflection"
+              ></textarea>
+              <button type="button" class="btn-chip btn-chip--ghost" @click="submitOutcome(trade)">
+                Save outcome
+              </button>
+            </div>
+            <template v-else>
+              <p v-if="trade.rule_adherence" class="trade-notes">Rule adherence: {{ trade.rule_adherence }}</p>
+              <p v-if="trade.rule_adherence_note" class="trade-notes">{{ trade.rule_adherence_note }}</p>
+              <p v-if="trade.reflection_notes" class="trade-notes">{{ trade.reflection_notes }}</p>
+            </template>
+          </div>
 
           <div v-if="trade.has_screenshot || !locked" class="trade-card__section">
             <div class="trade-card__section-label">Setup screenshot</div>
@@ -1198,6 +1318,29 @@ onUnmounted(revokeAllTradeScreenshots)
   margin-top: var(--el-space-3);
 }
 
+.plan-verified-badge {
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: var(--el-text-xs);
+  margin-left: var(--el-space-2);
+  color: var(--el-text-subtle);
+}
+
+.plan-verified-badge--verified {
+  color: var(--el-positive);
+}
+
+.outcome-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--el-space-2);
+}
+
+.outcome-form select,
+.outcome-form textarea {
+  width: 100%;
+}
+
 /* .btn-chip and its variants moved to global.css (P3.5) -- promoted from
    here since this is exactly the kind of page-specific styling the shared
    visual system is meant to replace. */
@@ -1376,6 +1519,25 @@ onUnmounted(revokeAllTradeScreenshots)
   resize: vertical;
 }
 
+.ticket-field--plan {
+  grid-column: 1 / -1;
+}
+
+.ticket-field--plan textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.plan-verified-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--el-space-2);
+  font-size: var(--el-text-sm);
+  color: var(--el-text-muted);
+  margin-top: var(--el-space-2);
+  cursor: pointer;
+}
+
 .custom-symbol {
   display: flex;
   align-items: center;
@@ -1534,6 +1696,12 @@ onUnmounted(revokeAllTradeScreenshots)
 
 .submit-error {
   color: var(--el-negative);
+  font-size: var(--el-text-sm);
+  margin: var(--el-space-2) 0 0;
+}
+
+.plan-verification-notice {
+  color: var(--el-text-muted);
   font-size: var(--el-text-sm);
   margin: var(--el-space-2) 0 0;
 }

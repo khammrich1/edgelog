@@ -13,6 +13,7 @@ const journalStore = useJournalStore()
 const tradesStore = useTradesStore()
 
 const marketBiasDraft = ref('')
+const eodReflectionDraft = ref('')
 const newChecklistLabel = ref('')
 const biasChartObjectUrl = ref(null)
 const uploadError = ref(null)
@@ -129,6 +130,7 @@ async function loadDay() {
       journalStore.fetchDay(route.params.date)
     ])
     marketBiasDraft.value = data.market_bias ?? ''
+    eodReflectionDraft.value = data.eod_reflection ?? ''
     await refreshBiasChartPreview()
   } catch (e) {
     loadError.value = e.response?.data?.detail || 'Could not load this journal.'
@@ -265,6 +267,18 @@ function setMood(value) {
 
 async function saveMarketBias() {
   await journalStore.updateDay(route.params.date, { market_bias: marketBiasDraft.value })
+}
+
+// DF-VS1 (issue #78): explicit no-trade-day marker, distinct from simply
+// never having opened the day. A deliberate click, not a rapid-fire scale
+// button, so it doesn't need the optimistic/serialized handling above --
+// updateDay's blanket currentDay replacement is fine for one-off saves.
+async function setIntendedToTrade(value) {
+  await journalStore.updateDay(route.params.date, { intended_to_trade: value })
+}
+
+async function saveEodReflection() {
+  await journalStore.updateDay(route.params.date, { eod_reflection: eodReflectionDraft.value })
 }
 
 async function toggleChecklistItem(itemId, completed) {
@@ -515,6 +529,51 @@ onBeforeUnmount(revokeBiasChartPreview)
               Remove
             </button>
           </div>
+        </section>
+
+        <section class="el-workstation">
+          <div class="el-workstation-header">
+            <span class="el-workstation-title">Reflection</span>
+          </div>
+          <div class="el-field">
+            <span class="el-field-label">Did you intend to trade today?</span>
+            <div class="intended-to-trade-buttons">
+              <button
+                type="button"
+                class="btn-chip"
+                :class="{ 'btn-chip--primary': day.intended_to_trade === true }"
+                :disabled="isLocked"
+                @click="setIntendedToTrade(true)"
+              >
+                Trading today
+              </button>
+              <button
+                type="button"
+                class="btn-chip"
+                :class="{ 'btn-chip--primary': day.intended_to_trade === false }"
+                :disabled="isLocked"
+                @click="setIntendedToTrade(false)"
+              >
+                No-trade day
+              </button>
+            </div>
+          </div>
+          <label class="el-field-label" for="eod-reflection">End-of-day reflection</label>
+          <textarea
+            id="eod-reflection"
+            v-model="eodReflectionDraft"
+            rows="4"
+            placeholder="How did today actually go?"
+            aria-label="End-of-day reflection"
+            :disabled="isLocked"
+          ></textarea>
+          <button
+            class="el-btn-primary"
+            :disabled="isLocked || eodReflectionDraft === (day.eod_reflection ?? '')"
+            @click="saveEodReflection"
+          >
+            Save
+          </button>
         </section>
       </div>
     </div>
@@ -993,6 +1052,13 @@ onBeforeUnmount(revokeBiasChartPreview)
 .chart-actions {
   display: flex;
   gap: var(--el-space-3);
+}
+
+.intended-to-trade-buttons {
+  display: flex;
+  gap: var(--el-space-2);
+  margin-top: var(--el-space-2);
+  margin-bottom: var(--el-space-3);
 }
 
 .upload-button {
