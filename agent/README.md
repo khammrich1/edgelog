@@ -100,6 +100,53 @@ TOPSTEPX_PRACTICE_ACCOUNT_ID=<the id you confirmed>
 From then on, the agent uses that pinned ID instead of the heuristic, so
 there is no ambiguity about which account it's looking at.
 
+## Interactive account selection (issue #83)
+
+`python -m trader_agent status` above is still the right way to find and
+pin your single Practice account for day-to-day running. If you want a
+friendlier list, want to select more than one account (e.g. a Practice
+account plus a funded account you want visible to future read-only
+workflows), or just don't want to go digging through log files, use:
+
+```powershell
+python -m trader_agent accounts
+```
+
+This authenticates, prints every account visible to this login with its
+ID, name, inferred type (Practice vs Live/Other), and balance, then asks
+you to type one or more numbers from the list (e.g. `1,3`) or `all`. Your
+selection is saved to `agent/.state/selected_accounts.json` -- a local,
+gitignored file containing only non-secret fields (account ID, name,
+type, balance). No credential, token, or order/execution behavior is
+touched by this command; it doesn't resolve a contract or open the
+realtime connection, so it works even before you've confirmed MNQ
+resolves correctly.
+
+Running `accounts` again overwrites the previous selection -- there is
+exactly one current selection, not an accumulating history. The file is
+there for a future read-only workflow to consume; nothing in ST0 reads it
+yet.
+
+### PowerShell acceptance steps
+
+```powershell
+python -m trader_agent accounts
+```
+
+1. Confirm every account you expect to see is listed, with the ID, name,
+   and type you expect (cross-check against the TopstepX web app).
+2. Type a single number (e.g. `1`) and confirm exactly one account is
+   confirmed as saved.
+3. Run `python -m trader_agent accounts` again, this time type a
+   multi-account selection (e.g. `1,2` or `all`), and confirm the saved
+   list updates to match -- not appended to the previous one.
+4. Open `agent/.state/selected_accounts.json` in a text editor and
+   confirm it contains only `id`, `name`, `is_practice`, and `balance`
+   fields -- no token, API key, or other secret.
+5. Type something invalid (e.g. a blank line, or a number bigger than
+   your account count) and confirm the command reports a clear error
+   without touching the previously saved file.
+
 ## Running the agent
 
 ```powershell
@@ -137,7 +184,7 @@ pip install -r requirements.txt
 pytest
 ```
 
-All 54 tests run against fakes/mocks -- no network access and no
+All tests run against fakes/mocks -- no network access and no
 TopstepX credentials required. The one piece that is *not* covered by
 this suite is `SignalRTransport` (`trader_agent/providers/topstepx/realtime.py`),
 the thin adapter onto the real `signalrcore` SignalR client library --
