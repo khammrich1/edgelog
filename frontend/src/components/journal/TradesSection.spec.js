@@ -148,6 +148,66 @@ describe('TradesSection add-contracts / add-trim forms', () => {
   })
 })
 
+describe('TradesSection edit-trim commission/fees (issue #80/#84 code review finding)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  function tradeWithExit() {
+    return {
+      ...openTrade(),
+      status: 'closed',
+      remaining_quantity: 0,
+      realized_pnl: '100.00',
+      net_pnl: '97.50',
+      exits: [
+        {
+          id: 1,
+          quantity: 5,
+          exit_price: '29800',
+          exit_time: '2026-01-01T10:00:00Z',
+          commission: '1.50',
+          fees: '1.00'
+        }
+      ]
+    }
+  }
+
+  async function mountExpandedClosedTrade() {
+    const result = mountTradesSection({ trades: [tradeWithExit()] })
+    await result.wrapper.vm.$nextTick()
+    await result.wrapper.find('.trade-card__header').trigger('click')
+    return result
+  }
+
+  it('pre-fills commission/fees from the existing exit when editing it', async () => {
+    const { wrapper } = await mountExpandedClosedTrade()
+
+    await wrapper.find('.edit-item-button').trigger('click')
+
+    expect(wrapper.find('.exit-edit-form input[placeholder="Commission"]').element.value).toBe('1.5')
+    expect(wrapper.find('.exit-edit-form input[placeholder="Fees"]').element.value).toBe('1')
+  })
+
+  it('submits edited commission/fees through updateExit', async () => {
+    const { wrapper, tradesStore } = await mountExpandedClosedTrade()
+    tradesStore.updateExit = vi.fn().mockResolvedValue(tradeWithExit())
+
+    await wrapper.find('.edit-item-button').trigger('click')
+    await wrapper.find('.exit-edit-form input[placeholder="Commission"]').setValue('3.00')
+    await wrapper.find('.exit-edit-form input[placeholder="Fees"]').setValue('2.25')
+    await wrapper.find('.exit-edit-form').trigger('submit')
+    await flushPromises()
+
+    expect(tradesStore.updateExit).toHaveBeenCalledWith(
+      '2026-01-01',
+      1,
+      1,
+      expect.objectContaining({ commission: 3, fees: 2.25 })
+    )
+  })
+})
+
 describe('TradesSection new-trade form target field', () => {
   beforeEach(() => {
     vi.restoreAllMocks()

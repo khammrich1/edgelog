@@ -329,7 +329,9 @@ function startEditExit(exit) {
   editExitForms[exit.id] = {
     quantity: exit.quantity,
     exit_price: Number(exit.exit_price),
-    exit_time: toDateTimeLocal(exit.exit_time)
+    exit_time: toDateTimeLocal(exit.exit_time),
+    commission: exit.commission !== null ? Number(exit.commission) : '',
+    fees: exit.fees !== null ? Number(exit.fees) : ''
   }
   editingExitId.value = exit.id
 }
@@ -344,7 +346,9 @@ async function submitEditExit(trade, exit) {
     await tradesStore.updateExit(props.date, trade.id, exit.id, {
       quantity: Number(form.quantity),
       exit_price: form.exit_price,
-      exit_time: new Date(form.exit_time).toISOString()
+      exit_time: new Date(form.exit_time).toISOString(),
+      commission: form.commission || null,
+      fees: form.fees || null
     })
     editingExitId.value = null
   } catch (error) {
@@ -1078,6 +1082,14 @@ onUnmounted(revokeAllTradeScreenshots)
                   <input v-model="editExitForms[exit.id].quantity" type="number" min="1" required />
                   <input v-model="editExitForms[exit.id].exit_price" type="number" step="any" required />
                   <input v-model="editExitForms[exit.id].exit_time" type="datetime-local" required />
+                  <input
+                    v-model="editExitForms[exit.id].commission"
+                    type="number"
+                    step="any"
+                    min="0"
+                    placeholder="Commission"
+                  />
+                  <input v-model="editExitForms[exit.id].fees" type="number" step="any" min="0" placeholder="Fees" />
                   <button type="submit">Save</button>
                   <button type="button" @click="cancelEditExit">Cancel</button>
                 </form>
@@ -1454,6 +1466,10 @@ onUnmounted(revokeAllTradeScreenshots)
 
 .plan-verified-badge--verified {
   color: var(--el-positive);
+}
+
+.plan-verified-badge--unverified {
+  color: var(--el-text-subtle);
 }
 
 .plan-verified-badge--unplanned {
