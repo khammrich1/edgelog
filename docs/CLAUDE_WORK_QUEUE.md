@@ -1,3 +1,21 @@
+## CURRENT COORDINATION — October 15, 2026 (Pacific)
+
+**Immediate goal: dependable daily journal and broker-data verification, not feature expansion.** This section supersedes older CURRENT priority labels below for near-term sequencing, without changing the longer-term product vision.
+
+| Issue / PR | Checked status / gate | Next action |
+|---|---|---|
+| #84 / PR #81 | Merged; manual completed-trade entry, commission/fee and net P&L groundwork | Verify DEV deployment and journal behavior; broker fees are not automatic |
+| #82 | Open daily-use acceptance | Owner tests Today, checklist, Plan/Outcome, EOD persistence in DEV |
+| #62 / PR #85 | Open draft, P&L regression tests; reported display discrepancy remains owner gate | Review, test representative MNQ trade, merge only after PASS |
+| #83 / PR #86 | Open draft, interactive multi-account agent selection | Local Windows acceptance, Practice safety, then owner merge approval |
+| #61 / PR #87 | Open draft, break-even exit action | Test partial-exit B/E and P&L in DEV; owner gate |
+| #80 / PR #88 | Open draft, read-only TopstepX history diagnostic | Review and run locally against real selected account; collect redacted field-presence report; no DB writes |
+| #70 / #57 | DEV migration/auth verification remains an open issue gate | Confirm current DEV auth, API, migrations and journal persistence; do not infer production readiness |
+
+**Two broker flows, not interchangeable:** Flow A is live provider-event execution tracking under ST1/PR #33 (not merged, no authorization for live trading). Flow B is explicit end-of-day, account/date-scoped read-only history and canonical journal reconciliation under #80. They must share provider/account identity and avoid duplicate trades; imported objective facts may prefill, but reflection remains trader-authored. No agent-to-cloud import connection is currently verified. Do not invent fee breakdowns from unverified API response fields.
+
+**Recommended order:** (1) owner DEV daily-use acceptance #82 and correctness checks #62; (2) local #86 account-selection acceptance; (3) run PR #88 diagnostic against real TopstepX account and inspect redacted report; (4) scope next #80 reconciliation slice based on verified API contract. Keep #87 as an independent acceptance gate. Follow issue → PR → exact DEV/local testing → owner PASS → merge → separate production approval. Never merge or deploy merely because tests pass.
+
 # Claude Open-Issue Work Queue
 
 ## CURRENT OWNER DECISION — October 11, 2026 (Pacific)
