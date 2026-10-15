@@ -46,6 +46,32 @@ class Quote:
     raw: dict = field(default_factory=dict, repr=False, compare=False)
 
 
+@dataclass(frozen=True)
+class TradeRecord:
+    """One execution/fill record from the broker's read-only trade
+    history (TopstepX's /api/Trade/search). Field names mirror
+    docs/integrations/projectx/PROJECTX_API_REFERENCE.md Sec.8's
+    documented shape -- which, unlike Account/search and
+    Contract/available, has never been exercised against a live response
+    before the issue #80 Step 2 diagnostic this exists for. Every field
+    below may be absent, null, or differently typed in practice; `raw`
+    keeps the untouched JSON item so trade_diagnostics.summarize_trade_records
+    can detect exactly that, rather than this dataclass silently hiding it."""
+
+    id: Optional[int] = None
+    account_id: Optional[int] = None
+    contract_id: Optional[str] = None
+    creation_timestamp: Optional[str] = None
+    price: Optional[float] = None
+    profit_and_loss: Optional[float] = None
+    fees: Optional[float] = None
+    side: Optional[int] = None
+    size: Optional[int] = None
+    voided: Optional[bool] = None
+    order_id: Optional[int] = None
+    raw: dict = field(default_factory=dict, repr=False, compare=False)
+
+
 AccountUpdateHandler = Callable[[dict], None]
 QuoteHandler = Callable[[Quote], None]
 TradeHandler = Callable[[dict], None]
@@ -70,6 +96,15 @@ class ExecutionProvider(ABC):
     def resolve_contract(self, symbol: str) -> Contract:
         """Finds the currently active tradable contract for a root symbol
         (e.g. "MNQ"). Raises if none can be resolved."""
+
+    @abstractmethod
+    def search_trades(
+        self, account_id: int, start_timestamp: str, end_timestamp: Optional[str] = None
+    ) -> list["TradeRecord"]:
+        """Read-only execution/fill history for one account over
+        [start_timestamp, end_timestamp) (ISO-8601). Never places,
+        modifies, or cancels anything -- query-only, same boundary as
+        list_accounts()."""
 
     @abstractmethod
     def get_current_price(self, contract_id: str) -> Optional[Quote]:

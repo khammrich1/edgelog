@@ -122,6 +122,49 @@ connection=connected execution_capable=True account=123456 contract=CON.F.US.MNQ
   `TOPSTEPX_STALE_AFTER_SECONDS` (default 15s) -- check your network and
   that the market is open.
 
+## Read-only execution-history diagnostic (issue #80)
+
+```powershell
+python -m trader_agent trades --start 2026-10-14 --account-id 123456
+```
+
+This is a **diagnostic, not a sync feature**: it calls the documented
+`POST /api/Trade/search` (reference doc Sec.8) for one account over a date
+range, and prints a report of which documented fields the *live* response
+actually contains -- it writes nothing to any database and makes no call
+to EdgeLog's backend. `/api/Trade/search`'s response shape has never been
+exercised against a real account before this command exists; unlike
+`accounts`/`status`, treat its output as the thing to verify, not an
+assumption to build on.
+
+- `--start` -- `YYYY-MM-DD` or a full ISO-8601 datetime.
+- `--end` -- optional, defaults to 24h after `--start`.
+- `--account-id` -- optional, defaults to `TOPSTEPX_PRACTICE_ACCOUNT_ID` from
+  `.env`.
+
+The printed report never shows your real account ID, order/trade IDs, or
+any dollar figure -- only whether each documented field was present, what
+Python type its value took, and (for `side`/`voided` only, since those are
+small enums rather than financial data) the distinct raw values seen. Any
+field in the live response that isn't in the documented schema is flagged
+separately, along with a fixed finding on commission vs. fees: the
+documented schema has exactly one cost field (`fees`), not a separate
+`commission` field, so this endpoint alone cannot populate EdgeLog's
+`commission` column.
+
+**Owner acceptance steps:**
+1. Run `python -m trader_agent status` first if you don't already know your
+   account ID, or pass `--account-id` directly.
+2. Run the command above for a date range you know has real trades on it.
+3. Confirm the report's "PRESENT" column shows the documented fields you'd
+   expect (`price`, `size`, `side`, etc.) actually came back non-null.
+4. Paste the printed report (not your `.env`, not raw logs) into a comment
+   on issue #80 -- it's already safe to share as-is.
+5. If any field you expected is missing, or the `side`/`voided` observed
+   values look unexpected (e.g. strings instead of integers), note that too
+   -- that's exactly the kind of gap this diagnostic exists to surface
+   before any reconciliation logic gets built on top of an assumed shape.
+
 ## Logs
 
 Structured (JSON-line) logs go to `agent/logs/agent-<date>.log` and to
@@ -172,6 +215,15 @@ codebase is written defensively rather than guessing -- notably:
   subscribed to" itself rather than trying to parse one out of each
   quote. This only works because ST0 subscribes to one contract at a
   time -- revisit if a later issue needs multiple simultaneous contracts.
+- **`/api/Trade/search`'s response shape is implemented per the
+  reference doc but still unverified against a live account.** The
+  `trades` CLI command above exists specifically to close that gap --
+  run it and report back per its "Owner acceptance steps" rather than
+  assuming the documented field list (`id`/`accountId`/`contractId`/
+  `creationTimestamp`/`price`/`profitAndLoss`/`fees`/`side`/`size`/
+  `voided`/`orderId`) matches reality, especially `side`'s encoding and
+  whether `fees` is ever split into separate commission/exchange-fee
+  figures by an undocumented field.
 - **Practice-account detection remains a name-based heuristic.** The
   reference's documented `/api/Account/search` fields
   (`id`/`name`/`balance`/`canTrade`/`isVisible`) don't include anything

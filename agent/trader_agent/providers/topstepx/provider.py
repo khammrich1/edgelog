@@ -14,6 +14,7 @@ from trader_agent.providers.base import (
     Quote,
     QuoteHandler,
     TradeHandler,
+    TradeRecord,
 )
 from trader_agent.providers.topstepx.client import TopstepXRestClient
 from trader_agent.providers.topstepx.errors import TopstepXError
@@ -130,6 +131,11 @@ class TopstepXProvider(ExecutionProvider):
 
     def get_current_price(self, contract_id: str) -> Optional[Quote]:
         return self._latest_quotes.get(contract_id)
+
+    def search_trades(
+        self, account_id: int, start_timestamp: str, end_timestamp: Optional[str] = None
+    ) -> list[TradeRecord]:
+        return self._rest.search_trades(account_id, start_timestamp, end_timestamp)
 
     def connect_realtime(self) -> None:
         token = self._rest.token
