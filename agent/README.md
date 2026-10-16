@@ -165,6 +165,50 @@ documented schema has exactly one cost field (`fees`), not a separate
    -- that's exactly the kind of gap this diagnostic exists to surface
    before any reconciliation logic gets built on top of an assumed shape.
 
+### Seeing the real execution rows: `--show-rows`
+
+The default report above never prints a dollar figure. If you want to see
+your actual executions -- e.g. to sanity-check `price`/`profitAndLoss`/`fees`
+against what TopstepX's own UI shows for the same date -- opt in explicitly:
+
+```powershell
+python -m trader_agent trades --start 2026-10-14 --account-id 123456 --show-rows
+```
+
+This prints a `WARNING:` banner, then one line per execution with the real
+`price`/`profitAndLoss`/`fees` values, the contract/symbol, `side` and
+`size`, and any undocumented field the live response adds (e.g. a
+`commissions` figure some accounts return alongside `fees`) -- all shown in
+full. Trade/order IDs (and any other identifier-shaped field, by name) stay
+masked even here. **Unlike the default report, this output is not
+automatically safe to paste into a public issue/PR comment** -- review it
+first if you plan to share it; strip anything you don't want visible.
+
+Two things this diagnostic deliberately does **not** do, even in
+`--show-rows` mode:
+- **It never groups fills into trades.** Each row is one broker execution
+  (fill) -- if a date returns 39 records, that is 39 fills, not 39
+  completed trades. Grouping opens/closes/partial fills into a logical
+  trade belongs to #80's EOD reconciliation design, not this diagnostic.
+- **It never guesses what an undocumented field means.** If `profitAndLoss`
+  is present on only some records, the default report notes a *plausible
+  but unverified* hypothesis (opening/adding fills may carry no P&L, only
+  closing/reducing fills do) and says so explicitly as a question to verify,
+  not a fact. The same goes for an undocumented `commissions` field: this
+  diagnostic reports that it's present and what type it is, and nothing
+  more -- it does not assume `commissions` is included in or separate from
+  `fees`, and does not add the two together into any P&L figure.
+
+**Owner acceptance checks for `--show-rows`:**
+1. Run it against a date with real trades; confirm the `WARNING:` banner
+   prints before any row.
+2. Confirm `price`/`profitAndLoss`/`fees` (and `commissions`, if your
+   account returns it) show their real values, not `(value redacted...)`.
+3. Confirm the `trade_id=`/`order_id=` fields show a masked value (e.g.
+   `**49`), never the real ID.
+4. Run the same command *without* `--show-rows`; confirm no row, no
+   `WARNING:` banner, and no dollar figure appears anywhere in that output.
+
 ## Logs
 
 Structured (JSON-line) logs go to `agent/logs/agent-<date>.log` and to

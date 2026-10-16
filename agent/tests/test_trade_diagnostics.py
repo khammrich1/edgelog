@@ -5,6 +5,8 @@ import pytest
 from trader_agent.providers.base import TradeRecord
 from trader_agent.trade_diagnostics import (
     DOCUMENTED_TRADE_FIELDS,
+    format_execution_row,
+    format_execution_rows,
     format_report,
     parse_flexible_datetime,
     redact_identifier,
@@ -146,12 +148,67 @@ def test_format_report_shows_observed_side_and_voided_values():
     assert "observed values:" in text
 
 
-def test_format_report_flags_unexpected_identifier_shaped_fields():
+def test_format_report_shows_presence_and_type_for_unexpected_fields_without_their_value():
+    # Mirrors the real DEV finding from issue #80 PR #88 (owner comment,
+    # 2026-10-16): a live account returned an undocumented `commissions`
+    # field alongside the documented `fees`.
+    surprising_raw = {**FULL_SHAPE_RAW, "commissions": 1.25}
+    report = summarize_trade_records([_record(surprising_raw)])
+    text = format_report(report)
+
+    assert report.unexpected_fields == ("commissions",)
+    by_field = {obs.field: obs for obs in report.unexpected_field_observations}
+    assert by_field["commissions"].present_count == 1
+    assert by_field["commissions"].observed_types == ("float",)
+    assert by_field["commissions"].redacted is True
+    assert "commissions" in text
+    assert "1.25" not in text
+    assert "semantics not assumed" in text
+
+
+def test_format_report_masks_unexpected_identifier_shaped_field_values_too():
     surprising_raw = {**FULL_SHAPE_RAW, "clearingFeeId": 99}
-    text = format_report(summarize_trade_records([_record(surprising_raw)]))
+    report = summarize_trade_records([_record(surprising_raw)])
+    text = format_report(report)
 
     assert "clearingFeeId" in text
-    assert "treat as sensitive" in text
+    assert "99" not in text.split("clearingFeeId")[1].split("\n")[0]
+
+
+def test_format_report_always_includes_the_execution_vs_trade_caution():
+    report = summarize_trade_records([_record(FULL_SHAPE_RAW)])
+    text = format_report(report)
+
+    assert "not one completed trade" in text
+
+
+def test_format_report_flags_unverified_pnl_hypothesis_only_when_profit_and_loss_is_partial():
+    # 2 of 3 records have profitAndLoss -- matches the owner's real
+    # 2026-10-16 DEV run (23/39 present, 16 missing).
+    records = [
+        _record(FULL_SHAPE_RAW),
+        _record(FULL_SHAPE_RAW),
+        _record({**FULL_SHAPE_RAW, "profitAndLoss": None}),
+    ]
+    text = format_report(summarize_trade_records(records))
+
+    assert "UNVERIFIED" in text
+    assert "opening" in text.lower() or "open or add" in text.lower()
+
+
+def test_format_report_omits_pnl_hypothesis_when_profit_and_loss_is_fully_present():
+    report = summarize_trade_records([_record(FULL_SHAPE_RAW), _record(FULL_SHAPE_RAW)])
+    text = format_report(report)
+
+    assert "UNVERIFIED" not in text
+
+
+def test_format_report_omits_pnl_hypothesis_when_profit_and_loss_is_fully_absent():
+    sparse = {**FULL_SHAPE_RAW, "profitAndLoss": None}
+    report = summarize_trade_records([_record(sparse), _record(sparse)])
+    text = format_report(report)
+
+    assert "UNVERIFIED" not in text
 
 
 def test_redact_identifier_never_returns_the_original_value():
@@ -188,3 +245,78 @@ def test_parse_flexible_datetime_accepts_full_iso8601():
 def test_parse_flexible_datetime_rejects_garbage_with_a_safe_message():
     with pytest.raises(ValueError, match="Could not parse 'not-a-date'"):
         parse_flexible_datetime("not-a-date")
+
+
+def test_format_execution_row_shows_real_price_pnl_fees_and_contract():
+    line = format_execution_row(_record(FULL_SHAPE_RAW))
+
+    assert "21005.5" in line
+    assert "38.0" in line
+    assert "2.5" in line
+    assert "CON.F.US.MNQ.Z25" in line
+
+
+def test_format_execution_row_masks_trade_and_order_id():
+    line = format_execution_row(_record(FULL_SHAPE_RAW))
+
+    assert "1001" not in line
+    assert "5551" not in line
+    assert "trade_id=" in line
+    assert "order_id=" in line
+
+
+def test_format_execution_row_shows_an_undocumented_commissions_field_in_full():
+    line = format_execution_row(_record({**FULL_SHAPE_RAW, "commissions": 1.25}))
+
+    assert "commissions=1.25" in line
+
+
+def test_format_execution_row_masks_an_undocumented_identifier_shaped_field():
+    line = format_execution_row(_record({**FULL_SHAPE_RAW, "clearingFeeId": 777}))
+
+    assert "clearingFeeId=" in line
+    assert "777" not in line
+    assert "(masked)" in line
+
+
+def test_format_execution_row_shows_null_for_missing_profit_and_loss():
+    line = format_execution_row(_record({**FULL_SHAPE_RAW, "profitAndLoss": None}))
+
+    assert "pnl=null" in line
+
+
+def test_format_execution_row_does_not_guess_side_semantics():
+    line = format_execution_row(_record(FULL_SHAPE_RAW))
+
+    assert "not independently confirmed" in line
+
+
+def test_format_execution_row_does_not_mangle_voided_as_an_identifier():
+    # Regression: "voided" contains the substring "id" ("v-o-id-e-d"), so
+    # a naive `"id" in key` check would wrongly mask it via
+    # redact_identifier and silently corrupt the boolean flag's display.
+    line = format_execution_row(_record({**FULL_SHAPE_RAW, "voided": True}))
+
+    assert "voided=" not in line  # not shown via the generic key=value path
+    assert "(masked)" not in line
+    assert "VOIDED" in line  # shown via the explicit flag instead
+
+
+def test_format_execution_row_omits_the_redundant_account_id():
+    # accountId is constant across every row and already shown, redacted,
+    # in the command's header line -- showing it again per row is noise.
+    line = format_execution_row(_record(FULL_SHAPE_RAW))
+
+    assert "accountId" not in line
+
+
+def test_format_execution_rows_includes_the_warning_before_any_row():
+    text = format_execution_rows([_record(FULL_SHAPE_RAW), _record(FULL_SHAPE_RAW)])
+
+    assert text.startswith("WARNING:")
+    assert "1. " in text
+    assert "2. " in text
+
+
+def test_format_execution_rows_handles_an_empty_list():
+    assert format_execution_rows([]) == "No records to display."

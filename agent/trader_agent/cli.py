@@ -9,7 +9,9 @@ trades  -- read-only diagnostic: fetch execution/fill history for a date
            live response actually contains. No database writes, no
            EdgeLog backend calls, no order placement -- see
            trader_agent.trade_diagnostics for the redaction rules this
-           applies before printing anything (issue #80 Step 2).
+           applies before printing anything (issue #80 Step 2). Pass
+           --show-rows to additionally opt into seeing each individual
+           execution's real price/P&L/fee/commission values.
 """
 from __future__ import annotations
 
@@ -21,7 +23,13 @@ from datetime import timedelta
 
 from trader_agent.config import ConfigError, load_config
 from trader_agent.service import TraderAgentService
-from trader_agent.trade_diagnostics import format_report, redact_identifier, parse_flexible_datetime, summarize_trade_records
+from trader_agent.trade_diagnostics import (
+    format_execution_rows,
+    format_report,
+    parse_flexible_datetime,
+    redact_identifier,
+    summarize_trade_records,
+)
 
 
 def _print_status(service: TraderAgentService) -> None:
@@ -106,6 +114,11 @@ def cmd_trades(args: argparse.Namespace) -> int:
     print(f"Account: ...{redact_identifier(account_id)}  Range: {start.isoformat()} to {end.isoformat()}")
     print()
     print(format_report(report))
+
+    if args.show_rows:
+        print()
+        print(format_execution_rows(trades))
+
     return 0
 
 
@@ -132,6 +145,15 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=None,
         help="TopstepX account ID to query (default: TOPSTEPX_PRACTICE_ACCOUNT_ID from .env)",
+    )
+    trades_parser.add_argument(
+        "--show-rows",
+        action="store_true",
+        help=(
+            "Opt-in: also print each individual execution with real price/P&L/fee/commission "
+            "values (trade/order IDs still masked). Off by default -- the default report never "
+            "prints a dollar figure. Not safe to paste elsewhere without reviewing it first."
+        ),
     )
     trades_parser.set_defaults(func=cmd_trades)
 

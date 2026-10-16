@@ -61,6 +61,39 @@ COMMISSION_FEE_FINDING = (
     "different breakdown."
 )
 
+# A real DEV run against a live TopstepX Practice account (issue #80 PR #88,
+# owner comment 2026-10-16) found an undocumented `commissions` field
+# alongside the documented `fees` -- this diagnostic must never assume what
+# that means (whether `fees` already includes it, whether it's additive, or
+# how it differs from `fees`) without separate proof. The two standing
+# cautions below exist specifically because of that owner feedback.
+EXECUTION_VS_TRADE_CAUTION = (
+    "Each row this diagnostic retrieves is one broker EXECUTION (fill), "
+    "not one completed trade. Nothing here groups fills into logical "
+    "trades (opens, closes, partial fills, scale-ins) -- a count of N "
+    "records is NOT N completed trades. That grouping is explicitly out "
+    "of scope for this diagnostic; see issue #80's EOD reconciliation "
+    "design for where it belongs."
+)
+
+UNVERIFIED_PNL_HYPOTHESIS = (
+    "`profitAndLoss` was present on only some records. One PLAUSIBLE BUT "
+    "UNVERIFIED hypothesis: fills that open or add to a position carry no "
+    "profitAndLoss, while only fills that close or reduce a position do. "
+    "This has NOT been confirmed against TopstepX documentation or "
+    "support, and no code in this diagnostic assumes it -- treat it as a "
+    "question to verify, not a fact."
+)
+
+ROW_DISPLAY_WARNING = (
+    "WARNING: the rows below show REAL price/P&L/fee/commission values "
+    "from live execution data. Unlike the field-presence report above, "
+    "this opt-in output is NOT safe to paste into a public issue/PR "
+    "comment without reviewing it first. Trade/order identifiers (and "
+    "any other identifier-shaped field) are masked; prices, P&L, fees, "
+    "and other numeric fields are shown in full."
+)
+
 
 @dataclass(frozen=True)
 class FieldObservation:
@@ -76,7 +109,27 @@ class TradeSearchReport:
     total_records: int
     field_observations: tuple[FieldObservation, ...]
     unexpected_fields: tuple[str, ...]
+    unexpected_field_observations: tuple[FieldObservation, ...]
     commission_fee_finding: str
+
+
+def _observe_field(field_name: str, records: list[TradeRecord], *, redacted: bool) -> FieldObservation:
+    present_values = [
+        record.raw[field_name]
+        for record in records
+        if field_name in record.raw and record.raw[field_name] is not None
+    ]
+    observed_types = tuple(sorted({type(v).__name__ for v in present_values}))
+    distinct_values = None
+    if field_name in _ENUM_FIELDS and present_values:
+        distinct_values = tuple(sorted({v for v in present_values}, key=str))
+    return FieldObservation(
+        field=field_name,
+        present_count=len(present_values),
+        observed_types=observed_types,
+        distinct_values=distinct_values,
+        redacted=redacted,
+    )
 
 
 def summarize_trade_records(records: list[TradeRecord]) -> TradeSearchReport:
@@ -85,37 +138,34 @@ def summarize_trade_records(records: list[TradeRecord]) -> TradeSearchReport:
     value itself for an identifier or monetary field. `records` should
     come straight from TopstepXRestClient.search_trades(); this function
     reads each record's raw dict so it sees exactly what the broker sent,
-    not just what TradeRecord's own fixed fields happened to capture."""
-    observations = []
-    for field_name in DOCUMENTED_TRADE_FIELDS:
-        present_values = [
-            record.raw[field_name]
-            for record in records
-            if field_name in record.raw and record.raw[field_name] is not None
-        ]
-        observed_types = tuple(sorted({type(v).__name__ for v in present_values}))
-        distinct_values = None
-        if field_name in _ENUM_FIELDS and present_values:
-            distinct_values = tuple(sorted({v for v in present_values}, key=str))
-        observations.append(
-            FieldObservation(
-                field=field_name,
-                present_count=len(present_values),
-                observed_types=observed_types,
-                distinct_values=distinct_values,
-                redacted=field_name in _IDENTIFIER_FIELDS or field_name in _MONETARY_FIELDS,
-            )
-        )
+    not just what TradeRecord's own fixed fields happened to capture.
+
+    Any field NOT in the documented schema (e.g. the `commissions` field
+    a real account revealed, per issue #80 PR #88's owner feedback) gets
+    the exact same presence/type treatment as a documented field --
+    `unexpected_field_observations` -- so "is it present, how often, what
+    type" is answered for it too, without ever assuming what it means.
+    Its value is always redacted: an unknown field's sensitivity can't be
+    judged by name alone."""
+    observations = [
+        _observe_field(field_name, records, redacted=field_name in _IDENTIFIER_FIELDS or field_name in _MONETARY_FIELDS)
+        for field_name in DOCUMENTED_TRADE_FIELDS
+    ]
 
     known = set(DOCUMENTED_TRADE_FIELDS)
     unexpected: set[str] = set()
     for record in records:
         unexpected.update(key for key in record.raw.keys() if key not in known)
+    unexpected_sorted = tuple(sorted(unexpected))
+    unexpected_observations = tuple(
+        _observe_field(field_name, records, redacted=True) for field_name in unexpected_sorted
+    )
 
     return TradeSearchReport(
         total_records=len(records),
         field_observations=tuple(observations),
-        unexpected_fields=tuple(sorted(unexpected)),
+        unexpected_fields=unexpected_sorted,
+        unexpected_field_observations=unexpected_observations,
         commission_fee_finding=COMMISSION_FEE_FINDING,
     )
 
@@ -141,16 +191,102 @@ def format_report(report: TradeSearchReport) -> str:
             note = ""
         lines.append(f"{obs.field:<20}{presence:<14}{(','.join(obs.observed_types) or '-'):<20}{note}")
 
-    if report.unexpected_fields:
+    if report.unexpected_field_observations:
         lines.append("")
         lines.append("Fields present in the live response but NOT in the documented schema:")
-        for name in report.unexpected_fields:
-            flag = " (identifier-shaped name -- treat as sensitive, do not log elsewhere)" if "id" in name.lower() else ""
-            lines.append(f"  - {name}{flag}")
+        lines.append(f"{'FIELD':<20}{'PRESENT':<14}{'TYPE(S)':<20}NOTES")
+        for obs in report.unexpected_field_observations:
+            presence = f"{obs.present_count}/{report.total_records}"
+            flag = "(value redacted -- unknown field, semantics not assumed)"
+            lines.append(f"{obs.field:<20}{presence:<14}{(','.join(obs.observed_types) or '-'):<20}{flag}")
 
     lines.append("")
     lines.append("Commission/fee finding:")
     lines.append(report.commission_fee_finding)
+
+    lines.append("")
+    lines.append(EXECUTION_VS_TRADE_CAUTION)
+
+    pnl_obs = next((obs for obs in report.field_observations if obs.field == "profitAndLoss"), None)
+    if pnl_obs is not None and 0 < pnl_obs.present_count < report.total_records:
+        lines.append("")
+        lines.append(UNVERIFIED_PNL_HYPOTHESIS)
+
+    return "\n".join(lines)
+
+
+def format_execution_row(record: TradeRecord) -> str:
+    """One execution/fill as `key=value` pairs, for the opt-in --show-rows
+    mode. Every documented identifier field and any field whose name ends
+    in "Id" (this API's own naming convention -- accountId, orderId,
+    contractId, a surprise clearingFeeId, etc.) is masked via
+    redact_identifier -- including undocumented ones, so a future
+    surprise identifier field is never shown raw just because it wasn't
+    anticipated. Everything else (price, P&L, fees, an undocumented
+    `commissions` figure, etc.) is shown as-is: this mode exists
+    specifically so the trader can see their own real execution data,
+    opted into explicitly, with ROW_DISPLAY_WARNING printed ahead of it.
+
+    Deliberately NOT a bare substring check ("id" in key) -- that would
+    also match "voided" (contains "oid"), silently mangling a legitimate
+    boolean flag into a masked-looking string."""
+    raw = record.raw
+
+    def _fmt(value: object) -> str:
+        return "null" if value is None else str(value)
+
+    parts = [
+        f"time={_fmt(raw.get('creationTimestamp'))}",
+        f"contract={_fmt(raw.get('contractId'))}",
+        f"side={_fmt(raw.get('side'))} (raw value -- Buy/Sell mapping not independently confirmed)",
+        f"size={_fmt(raw.get('size'))}",
+        f"price={_fmt(raw.get('price'))}",
+        f"pnl={_fmt(raw.get('profitAndLoss'))}",
+        f"fees={_fmt(raw.get('fees'))}",
+    ]
+
+    # accountId is constant across every row and already shown, redacted,
+    # in the command's "Account: ...XX" header -- omitted here as noise,
+    # not as a masking decision (unlike orderId/id, which are per-row).
+    shown = {
+        "creationTimestamp",
+        "contractId",
+        "side",
+        "size",
+        "price",
+        "profitAndLoss",
+        "fees",
+        "id",
+        "orderId",
+        "accountId",
+        "voided",
+    }
+    for key in sorted(raw.keys()):
+        if key in shown:
+            continue
+        value = raw[key]
+        if key.lower().endswith("id"):
+            parts.append(f"{key}={redact_identifier(value)} (masked)")
+        else:
+            parts.append(f"{key}={_fmt(value)}")
+
+    if raw.get("voided"):
+        parts.append("VOIDED")
+
+    parts.append(f"trade_id={redact_identifier(raw.get('id'))}")
+    parts.append(f"order_id={redact_identifier(raw.get('orderId'))}")
+    return " | ".join(parts)
+
+
+def format_execution_rows(records: list[TradeRecord]) -> str:
+    """Renders every record via format_execution_row, preceded by
+    ROW_DISPLAY_WARNING. Unlike format_report's output, this is NOT
+    generally safe to paste elsewhere as-is -- that's the point of
+    requiring an explicit opt-in (--show-rows) to see it at all."""
+    if not records:
+        return "No records to display."
+    lines = [ROW_DISPLAY_WARNING, ""]
+    lines.extend(f"{i}. {format_execution_row(record)}" for i, record in enumerate(records, start=1))
     return "\n".join(lines)
 
 
