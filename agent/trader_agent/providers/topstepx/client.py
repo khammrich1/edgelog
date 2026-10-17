@@ -25,7 +25,7 @@ from typing import Optional
 
 import requests
 
-from trader_agent.providers.base import Account, Contract
+from trader_agent.providers.base import Account, Contract, TradeRecord
 from trader_agent.providers.topstepx.errors import (
     AuthenticationError,
     ProviderConnectionError,
@@ -99,6 +99,24 @@ class TopstepXRestClient:
         raw_contracts = body.get("contracts") if isinstance(body.get("contracts"), list) else body.get("data") or []
         return [self._parse_contract(item) for item in raw_contracts]
 
+    def search_trades(
+        self, account_id: int, start_timestamp: str, end_timestamp: Optional[str] = None
+    ) -> list[TradeRecord]:
+        """POST /api/Trade/search -- read-only execution/fill history
+        (reference doc Sec.8). Documented request shape is
+        {accountId, startTimestamp, endTimestamp}; endTimestamp may be
+        null. Unlike search_accounts/list_available_contracts, this
+        endpoint's response has never been exercised against a live
+        account -- see trader_agent.trade_diagnostics for the
+        field-presence report issue #80's verification spike runs
+        against whatever actually comes back."""
+        body = self._post(
+            "/api/Trade/search",
+            json={"accountId": account_id, "startTimestamp": start_timestamp, "endTimestamp": end_timestamp},
+        )
+        raw_trades = body.get("trades") if isinstance(body.get("trades"), list) else body.get("data") or []
+        return [self._parse_trade(item) for item in raw_trades]
+
     def _post(self, path: str, json: dict, authenticated: bool = True) -> dict:
         headers = {}
         if authenticated:
@@ -157,5 +175,22 @@ class TopstepXRestClient:
             tick_size=item.get("tickSize"),
             tick_value=item.get("tickValue"),
             active=bool(item.get("activeContract")),
+            raw=item,
+        )
+
+    @staticmethod
+    def _parse_trade(item: dict) -> TradeRecord:
+        return TradeRecord(
+            id=item.get("id"),
+            account_id=item.get("accountId"),
+            contract_id=item.get("contractId"),
+            creation_timestamp=item.get("creationTimestamp"),
+            price=item.get("price"),
+            profit_and_loss=item.get("profitAndLoss"),
+            fees=item.get("fees"),
+            side=item.get("side"),
+            size=item.get("size"),
+            voided=item.get("voided"),
+            order_id=item.get("orderId"),
             raw=item,
         )
