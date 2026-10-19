@@ -10,4 +10,71 @@ Append each update at the bottom under `## YYYY-MM-DD — HH:mm PT`, with an ISO
 
 Use the [EOD workflow](docs/PROJECT_EOD_UPDATE.md) and [entry template](docs/EOD_STATUS_TEMPLATE.md). Record current status, newly completed work with event dates and evidence, blockers and resolutions, delivery verification, next actions, and Kyle's input needed. Keep implemented, tested, merged, deployed, and owner-accepted states separate.
 
-No EOD entries recorded yet. Installing this standard does not establish new product progress, acceptance, or a scheduled sync.
+## 2026-10-19 — 14:24 PT
+
+Recorded at: 2026-10-19T14:24:00-07:00
+Evidence reviewed: main-branch status and EOD workflow/template; GitHub PR #81, #85–#89, #91, #93; issue #80 and #62; PR #91 review and Claude response; current project discussion. Branch-only or local work and live server revisions were not independently accessible.
+Coverage: October 19 work session and latest available GitHub states; DEV/PROD live deployment state, independent CI execution, and local working trees not verified.
+
+### Current project status
+
+EdgeLog is an existing trading journal with merged commission/fee/net-P&L work (#81); production deployment of that work remains unverified. TopstepX historical execution diagnostic and account selection exist in draft PRs, not as a verified cloud synchronization or import. Step 3A read-only reconciliation preview is implemented on draft PR #91 per Claude's report, with review fixes reported and no DB-write/import/UI capability. No owner acceptance yet.
+
+### Current milestone / next gate
+
+Step 3A: verify PR #91 on the exact DEV commit using a throwaway account, synthetic execution batches, account isolation, duplicate checks, ambiguous grouping, unresolved P&L and database unchanged; obtain owner PASS before merge. Step 3B (upload/review UI) is separately scoped and not bundled or approved for implementation here.
+
+### Completed on this date
+
+- Reviewed PR #91 follow-up against approved grouping and plan-association rules — October 19; stage: code review only, no owner acceptance; evidence: https://github.com/khammrich1/edgelog/pull/91 . Claude reported fixes and 207 tests passing, not independently rerun here.
+- Reviewed PR #85's test-only P&L investigation and requested order-independent assertions — October 19; stage: review feedback, not merge; evidence: https://github.com/khammrich1/edgelog/pull/85#issuecomment-6276621143 .
+- Verified PR #93's standard EOD workflow documentation is merged — verified October 19, merge date not independently established in this snapshot; stage: merged; evidence: https://github.com/khammrich1/edgelog/pull/93 .
+
+### In progress
+
+- Step 3A read-only preview — draft PR #91; DEV deployment/revision and acceptance test pending.
+- P&L regression coverage and unresolved incident #62 — draft PR #85, test feedback outstanding.
+- TopstepX read-only diagnostic #88, multi-account agent #86, B/E action #87, documentation #89 — open draft PRs, independent acceptance pending.
+- Historical synchronization issue #80 — design and read-only slices, no confirmed import or cloud integration.
+
+### Current blockers
+
+- DEV branch/revision and real endpoint acceptance not verified — blocks PR #91 owner PASS/merge; responsible: Claude/DEV operator; next: verify deployed SHA and run documented throwaway-account API checks; follow-up: next work session; evidence: PR #91.
+- Cross-order entry/exit grouping not established — blocks reliable automatic completed-trade P&L from real execution history; responsible: development; next: preserve unresolved outcomes and scope deterministic grouping separately; follow-up: Step 3B planning; evidence: PR #91.
+- TopstepX `fees` versus `commissions` semantics unverified — blocks accurate import/net P&L design; responsible: Kyle for statement comparison, development for surfacing raw values; next: compare a real statement with raw broker fields; follow-up: before confirm/import implementation; evidence: issue #80.
+- Original -$19,884 P&L anomaly root cause unverified — blocks claiming #62 fixed; responsible: development/Kyle; next: compare stored rows/API/UI if reproducible, or explicit owner disposition; follow-up: next review; evidence: PR #85 and issue #62.
+
+### Blockers resolved on this date
+
+- None independently verified as resolved on October 19. Claude reported addressing PR #91 code review blockers; DEV/owner acceptance remains outstanding.
+
+### Verification and delivery
+
+- Implemented: PR #91 draft branch per code review; #85 test-only changes; #81 previously merged.
+- Tests: Claude reports 207 backend tests passing on #91 and 165 on #85's original PR; not independently rerun in this EOD. DEV API acceptance not verified.
+- Merged: #81 and #93 confirmed merged on GitHub; #85–#89 and #91 open drafts.
+- Deployed: DEV exact revision for #91 not verified; PROD exact revision and #81 rollout not verified.
+- Owner accepted: no October 19 owner PASS for PR #91 or #85; awaiting acceptance.
+
+### Decisions / scope boundaries
+
+- Preserve three stages: broker identity, deterministic fill grouping, and proposed journal-plan association. Never silently certify plan matches or fabricate P&L.
+- Step 3A is backend preview + tests only: no DB writes, migrations, UI, imports, agent-to-cloud connection or PROD changes. File export/upload is an initial later validation path, not a permanent manual-only goal.
+- Preserve raw fees and commissions separately pending statement reconciliation. Keep live Practice execution separate; no live-trading authorization.
+- No merges or deployments authorized by this reporting PR.
+
+### Next actions
+
+1. Confirm DEV is on PR #91 SHA and run synthetic authenticated acceptance suite; post PASS/FAIL, SHA, and DB read-only evidence — responsible: Claude/DEV operator; due: next work session.
+2. Review #91 acceptance evidence and request explicit owner PASS before merge — responsible: Nova/Kyle; due: after DEV tests.
+3. Correct #85's list-order-dependent test; investigate #62 separately; prioritize #86/#87/#88 review and real statement fee check — responsible: Claude/Kyle; due: unscheduled.
+
+### Kyle's input needed
+
+- Owner PASS/FAIL after verified DEV #91 evidence; later, one real TopstepX statement to reconcile fee/commission fields. No production approval requested.
+
+### Publication / handoff
+
+- Status update location: branch `docs/eod-2026-10-19`, PR to main (link supplied after publication).
+- Remaining evidence gaps: live DEV/PROD revisions, independent test logs, local agent working-tree state, real statement cost semantics, root cause of #62.
+
