@@ -58,3 +58,7 @@ See `DEPLOYMENT.md` for production deployment.
 ---
 
 **EdgeLog** is a product of **Green Bread Enterprises LLC**, operated under **Green Bread Trades**.
+
+## EOD status handoff
+
+When finishing a work session, update project status and append a dated entry to [EOD_STATUS.md](EOD_STATUS.md) using the [standard EOD workflow](docs/PROJECT_EOD_UPDATE.md). Preserve earlier entries and distinguish implementation, merge, deployment, and owner acceptance.

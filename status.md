@@ -100,3 +100,7 @@ Five Alembic migrations exist beyond what's confirmed live in production: `004_t
 - A vague extraction-prompt field description (e.g. "account name") will make Claude pick up the nearest matching row text (an account ID) instead of the actually-wanted value (the firm's brand name from page branding) -- be explicit about what a field is NOT, not just what it is (PR #22).
 - All-or-nothing batch validation (bulk-create) means a single edge-case row (e.g. a legitimate $0.00 entry that used to be rejected as non-positive) silently blocks the entire batch with no partial success -- worth remembering as a sharp edge any time a new bulk-anything endpoint is added (PR #23).
 - The admin page (PR #24) is useless immediately after deploy until someone is manually flipped to `is_admin = true` via SQL -- there's no bootstrapping path in the app itself. Don't forget this step on a fresh environment.
+
+## EOD status handoff
+
+When finishing a work session, update project status and append a dated entry to [EOD_STATUS.md](EOD_STATUS.md) using the [standard EOD workflow](docs/PROJECT_EOD_UPDATE.md). Preserve earlier entries and distinguish implementation, merge, deployment, and owner acceptance.
