@@ -1,5 +1,12 @@
 # EdgeLog Status
 
+## EOD follow-up — October 19, 2026 (Pacific; 14:24 PT snapshot continuation)
+
+The EOD-only reporting workflow was updated on `main` to authorize direct documentation commits without a PR; this instruction applies only to `status.md` and `EOD_STATUS.md` reporting updates, not implementation or deployments. [PR #94](https://github.com/khammrich1/edgelog/pull/94) (prior October 19 EOD) is now verified **merged**. This follow-up records that change and carries forward unresolved work; it does **not** count earlier October 19 PR reviews as new completions.
+
+**Current gate unchanged:** [PR #91](https://github.com/khammrich1/edgelog/pull/91) remains an open draft, not merged or DEV owner-accepted; DEV deployed SHA and read-only acceptance results are not verified. [PR #85](https://github.com/khammrich1/edgelog/pull/85) remains an open draft; original #62 P&L anomaly root cause not verified. [#86](https://github.com/khammrich1/edgelog/pull/86), [#87](https://github.com/khammrich1/edgelog/pull/87), [#88](https://github.com/khammrich1/edgelog/pull/88), [#89](https://github.com/khammrich1/edgelog/pull/89), and [#33](https://github.com/khammrich1/edgelog/pull/33) remain open. Fees/commissions statement comparison and deterministic cross-order grouping remain blocked. Next: Claude posts verified DEV SHA and Step 3A synthetic test evidence; Kyle provides explicit owner PASS before merge. No implementation merge, data writes, or production deploy authorized.
+
+
 ## Current reconciliation — October 19, 2026 (Pacific; EOD snapshot)
 
 **Milestone:** make the existing journal dependable and advance TopstepX historical-execution reconciliation without changing historical records. Current next gate is **Step 3A owner acceptance in DEV**, followed by a separate approval for Step 3B upload/review UI. [PR #91](https://github.com/khammrich1/edgelog/pull/91) is an open draft, **not merged, deployed, or owner-accepted**. Claude reported addressing grouping/P&L/account-isolation review blockers and 207 backend tests passing; this report is not independent CI or DEV acceptance evidence. No verified DEV commit SHA or throwaway-account endpoint test was available for this snapshot. [Issue #80](https://github.com/khammrich1/edgelog/issues/80) remains open.
