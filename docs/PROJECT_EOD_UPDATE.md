@@ -2,11 +2,13 @@
 
 Give this file to each project chat and say:
 
-> Update the project status and append a dated entry to EOD_STATUS.md using this standard.
+> Run EOD: update project status, append a dated entry to EOD_STATUS.md, and commit and push the documentation directly to main. Do not open a PR.
 
 ## Standard document
 
 Every project uses one file at the repository root: `EOD_STATUS.md`.
+
+**Owner's standing instruction:** EOD reporting is a direct documentation update to `main`, with no pull request or merge request for Kyle. This explicitly overrides the normal PR requirement for the EOD log and necessary current-status documentation updates only. Implementation and other changes retain their usual delivery rules.
 
 - Create it from the local [EOD entry template](EOD_STATUS_TEMPLATE.md) on first use, replacing placeholders with project facts.
 - Append each new entry at the bottom, under `## YYYY-MM-DD — HH:mm PT`.
@@ -23,7 +25,7 @@ Every project uses one file at the repository root: `EOD_STATUS.md`.
 4. Append the standard entry to root `EOD_STATUS.md`. Use the format in the local [EOD entry template](EOD_STATUS_TEMPLATE.md). Replace every placeholder; use `None recorded` or `Not verified` when appropriate. Record when completed events happened, especially across midnight, so the daily sync can assign them to the correct day.
 5. Record blockers explicitly, including what is blocked, who can resolve it, and the next unblock action. Carry unresolved blockers into each current snapshot; list resolved blockers separately.
 6. Keep implemented, tested, merged, deployed, and owner-accepted states separate. A merge, passing build, or missing task does not establish owner acceptance or completion on a particular date.
-7. Follow the project's normal commit/PR workflow. Do not merge implementation work or deploy as part of reporting. Return the status-file path, EOD path, branch, and commit/PR link. Clearly identify unpushed/local-only changes; GitHub-based sync cannot read them.
+7. Commit and push the EOD log and necessary current-status documentation directly to `main`; do not open a PR or ask Kyle to merge an EOD-only update. Start from fresh remote `main`, preserve concurrent updates, and commit only the reporting files. If the session is on a feature branch or has unrelated changes, use an isolated checkout or SHA-checked GitHub file edits; never push implementation commits to `main` as part of EOD. Do not force-push, bypass branch protection, merge implementation work, or run a deployment command. If permissions or branch protection prevent the direct update, report the concrete blocker without silently creating a PR. Return the status-file path, EOD path, and resulting commit link; clearly flag any unpublished changes.
 8. Report completed work, current blockers, next action, and any specific input needed from Kyle. Do not claim publication unless verified.
 
 ## Daily sync in the Today chat
