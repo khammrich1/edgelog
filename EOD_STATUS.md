@@ -78,3 +78,69 @@ Step 3A: verify PR #91 on the exact DEV commit using a throwaway account, synthe
 - Status update location: branch `docs/eod-2026-10-19`, PR to main (link supplied after publication).
 - Remaining evidence gaps: live DEV/PROD revisions, independent test logs, local agent working-tree state, real statement cost semantics, root cause of #62.
 
+---
+
+## 2026-10-19 — 14:24 PT (follow-up)
+
+Recorded at: 2026-10-19T14:24:00-07:00
+Evidence reviewed: latest `docs/PROJECT_EOD_UPDATE.md` and `docs/EOD_STATUS_TEMPLATE.md` on main, canonical `status.md`, previous EOD entry, current GitHub PR #94, #91, #85 and open-PR search, current conversation.
+Coverage: same-day follow-up to the earlier 2026-10-19 14:24 PT entry; actual elapsed clock time between entries not independently available. No direct DEV/PROD access or local working-tree visibility.
+
+### Current project status
+
+EdgeLog's journal remains the working product; commission/fee/net-P&L work (#81) is merged, with exact PROD deployment unverified. Broker diagnostic, account selection, B/E action and Step 3A reconciliation preview remain in open draft PRs, not production-verified features. The canonical status has been refreshed with this follow-up.
+
+### Current milestone / next gate
+
+PR #91 Step 3A read-only reconciliation DEV acceptance: verify deployed SHA and synthetic endpoint behavior, account isolation, duplicate detection, unresolved P&L and no DB writes, then obtain explicit owner PASS before merge. Later Step 3B upload/review UI is separate.
+
+### Completed on this date
+
+- Verified prior EOD reporting [PR #94](https://github.com/khammrich1/edgelog/pull/94) merged to main — verified October 19; stage: merged documentation only; exact merge time not established in this snapshot.
+- Read and applied the revised EOD workflow allowing direct documentation commits to main — October 19; stage: reporting process only; evidence: [docs/PROJECT_EOD_UPDATE.md](docs/PROJECT_EOD_UPDATE.md).
+
+### In progress
+
+- Step 3A preview — draft PR #91; DEV acceptance outstanding.
+- P&L regression coverage — draft PR #85; review feedback and original #62 investigation outstanding.
+- TopstepX read-only diagnostic #88, account selection #86, B/E #87, docs #89 and Practice ST1 #33 — open, not merged/accepted based on current GitHub state.
+
+### Current blockers
+
+- DEV deployed SHA and synthetic endpoint acceptance evidence missing — blocks PR #91 approval; responsible: Claude/DEV operator; next unblock action: confirm branch/revision, run read-only checks, post results; follow-up: next work session; evidence: PR #91.
+- Reliable entry/exit pairing across broker order IDs not yet proven — blocks verified automatic completed-trade P&L; responsible: development; next unblock action: keep unresolved until deterministic position-transition evidence is available; follow-up: subsequent scoped work; evidence: PR #91.
+- Broker `fees` and `commissions` relationship unverified against statement — blocks safe net-cost import; responsible: Kyle/development; next unblock action: reconcile raw values with real statement; follow-up: before write/import; evidence: issue #80.
+- Original #62 -$19,884 anomaly unexplained — blocks claiming incident fixed; responsible: development/Kyle; next unblock action: inspect actual persisted rows/API response if reproducible; follow-up: next review; evidence: PR #85.
+
+### Blockers resolved on this date
+
+- Previous EOD PR merge gate for documentation — PR #94 verified merged on October 19; subsequent EOD reporting now permitted direct to main under updated workflow.
+
+### Verification and delivery
+
+- Implemented: PR #91 preview and PR #85 regression tests on draft branches per reviewed patches; not main.
+- Tests: Claude previously reported 207 backend tests for #91 and 165 for #85; no independent rerun or DEV endpoint evidence in this follow-up.
+- Merged: #94 and #81 confirmed merged; #85–#89 and #91 remain open drafts.
+- Deployed: DEV SHA for #91 not verified; PROD revision not verified.
+- Owner accepted: no new explicit PASS for #91 or #85; awaiting acceptance.
+
+### Decisions / scope boundaries
+
+- EOD-only changes to `status.md` and `EOD_STATUS.md` go directly to main, no PR; other work retains issue/PR/owner-gate process.
+- No import/write endpoints, agent-to-cloud relay, production deploy, automatic plan certification or live execution approval.
+- Preserve broker fee/commission fields separately and unknown P&L as unresolved.
+
+### Next actions
+
+1. Claude/DEV operator: deploy PR #91 to DEV only after verifying revision, run throwaway-account acceptance tests and post SHA/results; due: next work session.
+2. Nova/Kyle: review acceptance evidence and obtain explicit owner PASS before any PR #91 merge; due: after tests.
+3. Claude/Kyle: finish #85 review and compare real TopstepX fee statement; due: unscheduled.
+
+### Kyle's input needed
+
+- Owner PASS after verified #91 DEV evidence and a real TopstepX statement for fee/commission correlation; no additional access needed for synthetic DEV checks if Claude has DEV access.
+
+### Publication / handoff
+
+- Status update location: `main` direct documentation commit (see resulting commit link in handoff); no EOD-only PR.
+- Remaining evidence gaps: DEV/PROD SHAs, independent API/CI tests, real broker statement, #62 root cause and local agent state.
