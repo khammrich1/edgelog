@@ -62,5 +62,5 @@ Coverage: <period reviewed and any inaccessible sources>
 
 ### Publication / handoff
 
-- Status update location: <branch and PR link, or local-only/unpushed>.
+- Status update location: <main branch link; return the resulting commit URL in the handoff, or explicitly report unpublished changes>. No EOD-only PR.
 - Remaining evidence gaps: <details, or none>.
