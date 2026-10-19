@@ -140,7 +140,13 @@ async def test_four_broker_rows_as_separate_trades_never_combine(client: AsyncCl
     assert len(all_trades) == 4
     total_gross = sum(Decimal(t["realized_pnl"]) for t in all_trades)
     assert total_gross == Decimal("119.00")
-    first_three_gross = sum(Decimal(t["realized_pnl"]) for t in all_trades[:3])
+
+    # Keyed by the actual created trade IDs, not API list position/order --
+    # list_trades's ordering is an implementation detail this test
+    # shouldn't depend on.
+    by_id = {t["id"]: Decimal(t["realized_pnl"]) for t in all_trades}
+    first_three_ids = [t["id"] for t in created[:3]]
+    first_three_gross = sum(by_id[trade_id] for trade_id in first_three_ids)
     assert first_three_gross == Decimal("110.00")
 
 
