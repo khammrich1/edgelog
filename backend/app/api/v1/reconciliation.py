@@ -8,8 +8,6 @@ creates, updates, or deletes a Trade/TradeEntry/TradeExit row. The actual
 "confirm and import" endpoint, the review UI, and the agent-to-cloud
 transport are explicitly separate, later, separately-approved slices.
 """
-from datetime import date as date_type
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,7 +49,7 @@ async def preview_reconciliation(
             ),
         )
 
-    candidate_trades = await _load_candidate_trades(db, current_user.id, payload.date)
+    candidate_trades = await _load_candidate_trades(db, current_user.id)
 
     executions = [
         ExecutionFact(
@@ -71,7 +69,7 @@ async def preview_reconciliation(
         for e in payload.executions
     ]
 
-    result = build_reconciliation_preview(executions, candidate_trades)
+    result = build_reconciliation_preview(executions, candidate_trades, payload.account_id, payload.date)
 
     executions_out = [
         ExecutionIdentityOut(
@@ -131,18 +129,20 @@ async def preview_reconciliation(
     )
 
 
-async def _load_candidate_trades(db: AsyncSession, user_id: int, day: date_type) -> list[CandidateTrade]:
-    """Every Trade the user has journaled on this date -- regardless of
-    whether it has Plan fields, and regardless of whether it's already
-    been reconciled (external_trade_id/external_order_id set) -- the
-    service layer buckets those into duplicate-detection vs. open-for-
-    matching itself. A pure read; this function never writes."""
+async def _load_candidate_trades(db: AsyncSession, user_id: int) -> list[CandidateTrade]:
+    """Every Trade the user has EVER journaled -- not date-scoped. Broker
+    execution IDs are a fact independent of which date a preview is run
+    for, so already-imported detection (app.services.reconciliation)
+    must be able to find a prior import filed under a different date;
+    fresh plan-match candidates are then date- and account-scoped inside
+    the service layer itself, from the entry_date/account_id carried on
+    each CandidateTrade here. A pure read; this function never writes."""
     result = await db.execute(
-        select(Trade)
+        select(Trade, TradingDay.date)
         .join(TradingDay, Trade.trading_day_id == TradingDay.id)
-        .where(TradingDay.user_id == user_id, TradingDay.date == day)
+        .where(TradingDay.user_id == user_id)
     )
-    trades = result.scalars().all()
+    rows = result.all()
     return [
         CandidateTrade(
             id=trade.id,
@@ -151,6 +151,8 @@ async def _load_candidate_trades(db: AsyncSession, user_id: int, day: date_type)
             setup=trade.setup,
             external_trade_id=trade.external_trade_id,
             external_order_id=trade.external_order_id,
+            account_id=trade.account_id,
+            entry_date=day_date,
         )
-        for trade in trades
+        for trade, day_date in rows
     ]

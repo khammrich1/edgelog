@@ -15,11 +15,18 @@ Three distinct stages, per the owner's correction (issue #80 chat,
 1. Broker execution identity -- facts straight off the wire (id, orderId,
    accountId, price, size, ...). Always certain; nothing to resolve.
 2. Fill grouping -- which executions belong to the same logical trade.
-   Automatic ONLY when a shared orderId, or an unambiguous 2-fill
-   opposite-side same-size pair, makes it deterministic. Anything else is
-   `needs_confirmation`, never guessed.
+   Automatic/`confident` ONLY when a stable shared orderId makes it
+   deterministic. A same-size/opposite-side leftover pairing with no
+   orderId is a plausible guess, not a verified identifier match, so it's
+   always `needs_confirmation` -- two unrelated executions could satisfy
+   that shape by coincidence.
 3. Journal plan association -- always a PROPOSAL for trader review, never
    an automatic certification, even when exactly one candidate matches.
+
+A shared orderId also does NOT by itself certify a completed round trip:
+an order's fills all share that order's own side, so a same-side group
+represents one leg of a position (an entry or an exit), never a closed
+trade on its own -- see _candidate_pnl's explicit side-mix check.
 
 Candidate gross P&L deliberately does NOT trust the broker's per-fill
 `profitAndLoss` (unreliable per the real DEV test: 23/39 present) and does
@@ -27,14 +34,24 @@ NOT guess at the broker's `side` encoding (Buy/Sell mapping unconfirmed,
 per agent/README.md). Instead, it borrows the DIRECTION from an
 unambiguous matched Plan (trader-entered, already trusted) and computes
 from chronological entry/exit prices -- if there is no single unambiguous
-plan match, direction is genuinely unknowable here, and P&L is marked
-`unresolved`, never invented.
+plan match, or the group's fills don't actually span both sides of a
+position, direction/completeness is genuinely unknowable here, and P&L is
+marked `unresolved`, never invented.
+
+Candidate-trade matching is scoped to BOTH the requested account (a Trade
+with no account_id recorded is eligible to match any account, since it
+predates account tracking; a Trade with an account_id set must match the
+requested one exactly) AND the requested date. Already-imported detection
+(by external_trade_id/external_order_id) is NOT date-scoped -- a broker
+execution ID is a fact independent of which date the trader requests a
+preview for, so a prior import filed under a different date must still be
+found.
 """
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
@@ -94,11 +111,15 @@ class ExecutionFact:
 
 @dataclass(frozen=True)
 class CandidateTrade:
-    """A Trade already in the journal for this user, on the requested
-    date, eligible to be proposed as a plan match. `external_trade_id`/
-    `external_order_id` being set means this Trade was already reconciled
-    to a specific broker execution -- used for duplicate detection, not
-    offered as a fresh candidate."""
+    """A Trade already in the journal for this user -- from ANY date, not
+    just the one requested (see _already_imported_trade_id: a broker
+    execution ID is a global fact, so duplicate detection must not be
+    blind to a previous import filed under a different date). Only
+    `entry_date` matching the request, `account_id` compatible, and no
+    external IDs set yet make a Trade eligible as a FRESH plan-match
+    candidate -- see _find_candidate_trades. `account_id` of None means
+    this Trade predates account tracking and is eligible to match any
+    requested account, never a specific wrong one."""
 
     id: int
     symbol: str
@@ -106,6 +127,8 @@ class CandidateTrade:
     setup: Optional[str]
     external_trade_id: Optional[str]
     external_order_id: Optional[str]
+    account_id: Optional[str] = None
+    entry_date: Optional[date] = None
 
 
 @dataclass(frozen=True)
@@ -151,12 +174,17 @@ def _already_imported_trade_id(execution: ExecutionFact, candidate_trades: list[
 
 def _group_fresh_executions(executions: list[ExecutionFact]) -> list[tuple[tuple[int, ...], str, str, str]]:
     """Groups non-voided, not-already-imported executions sharing a
-    contract. Returns (execution_ids, basis, status, note) tuples. The
-    only two groupings ever treated as automatic/confident:
-    (a) every execution sharing one non-null order_id, (b) exactly two
-    leftover executions on the same contract with opposite `side` values
-    and equal `size` (an unambiguous open+close pair). Anything else is
-    left ungrouped and flagged ambiguous -- never further guessed at."""
+    contract. Returns (execution_ids, basis, status, note) tuples.
+
+    The ONLY grouping ever treated as automatic/confident is every
+    execution sharing one non-null order_id -- a stable broker identifier,
+    per the owner-approved doctrine (automatic grouping only with a
+    stable shared order ID). An inferred pairing from side/size alone
+    (two leftover fills with opposite `side` and equal `size`, no
+    orderId) is a plausible guess, not a verified identifier match -- two
+    genuinely unrelated executions could satisfy that shape by
+    coincidence -- so it is surfaced as `needs_confirmation`, same as any
+    other ambiguous leftover, never `confident`."""
     groups: list[tuple[tuple[int, ...], str, str, str]] = []
 
     by_contract: dict[str, list[ExecutionFact]] = {}
@@ -193,9 +221,10 @@ def _group_fresh_executions(executions: list[ExecutionFact]) -> list[tuple[tuple
                 (
                     ids,
                     "inferred_open_close_pair",
-                    "confident",
-                    "Grouped automatically: exactly two fills with opposite side values and matching "
-                    "size, and no orderId to group by -- treated as one open+close pair.",
+                    "needs_confirmation",
+                    "Two fills with opposite side values and matching size, but no shared orderId -- "
+                    "a PLAUSIBLE open+close pairing, not a verified one (two unrelated executions could "
+                    "coincidentally fit this shape). Needs trader confirmation before it's treated as a group.",
                 )
             )
         elif len(remaining) == 1:
@@ -226,17 +255,36 @@ def _group_fresh_executions(executions: list[ExecutionFact]) -> list[tuple[tuple
     return groups
 
 
-def _find_candidate_trades(symbol: Optional[str], candidate_trades: list[CandidateTrade]) -> list[CandidateTrade]:
+def _find_candidate_trades(
+    symbol: Optional[str],
+    candidate_trades: list[CandidateTrade],
+    account_id: int,
+    requested_date: date,
+) -> list[CandidateTrade]:
+    """Fresh plan-match candidates: not already reconciled, on the exact
+    requested date, and account-compatible (no account_id recorded yet,
+    or recorded as exactly the requested account -- never a Trade known
+    to belong to a different account)."""
     if symbol is None:
         return []
     root = _root_symbol(symbol)
-    openable = [t for t in candidate_trades if t.external_trade_id is None and t.external_order_id is None]
+    account_id_str = str(account_id)
+    openable = [
+        t
+        for t in candidate_trades
+        if t.external_trade_id is None
+        and t.external_order_id is None
+        and t.entry_date == requested_date
+        and (t.account_id is None or t.account_id == account_id_str)
+    ]
     return [t for t in openable if _root_symbol(t.symbol) == root]
 
 
 def build_reconciliation_preview(
     executions: list[ExecutionFact],
     candidate_trades: list[CandidateTrade],
+    account_id: int,
+    requested_date: date,
 ) -> ReconciliationPreviewResult:
     execution_results: list[ExecutionResult] = []
     already_imported_by_id: dict[int, Optional[int]] = {}
@@ -291,7 +339,9 @@ def build_reconciliation_preview(
         symbols = {derive_symbol_from_contract_id(e.contract_id) for e in group_executions}
         symbol = next(iter(symbols)) if len(symbols) == 1 else None
 
-        candidates = _find_candidate_trades(symbol, candidate_trades) if status == "confident" else []
+        candidates = (
+            _find_candidate_trades(symbol, candidate_trades, account_id, requested_date) if status == "confident" else []
+        )
         if len(candidates) == 1:
             plan_match_status = "candidate_match"
             candidate_ids = (candidates[0].id,)
@@ -346,7 +396,9 @@ def _candidate_pnl(
     candidates: list[CandidateTrade],
 ) -> tuple[str, Optional[Decimal], Optional[str]]:
     """Computes candidate gross P&L ONLY for the single case this slice
-    trusts completely: a confidently-grouped pair of exactly two fills,
+    trusts completely: a confidently-grouped pair of exactly two fills
+    that actually span both sides of a position (not two fills of the
+    same side/order, which is one leg, never a round trip on its own),
     matched to exactly one existing plan (so direction is a trusted,
     trader-entered fact, never guessed from the broker's unconfirmed
     `side` encoding), on a symbol with a verified multiplier. Every other
@@ -359,6 +411,14 @@ def _candidate_pnl(
             "unresolved",
             None,
             "Group has more than two fills; multi-fill P&L aggregation isn't implemented in this preview slice.",
+        )
+    if len({e.side for e in group_executions}) < 2:
+        return (
+            "unresolved",
+            None,
+            "Both fills in this group share the same side (they're fills of the same order/leg) -- this is "
+            "one leg of a position, an entry or an exit, not a verified round trip. A shared orderId groups "
+            "fills together but never certifies that the position was actually closed.",
         )
     if plan_match_status != "candidate_match":
         return (

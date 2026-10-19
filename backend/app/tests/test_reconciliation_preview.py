@@ -167,8 +167,8 @@ async def test_preview_proposes_a_candidate_match_against_an_existing_plan(clien
             "account_id": 28592949,
             "date": "2026-10-16",
             "executions": [
-                _execution(id=1, orderId=1, price="21000", creationTimestamp="2026-10-16T09:30:00Z"),
-                _execution(id=2, orderId=1, price="21050", creationTimestamp="2026-10-16T10:00:00Z"),
+                _execution(id=1, orderId=1, side=0, price="21000", creationTimestamp="2026-10-16T09:30:00Z"),
+                _execution(id=2, orderId=1, side=1, price="21050", creationTimestamp="2026-10-16T10:00:00Z"),
             ],
         },
     )
