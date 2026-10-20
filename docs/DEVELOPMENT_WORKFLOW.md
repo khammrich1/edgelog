@@ -18,34 +18,32 @@ For Strategy Trader, **ST means Strategy Trader**. ST0, ST1, ST2, etc. are Strat
 4. **Claude creates the implementation PR** from that issue, or uses an already-existing implementation PR when one intentionally exists.
 5. Claude implements and updates that same PR.
 6. Assistant reviews the implementation against the issue/spec.
-7. Deploy the exact PR to DEV with `dev-el-deploy pr <PR_NUMBER>`.
-8. Owner manually tests the DEV build.
-9. **FAIL:** fix the same PR, redeploy, and retest.
-10. **PASS:** merge the PR to `main`.
-11. Deploy `main` to production as a separate explicit step.
+7. After assistant code review and required automated checks, **owner explicitly authorizes merging the PR to `main`**.
+8. Merge to `main` triggers **automatic public DEV deployment** on DigitalOcean App Platform (`https://d.edgelog.trade`). Confirm the deployment succeeded and record its commit.
+9. Owner manually tests **public DEV**. **FAIL:** correct the defect via an approved follow-up PR, merge to `main` with owner authorization, wait for App Platform redeployment, and retest. **PASS:** owner explicitly accepts the DEV build.
+10. **Only after DEV PASS and separate owner authorization**, run `el-deploy` on the **PROD droplet** to deploy approved `main` to `https://edgelog.trade`.
+11. Verify PROD and record deployed revision and smoke-test results.
 12. Start the next slice.
 
 The **Issue is the authoritative scope/specification record**. The **PR is the implementation/testable unit**. Do not create an implementation PR merely while scoping a new issue; the normal handoff is Issue → Claude implementation PR.
 
 ## Owner acceptance
 
-A slice is not complete merely because code exists, Claude self-reviewed it, or automated tests/build pass. Major milestones require owner testing and an explicit PASS before merge.
+A slice is not complete merely because code exists, Claude self-reviewed it, or automated tests/build pass. Major milestones require owner testing and an explicit PASS on public DEV **before production deployment**. Merging to `main` precedes public DEV acceptance because App Platform automatically deploys `main`. Owner approval is required for both merge and PROD deployment.
 
-Do not silently broaden a failed owner test into a redesign. Fix the concrete failure on the same PR unless the owner explicitly moves the problem into a new slice.
+Do not silently broaden a failed owner test into a redesign. Fix the concrete failure in a narrowly scoped follow-up PR and retest public DEV; never deploy a failed slice to PROD.
 
 ## EdgeLog deployment commands
 
-DEV exact-PR deployment:
+**Public DEV:** Merge an owner-approved PR into `main`; DigitalOcean App Platform automatically deploys `main` to `d.edgelog.trade`. Verify deployment and owner-test there. No droplet command is needed for public DEV.
 
-```bash
-dev-el-deploy pr <PR_NUMBER>
-```
-
-Production deployment after the accepted PR is merged:
+**PROD:** After owner DEV PASS and separate PROD authorization, SSH to the PROD droplet and run:
 
 ```bash
 el-deploy
 ```
+
+The legacy `dev-el-deploy pr <PR_NUMBER>` function targets a **local test service on the PROD droplet**, not public DEV. Do not use it as the normal DEV release path. Do not change DNS or App Platform ingress to mimic droplet routing.
 
 ## EdgeLog product constraints that affect implementation
 
