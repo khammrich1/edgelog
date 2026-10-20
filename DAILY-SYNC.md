@@ -62,3 +62,7 @@ Review the carried-forward next actions against today's owner priorities before 
 - Shared project gates: [ProjectStatus reconciliation](https://github.com/khammrich1/ProjectStatus/blob/main/updates/2026-10-19-sync.md).
 - EOD history and canonical status remain authoritative; this file is the start-of-day handoff.
 - No implementation, test run, deployment, account action, or cross-project task/status mutation performed by this documentation update.
+
+## Project orientation - read before planning
+
+Read [how the application works](docs/APPLICATION_GUIDE.md), [development workflow](docs/DEVELOPMENT_WORKFLOW.md), [operations runbook](docs/RUNBOOK.md) and repository instructions before recommending work or commands. Follow linked authorities and record operational gaps rather than inventing runtime facts.
