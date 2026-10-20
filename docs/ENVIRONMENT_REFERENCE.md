@@ -20,6 +20,14 @@ Updated: 2026-10-20. Read this BEFORE giving EdgeLog deployment or testing comma
 - These are checkout revisions, not independent proof of deployed running backend/frontend revisions.
 - Note: the checked-in `deploy/nginx/edgelog.conf` refers to `/var/www/edgelog/frontend`, but the observed production deploy wrapper publishes to `/var/www/edgelog/`. Inspect live Nginx config to resolve this drift.
 
+## DEV runtime verification (owner terminal, 2026-10-20)
+- `systemctl show edgelog-dev`: `WorkingDirectory=/home/edgelog/dev/backend`.
+- `ExecStart=/home/edgelog/dev/backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8001 --workers 2`.
+- `ActiveEnterTimestamp=Tue 2026-10-20 16:56:09 UTC` (09:56:09 PDT).
+- `git -C /home/edgelog/dev log -1`: `b6bae17`, 2026-10-19 20:31:39 UTC, "Address PR #91 review blocker: grouping/P&L/scoping correctness fixes".
+- `curl https://d.edgelog.trade/`: HTTP 200.
+- Evidence supports PR #91 backend checkout being active after its latest commit; it does NOT independently establish that frontend static assets are from the same revision or that the reconciliation API works. Test endpoint next.
+
 ## Actual deployment functions (observed via `type`)
 - `dev-el-deploy pr N`: cd `~/dev`; resolve PR branch using `gh pr view`; fetch; `git checkout -B`; **`git reset --hard origin/<branch>` (discards uncommitted changes in DEV checkout)**; install backend requirements; **`alembic upgrade head` (DB migration)**; restart `edgelog-dev`; `npm install`; `npm run build`; `rsync -av --delete dist/ /var/www/d.edgelog.trade/`; `nginx -t`; reload Nginx; show service status.
 - `el-deploy`: cd `~/app`; `git pull --ff-only origin main`; install backend requirements; **`alembic upgrade head`**; restart `edgelog-backend`; `npm install`; `npm run build`; `rsync -av --delete dist/ /var/www/edgelog/`; `nginx -t`; reload Nginx; show service status.
@@ -72,7 +80,7 @@ Do not print runtime .env contents or secrets.
 
 ## Outstanding runtime facts to record once verified
 - Contents/paths of `dev-el-deploy` and `el-deploy` wrappers (without secrets).
-- Systemd unit WorkingDirectory and ExecStart, DEV/PROD port mapping (unit names and active status confirmed).
+- PROD systemd unit WorkingDirectory and ExecStart; DEV service port 8001 confirmed.
 - DEV live Nginx configuration (frontend deployment directory confirmed).
 - DB identifiers and env-file **paths only**, no credentials.
 - Actual Nginx document roots, log paths, and independently verifiable deployed SHA for each environment.
