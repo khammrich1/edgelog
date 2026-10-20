@@ -143,3 +143,12 @@ Owner ran authenticated, read-only browser-console checks against `https://d.edg
 | Payload execution account ID differs from requested account ID | 400 (expected rejection) | PASS |
 
 Console summary: **3/3 PASS**. The 400 response is expected validation, not a failure. This confirms payload account-ID mismatch rejection, **not** comprehensive account authorization or isolation. Duplicate detection against previously imported records, full account authorization, and proof of database non-mutation remain unverified. No production deployment authorized by this test.
+
+
+### 2026-10-20 — Reconciliation preview production release (owner-confirmed)
+
+- PR #91 merged earlier; read-only `POST /api/v1/journal/reconciliation/preview` passed authenticated public DEV acceptance checks (grouping, ambiguous pairing, voided handling, account-ID mismatch rejection).
+- PR #96 merged (commit `df92e096d7da6163cc9237ab6cdd60d586394dcd`), bringing additional cross-user/account-isolation and non-mutation regression tests onto `main`.
+- Owner reported **DEV good** after automatic App Platform deployment, then ran the separate PROD droplet release workflow and reported **PROD good**.
+- **Status: owner-confirmed production deployment and smoke test**. No independent production HTTP or runtime inspection performed by assistant; do not claim independent verification.
+- Issue #95 remains open: no verified mapping of broker account IDs to EdgeLog users. Must be addressed before any import/write workflow trusts broker account identity.
