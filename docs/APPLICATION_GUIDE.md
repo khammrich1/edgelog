@@ -1,5 +1,8 @@
 # EdgeLog - How the application works
 
+> Orientation source, not a live-state certificate. Follow [DAILY_SYNC_PROTOCOL.md](DAILY_SYNC_PROTOCOL.md) and the current detailed authorities linked below. Reconcile each claim by its evidence date/revision; do not repeat this guide's unknowns when a newer detailed source has resolved them.
+
+
 Manual-first trading journal: Plan -> Trade -> Journal -> Reflect -> Improve. Automation can prefill objective candidate data; the trader deliberately confirms and reflects.
 
 Prepare a plan, record/track the trade, journal the outcome, reflect and review analytics. Reconcile completed-trade fees/net P&L against actual execution and statement evidence.
