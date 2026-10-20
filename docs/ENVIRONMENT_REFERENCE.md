@@ -100,3 +100,26 @@ When evidence conflicts, verify actual host configuration rather than treating a
 - The App Platform `/api` routing rule already exists and preserves the prefix; **do not add a duplicate rule or enable prefix stripping** to address the reconciliation endpoint 404.
 - Public DEV `POST /api/v1/journal/reconciliation/preview` returned HTTP 404, whereas the separate droplet local backend and Nginx returned HTTP 403 without authentication. **Cause remains unverified**; next read-only diagnostic is to check the registered routes inside the App Platform backend runtime, not the PROD droplet.
 - Suggested App Platform backend Console diagnostic: `python -c "from app.main import app; print('\\n'.join(r.path for r in app.routes if 'reconciliation' in r.path))"`. The command has **not** been executed or verified in App Platform.
+
+## Lessons learned / avoid repeat troubleshooting (2026-10-20)
+
+**Verified topology**
+- PROD: droplet `edgelog-prod`, serving `edgelog.trade`; its `/home/edgelog/dev` checkout and port 8001 are **local test services on the PROD droplet**, not the public DEV deployment.
+- Public DEV: DigitalOcean App Platform app associated with `jellyfish-app-3r6dd.ondigitalocean.app`, serving `d.edgelog.trade`. Its backend web-service component is `edgelog-backend`, public HTTP port `8080`. The owner confirmed App Platform follows `khammrich1/edgelog/main` for deployments. Do not mistake GitHub Recent Activity pushes for proof of successful deployment.
+- App Platform backend routing: `/api` and `/health`, **full path preserved** and **all domains**. DNS and these ingress rules were verified correct. Do not change them to fix a missing application route.
+
+**Root cause of the Oct 20 404 (verified at the time of investigation)**
+- Direct PROD-droplet-local test backend `127.0.0.1:8001` registered `/api/v1/journal/reconciliation/preview` and returned 403 unauthenticated; local droplet Nginx also returned 403. Those tests said **nothing about the App Platform runtime**.
+- Public App Platform `POST https://d.edgelog.trade/api/v1/journal/reconciliation/preview` returned 404.
+- In the **actual App Platform backend Console**, `python -c "from app.main import app; print('\\n'.join(r.path for r in app.routes if 'reconciliation' in r.path))"` printed no routes. This directly demonstrated the running public DEV FastAPI app had **not registered** the endpoint; the 404 was not explained by DNS or prefix rewriting.
+- PR #91 was still pending merge/deployment verification when owner stated intent to merge it so App Platform would deploy from `main`. **Do not assert it has merged, deployed or passed acceptance until checked.**
+
+**Fast diagnostic workflow — start here next time**
+1. Identify target environment and hosting **before any SSH command**. For public DEV, open DigitalOcean App Platform's `edgelog-backend` Console, not the PROD droplet. For PROD, use the droplet.
+2. Check public endpoint status. For unauthenticated reconciliation preview POST, expect 403 if the route is registered and protected; 404 indicates missing route or routing issue. Do not use `/api/openapi.json` as the sole test: FastAPI's OpenAPI may live at `/openapi.json` and ingress may not expose it.
+3. In App Platform backend Console, inspect registered routes directly (command above). If absent, inspect **that component's deployed SHA, source branch, build/deploy status, and code**, not droplet checkout SHAs or Nginx. App Platform console route inspection is read-only.
+4. If registered in App Platform but public URL still returns 404, inspect App Platform ingress mapping and application logs for that request. Preserve `/api` prefix unless evidence shows otherwise.
+5. After an **authorized** PR merge and successful App Platform deployment, rerun route registration and public unauthenticated POST; then perform authenticated acceptance with synthetic data and verify read-only behavior. **Do not mark PR #91/issue #80 accepted merely because route exists or tests pass.**
+6. Record the exact public DEV deployed commit and test results in this file, status and EOD. Avoid conflating `dev-el-deploy pr N` (droplet-local) with public App Platform deployment.
+
+**Operational gap:** Prior environment documentation incorrectly treated the PROD droplet's local DEV service as public DEV. This caused unnecessary Nginx, DNS and droplet testing. Public DEV deployment/rollback commands and precise component source/build settings still require confirmation; do not invent them.
