@@ -28,9 +28,13 @@ Every project uses one file at the repository root: `EOD_STATUS.md`.
 7. Commit and push the EOD log and necessary current-status documentation directly to `main`; do not open a PR or ask Kyle to merge an EOD-only update. Start from fresh remote `main`, preserve concurrent updates, and commit only the reporting files. If the session is on a feature branch or has unrelated changes, use an isolated checkout or SHA-checked GitHub file edits; never push implementation commits to `main` as part of EOD. Do not force-push, bypass branch protection, merge implementation work, or run a deployment command. If permissions or branch protection prevent the direct update, report the concrete blocker without silently creating a PR. Return the status-file path, EOD path, and resulting commit link; clearly flag any unpublished changes.
 8. Report completed work, current blockers, next action, and any specific input needed from Kyle. Do not claim publication unless verified.
 
-## Daily sync in the Today chat
+## How it reaches Today
 
-When Kyle says `Run the daily sync`:
+Today already reads published `EOD_STATUS.md` files through its configured product-repository access. The Projects view shows EOD evidence and Yesterday includes dated completions. No routine manual copy into ProjectStatus is required for that evidence to appear.
+
+Kyle chooses the top three and checks off actions in Today. Project chats publish EOD directly to main. That is the normal daily workflow.
+
+Optional portfolio reconciliation, when Kyle asks `Run the daily sync`:
 
 1. Review each project's `EOD_STATUS.md` and canonical status document. Use the latest dated snapshot for current state; use individual event dates for yesterday's completions. Check relevant published PR branches and label branch-only work.
 2. Cross-check changed commits, PRs, issues, and available deployment evidence since the previous successful sync. Flag stale, conflicting, missing, or unpublished records rather than inventing progress.
@@ -39,4 +43,4 @@ When Kyle says `Run the daily sync`:
 5. Reconcile actionable owner tasks into Todo, respecting explicit priorities, completed tasks, and parked work. Project next actions are candidates for the overall top three.
 6. Refresh Today after updating the sources and report coverage and unresolved evidence gaps.
 
-The current Today app does not automatically read project EOD files. Until that integration is implemented, the assistant running the daily sync reviews them and updates ProjectStatus explicitly. This standard does not itself schedule a job. Ask the project chat to run the EOD update; merely installing this document does not trigger one.
+The daily briefing job archives the report; it does not triage email or choose priorities. EOD updates need a project-chat request unless that project separately schedules them. Missing repository access or malformed EOD entries must not be presented as verified progress.
