@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from .admin import router as admin_router
 from .ai_capture import router as ai_capture_router
 from .auth import router as auth_router
+from .broker_accounts import router as broker_accounts_router
 from .feedback import router as feedback_router
 from .financial_ai_capture import router as financial_ai_capture_router
 from .financial_entries import router as financial_entries_router
@@ -18,6 +19,7 @@ api_router.include_router(auth_router, prefix="/auth", tags=["auth"])
 api_router.include_router(journal_router, prefix="/journal", tags=["journal"])
 api_router.include_router(trades_router, prefix="/journal", tags=["trades"])
 api_router.include_router(reconciliation_router, prefix="/journal", tags=["reconciliation"])
+api_router.include_router(broker_accounts_router, tags=["broker-accounts"])
 api_router.include_router(ai_capture_router, tags=["ai-capture"])
 api_router.include_router(instruments_router, tags=["instruments"])
 api_router.include_router(financial_entries_router, tags=["financial-entries"])
