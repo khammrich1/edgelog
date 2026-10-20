@@ -10,8 +10,9 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+import app.api.v1.broker_accounts as broker_accounts_module
 from app.models.broker_accounts import BrokerAccount
 from app.models.trades import Trade
 from app.models.user import User
@@ -230,3 +231,108 @@ async def test_two_unverified_rows_for_the_same_account_id_do_not_violate_the_ve
     )
     db_session.add_all([first, second])
     await db_session.flush()  # must not raise
+
+
+# --- Owner review follow-up (PR #98): normalization + race safety ---
+
+
+@pytest.mark.asyncio
+async def test_provider_is_normalized_to_lowercase_and_whitespace_trimmed(client: AsyncClient):
+    headers = await _register_and_auth_headers(client, "normalize-provider@example.com")
+
+    resp = await client.post(BASE, headers=headers, json={"provider": "  TopstepX  ", "account_id": "123"})
+    assert resp.status_code == 201
+    assert resp.json()["provider"] == "topstepx"
+
+
+@pytest.mark.asyncio
+async def test_account_id_is_whitespace_trimmed_but_not_case_folded(client: AsyncClient):
+    headers = await _register_and_auth_headers(client, "normalize-account@example.com")
+
+    resp = await client.post(BASE, headers=headers, json={"provider": "topstepx", "account_id": "  AbC123  "})
+    assert resp.status_code == 201
+    assert resp.json()["account_id"] == "AbC123"  # trimmed, casing preserved -- opaque broker identifier
+
+
+@pytest.mark.asyncio
+async def test_differently_cased_provider_collides_with_an_existing_registration(client: AsyncClient):
+    """The exact bypass the owner review flagged: "TopstepX" vs
+    "topstepx" must not be able to register as two separate rows for
+    what is, after normalization, the same claim."""
+    headers = await _register_and_auth_headers(client, "collide-provider@example.com")
+    first = await client.post(BASE, headers=headers, json={"provider": "topstepx", "account_id": "456"})
+    assert first.status_code == 201
+
+    second = await client.post(BASE, headers=headers, json={"provider": "TopstepX", "account_id": "456"})
+    assert second.status_code == 409
+
+    accounts = (await client.get(BASE, headers=headers)).json()
+    assert len(accounts) == 1
+
+
+@pytest.mark.asyncio
+async def test_padded_account_id_collides_with_an_existing_registration(client: AsyncClient):
+    headers = await _register_and_auth_headers(client, "collide-account@example.com")
+    first = await client.post(BASE, headers=headers, json={"provider": "topstepx", "account_id": "789"})
+    assert first.status_code == 201
+
+    second = await client.post(BASE, headers=headers, json={"provider": "topstepx", "account_id": "  789  "})
+    assert second.status_code == 409
+
+    accounts = (await client.get(BASE, headers=headers)).json()
+    assert len(accounts) == 1
+
+
+@pytest.mark.asyncio
+async def test_whitespace_only_provider_or_account_id_is_rejected(client: AsyncClient):
+    headers = await _register_and_auth_headers(client, "blank-fields@example.com")
+
+    blank_provider = await client.post(BASE, headers=headers, json={"provider": "   ", "account_id": "123"})
+    assert blank_provider.status_code == 422
+
+    blank_account = await client.post(BASE, headers=headers, json={"provider": "topstepx", "account_id": "   "})
+    assert blank_account.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_concurrent_duplicate_registration_returns_409_not_500(
+    client: AsyncClient, test_engine: AsyncEngine, monkeypatch
+):
+    """Simulates the race the owner review flagged: another request's
+    INSERT commits in the window between this request's pre-check SELECT
+    and its own INSERT. The route's pre-check is monkeypatched to report
+    "nothing found" (exactly what a losing race would see), so only the
+    database's own unique index is left standing between this request
+    and a duplicate row -- proving the INSERT path itself converts that
+    conflict into 409, not an unhandled 500.
+
+    Built entirely on a second, independently-committed session (not
+    the shared, never-committed db_session the test client's requests
+    run on) so the "pre-existing" row is genuinely visible to a *new*
+    transaction the way a real concurrent request's commit would be --
+    not an artifact of sharing one uncommitted test transaction."""
+    from app.core.security import create_access_token
+
+    IndependentSession = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+    async with IndependentSession() as other_session:
+        user = User(email="race@example.com", password_hash="not-a-real-hash")
+        other_session.add(user)
+        await other_session.flush()
+        other_session.add(
+            BrokerAccount(user_id=user.id, provider="topstepx", account_id="race-123", verification_status="unverified")
+        )
+        await other_session.commit()
+        user_id = user.id
+
+    token = create_access_token({"sub": str(user_id), "email": "race@example.com"})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    async def _report_nothing_found(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(broker_accounts_module, "_find_existing_claim", _report_nothing_found)
+
+    response = await client.post(BASE, headers=headers, json={"provider": "topstepx", "account_id": "race-123"})
+
+    assert response.status_code == 409
+    assert "already registered" in response.json()["detail"].lower()

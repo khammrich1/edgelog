@@ -45,8 +45,15 @@ class BrokerAccount(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    provider = Column(String, nullable=False)  # e.g. "topstepx" -- free text, mirrors agent/'s provider naming
-    account_id = Column(String, nullable=False)  # the broker's own account identifier, opaque to EdgeLog
+    # Normalized by app.schemas.broker_accounts before this is ever set:
+    # provider is lowercased (small known namespace, e.g. "topstepx"),
+    # account_id is whitespace-trimmed but never case-folded (opaque
+    # broker identifier; casing may matter to some future provider).
+    # Stored pre-normalized so the uniqueness indexes above actually
+    # compare canonical values, not whatever casing/whitespace a trader
+    # happened to type (owner review, PR #98).
+    provider = Column(String, nullable=False)
+    account_id = Column(String, nullable=False)
     label = Column(String, nullable=True)  # trader's own friendly name, e.g. "Practice 50K"
     verification_status = Column(String, nullable=False, default="unverified")  # "unverified" | "verified"
     verified_at = Column(DateTime(timezone=True), nullable=True)  # set only if verification_status becomes "verified"
