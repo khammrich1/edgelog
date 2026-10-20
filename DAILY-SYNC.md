@@ -66,3 +66,39 @@ Review the carried-forward next actions against today's owner priorities before 
 ## Project orientation - read before planning
 
 Read [how the application works](docs/APPLICATION_GUIDE.md), [development workflow](docs/DEVELOPMENT_WORKFLOW.md), [operations runbook](docs/RUNBOOK.md) and repository instructions before recommending work or commands. Follow linked authorities and record operational gaps rather than inventing runtime facts.
+
+
+### 2026-10-20 — Incremental daily sync: runtime evidence and API blocker
+
+Evidence basis: owner-provided read-only SSH command output on October 20, live GitHub PR search, [operations runbook](docs/ENVIRONMENT_REFERENCE.md), [development workflow](docs/DEVELOPMENT_WORKFLOW.md), [October 19 EOD](EOD_STATUS.md), and [canonical status](status.md). This is an incremental update to today's existing morning handoff, not a second accounting of October 19 work. No independent authenticated API test or production deployment occurred.
+
+#### Previous-day results (October 19; carried forward, not counted again)
+
+- PR #91 review corrections committed as `b6bae17` on October 19; PR remains open/draft; no owner PASS.
+- PR #85 review feedback outstanding; PR remains open/draft.
+- PR #93 and #94 EOD documentation merged on October 19. No new product feature merge established.
+
+#### New verification on October 20
+
+- Owner terminal: DEV checkout `/home/edgelog/dev` at `b6bae1716b609b9b6168e939fe72b48caaa37d30`; backend `edgelog-dev.service` running Uvicorn from `/home/edgelog/dev/backend` on `127.0.0.1:8001`, restarted October 20 16:56:09 UTC.
+- DEV homepage returned HTTP 200, but unauthenticated `POST https://d.edgelog.trade/api/v1/journal/reconciliation/preview` with `{}` returned **404**. This is a failed API reachability check; backend route and proxy behavior remain unverified. A matching checkout SHA does not prove API availability or frontend revision.
+- Actual deployment functions and DEV/PROD checkouts/services were documented in `docs/ENVIRONMENT_REFERENCE.md` on main. DEV and PROD deployments were **not** executed in this sync.
+- GitHub search: PR #91, #85, #86, #87, #88, and #89 remain open/draft; PR #81 merged previously. No owner acceptance evidence for #91.
+
+#### Current blocker and next action
+
+**Blocked:** PR #91 owner acceptance and merge. **Responsible:** development/DEV operator. **Next:** compare POST to `http://127.0.0.1:8001/api/v1/journal/reconciliation/preview` with public DEV URL, inspect live routing and FastAPI registration, fix within PR #91 if necessary, redeploy exact PR only when justified, then run authenticated synthetic read-only acceptance tests. No production deployment.
+
+Other carried-forward blockers: TopstepX fee vs commission statement semantics unverified; reliable cross-order fill grouping/P&L unresolved; issue #62 P&L anomaly root cause unverified; PR #85 test review outstanding.
+
+#### Up to three next actions
+
+1. Resolve DEV reconciliation endpoint 404 by local-versus-public POST comparison; document cause and fix.
+2. Run PR #91 authenticated synthetic acceptance after reachability passes, verify no DB writes, and request explicit owner PASS before merge.
+3. Complete PR #85 review and obtain broker fee/commission statement evidence; do not claim issue #62 fixed without proof.
+
+**First step:** run read-only local-versus-public API POST comparison. Owner input: results of that comparison, then acceptance PASS/FAIL after verified tests.
+
+#### Delivery and publication boundaries
+
+Implemented: PR #91 draft branch. DEV: backend checkout/restart and homepage verified, reconciliation endpoint FAIL (404). Merged: PR #81 previously, EOD docs #93/#94 October 19. PROD: exact running revision not verified. Owner accepted: PR #91 not accepted. This reporting update makes no implementation, deployment, database, or cross-project Todo/ProjectStatus change.
