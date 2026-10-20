@@ -9,11 +9,23 @@ Updated: 2026-10-20. Read this BEFORE giving EdgeLog deployment or testing comma
 - Backend: FastAPI / Uvicorn; frontend: Vue 3 / Vite; database: PostgreSQL / Alembic.
 - Host observed in owner terminal: `edgelog-prod` (both Git checkouts are on this host). This does not independently establish which running services point to which checkout.
 
-## Observed server layout (owner terminal, 2026-10-20)
-- `/home/edgelog/dev/.git` exists: DEV-named repository checkout.
-- `/home/edgelog/app/.git` exists: app-named repository checkout (likely PROD).
-- Neither checkout's branch/SHA or active service working directory has yet been checked.
-- The production deployment guide documents `/var/www/edgelog/backend` as a *setup example* and `/var/www/edgelog/frontend` as a static output directory; do not confuse either with confirmed Git checkout paths.
+## Verified server layout (owner terminal, 2026-10-20)
+- Host: `edgelog-prod`, login `edgelog`. Both DEV and PROD run on this host.
+- DEV checkout: `/home/edgelog/dev`; observed HEAD `b6bae1716b609b9b6168e939fe72b48caaa37d30` (matches PR #91 head).
+- PROD checkout: `/home/edgelog/app`; observed HEAD `a2b314154179124e947b2e1de4da2201bf7add47`.
+- DEV backend systemd unit: `edgelog-dev.service` (active/running).
+- PROD backend systemd unit: `edgelog-backend.service` (active/running).
+- DEV frontend build destination: `/var/www/d.edgelog.trade/`.
+- PROD frontend build destination: `/var/www/edgelog/`.
+- These are checkout revisions, not independent proof of deployed running backend/frontend revisions.
+- Note: the checked-in `deploy/nginx/edgelog.conf` refers to `/var/www/edgelog/frontend`, but the observed production deploy wrapper publishes to `/var/www/edgelog/`. Inspect live Nginx config to resolve this drift.
+
+## Actual deployment functions (observed via `type`)
+- `dev-el-deploy pr N`: cd `~/dev`; resolve PR branch using `gh pr view`; fetch; `git checkout -B`; **`git reset --hard origin/<branch>` (discards uncommitted changes in DEV checkout)**; install backend requirements; **`alembic upgrade head` (DB migration)**; restart `edgelog-dev`; `npm install`; `npm run build`; `rsync -av --delete dist/ /var/www/d.edgelog.trade/`; `nginx -t`; reload Nginx; show service status.
+- `el-deploy`: cd `~/app`; `git pull --ff-only origin main`; install backend requirements; **`alembic upgrade head`**; restart `edgelog-backend`; `npm install`; `npm run build`; `rsync -av --delete dist/ /var/www/edgelog/`; `nginx -t`; reload Nginx; show service status.
+- Both wrappers are shell functions defined in the user's shell environment; exact defining file not yet identified.
+- Neither wrapper verifies an HTTP response after deployment; perform separate health and acceptance checks.
+- Before running DEV wrapper, inspect uncommitted work and migrations; never run PROD wrapper without owner approval.
 
 ## Authoritative delivery workflow
 Source: `docs/DEVELOPMENT_WORKFLOW.md`.
@@ -60,10 +72,10 @@ Do not print runtime .env contents or secrets.
 
 ## Outstanding runtime facts to record once verified
 - Contents/paths of `dev-el-deploy` and `el-deploy` wrappers (without secrets).
-- Actual systemd units, their WorkingDirectory and ExecStart, DEV/PROD port mapping.
-- DEV Nginx configuration and frontend static directory.
+- Systemd unit WorkingDirectory and ExecStart, DEV/PROD port mapping (unit names and active status confirmed).
+- DEV live Nginx configuration (frontend deployment directory confirmed).
 - DB identifiers and env-file **paths only**, no credentials.
-- Where to inspect logs and deployed SHA for each environment.
+- Actual Nginx document roots, log paths, and independently verifiable deployed SHA for each environment.
 - Rollback process supported by the real deployment scripts.
 
 When evidence conflicts, verify actual host configuration rather than treating an old setup guide as current reality.
