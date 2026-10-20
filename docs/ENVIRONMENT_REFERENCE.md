@@ -93,3 +93,10 @@ Do not print runtime .env contents or secrets.
 - Rollback process supported by the real deployment scripts.
 
 When evidence conflicts, verify actual host configuration rather than treating an old setup guide as current reality.
+
+## Public DEV App Platform routing (owner dashboard, 2026-10-20)
+- Backend component routing rules: `/api` and `/health`, both **Match all domains** and **Full path preserved**.
+- Backend component Public HTTP Port: `8080`.
+- The App Platform `/api` routing rule already exists and preserves the prefix; **do not add a duplicate rule or enable prefix stripping** to address the reconciliation endpoint 404.
+- Public DEV `POST /api/v1/journal/reconciliation/preview` returned HTTP 404, whereas the separate droplet local backend and Nginx returned HTTP 403 without authentication. **Cause remains unverified**; next read-only diagnostic is to check the registered routes inside the App Platform backend runtime, not the PROD droplet.
+- Suggested App Platform backend Console diagnostic: `python -c "from app.main import app; print('\\n'.join(r.path for r in app.routes if 'reconciliation' in r.path))"`. The command has **not** been executed or verified in App Platform.
