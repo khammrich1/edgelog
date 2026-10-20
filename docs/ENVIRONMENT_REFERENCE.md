@@ -130,3 +130,16 @@ When evidence conflicts, verify actual host configuration rather than treating a
 - Summary reported `total_executions=3`, `voided_count=0`, `already_imported_count=0`, `confident_groups=2`, `needs_confirmation_groups=0` (other summary fields not fully visible in screenshot).
 - Prior unauthenticated POST returned HTTP 403; authenticated malformed/empty-executions POST returned HTTP 422. These are separate preliminary tests.
 - **Not yet verified:** ambiguous pairing, voided fills, cross-account/date isolation, existing external-ID duplicate detection, database non-mutation, or owner final acceptance. Do not mark the slice fully accepted or deploy PROD based on this partial pass.
+
+
+### 2026-10-20 — Public DEV reconciliation preview follow-up acceptance
+
+Owner ran authenticated, read-only browser-console checks against `https://d.edgelog.trade/api/v1/journal/reconciliation/preview` and supplied the console screenshot:
+
+| Scenario | HTTP | Result |
+| --- | --- | --- |
+| Two opposing no-order-ID fills, inferred pairing requiring confirmation with unresolved P&L | 200 | PASS |
+| Voided execution reported with unresolved P&L and voided count 1 | 200 | PASS |
+| Payload execution account ID differs from requested account ID | 400 (expected rejection) | PASS |
+
+Console summary: **3/3 PASS**. The 400 response is expected validation, not a failure. This confirms payload account-ID mismatch rejection, **not** comprehensive account authorization or isolation. Duplicate detection against previously imported records, full account authorization, and proof of database non-mutation remain unverified. No production deployment authorized by this test.
