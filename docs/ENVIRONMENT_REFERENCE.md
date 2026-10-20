@@ -7,10 +7,11 @@ Updated: 2026-10-20. Read this BEFORE giving EdgeLog deployment or testing comma
 - DEV: https://d.edgelog.trade
 - PROD: https://edgelog.trade
 - Backend: FastAPI / Uvicorn; frontend: Vue 3 / Vite; database: PostgreSQL / Alembic.
-- Host observed in owner terminal: `edgelog-prod` (both Git checkouts are on this host). This does not independently establish which running services point to which checkout.
+- **Public DEV is DigitalOcean App Platform**, reached through `d.edgelog.trade` CNAME `jellyfish-app-3r6dd.ondigitalocean.app` (owner DNS and DigitalOcean dashboard evidence, 2026-10-20). The App Platform dashboard shows GitHub activity for `khammrich1/edgelog/main`. Do not assume droplet DEV is the public DEV runtime.
+- Droplet `edgelog-prod` (public outbound IPv4 observed `24.144.95.61`) hosts separate DEV and PROD checkouts/services. These do not establish the runtime deployed to public App Platform.
 
 ## Verified server layout (owner terminal, 2026-10-20)
-- Host: `edgelog-prod`, login `edgelog`. Both DEV and PROD run on this host.
+- Host: `edgelog-prod`, login `edgelog`. Both DEV and PROD **droplet services** run on this host; public DEV runs on App Platform.
 - DEV checkout: `/home/edgelog/dev`; observed HEAD `b6bae1716b609b9b6168e939fe72b48caaa37d30` (matches PR #91 head).
 - PROD checkout: `/home/edgelog/app`; observed HEAD `a2b314154179124e947b2e1de4da2201bf7add47`.
 - DEV backend systemd unit: `edgelog-dev.service` (active/running).
@@ -26,6 +27,11 @@ Updated: 2026-10-20. Read this BEFORE giving EdgeLog deployment or testing comma
 - `ActiveEnterTimestamp=Tue 2026-10-20 16:56:09 UTC` (09:56:09 PDT).
 - `git -C /home/edgelog/dev log -1`: `b6bae17`, 2026-10-19 20:31:39 UTC, "Address PR #91 review blocker: grouping/P&L/scoping correctness fixes".
 - `curl https://d.edgelog.trade/`: HTTP 200.
+- Direct droplet DEV FastAPI `http://127.0.0.1:8001/openapi.json` advertises `/api/v1/journal/reconciliation/preview`; unauthenticated POST returns HTTP 403.
+- Droplet local Nginx (HTTPS `--resolve d.edgelog.trade:443:127.0.0.1`) returns HTTP 403 for the same POST; droplet Nginx `location /api/` proxies to port 8001 without stripping the prefix.
+- **Public App Platform** `https://d.edgelog.trade/api/v1/journal/reconciliation/preview` returns HTTP 404, and `/api/openapi.json` returns HTTP 404. These results do not prove PR #91 is missing from App Platform: inspect its own deployed components and routing before concluding cause.
+- Public DNS: `d.edgelog.trade` CNAME `jellyfish-app-3r6dd.ondigitalocean.app`, with observed IPv4 ingress `162.159.140.98`, `172.66.0.96`; these match the DigitalOcean dashboard static ingress IPs. **Do not recommend changing DNS to the droplet.**
+- DigitalOcean App Platform dashboard Recent Activity shows pushes to `khammrich1/edgelog/main`, including `49d16b1` at 10:25:50 AM (2026-10-20). Push activity alone is not proof of deployed SHA; app deployment details have not been independently checked.
 - Evidence supports PR #91 backend checkout being active after its latest commit; it does NOT independently establish that frontend static assets are from the same revision or that the reconciliation API works. Test endpoint next.
 
 ## Actual deployment functions (observed via `type`)
@@ -75,13 +81,13 @@ Do not print runtime .env contents or secrets.
 ## Current PR acceptance focus (as of 2026-10-20)
 - PR #91: `feat/issue-80-reconciliation-preview`.
 - GitHub head observed: `b6bae1716b609b9b6168e939fe72b48caaa37d30`; re-fetch before deploying.
-- Deployment is **not yet verified**. Use `dev-el-deploy pr 91` to deploy exact PR, then verify deployed revision and run read-only synthetic acceptance tests.
+- Public App Platform deployment of PR #91 is **not verified**; the droplet's `dev-el-deploy pr 91` wrapper deploys to the droplet, **not public App Platform**. Do not use that wrapper to claim public DEV deployment. Verify App Platform deployed revision/components and route mapping first.
 - No broker writes, production changes, or historical journal mutation authorized.
 
 ## Outstanding runtime facts to record once verified
 - Contents/paths of `dev-el-deploy` and `el-deploy` wrappers (without secrets).
 - PROD systemd unit WorkingDirectory and ExecStart; DEV service port 8001 confirmed.
-- DEV live Nginx configuration (frontend deployment directory confirmed).
+- Droplet DEV Nginx config inspected and functional locally; **public DEV App Platform app spec, deployed revision and routing still need inspection**.
 - DB identifiers and env-file **paths only**, no credentials.
 - Actual Nginx document roots, log paths, and independently verifiable deployed SHA for each environment.
 - Rollback process supported by the real deployment scripts.
