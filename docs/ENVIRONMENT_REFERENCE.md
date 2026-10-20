@@ -122,3 +122,11 @@ When evidence conflicts, verify actual host configuration rather than treating a
 6. Record the exact public DEV deployed commit and test results in this file, status and EOD. Avoid conflating `dev-el-deploy pr N` (droplet-local) with public App Platform deployment.
 
 **Operational gap:** Prior environment documentation incorrectly treated the PROD droplet's local DEV service as public DEV. This caused unnecessary Nginx, DNS and droplet testing. Public DEV deployment/rollback commands and precise component source/build settings still require confirmation; do not invent them.
+
+## PR #91 public DEV acceptance evidence (owner browser, 2026-10-20)
+- Authenticated POST `/api/v1/journal/reconciliation/preview` on `https://d.edgelog.trade` with three synthetic MNQ execution rows returned **HTTP 200**.
+- Executions `910001` and `910002`, both with broker `orderId=810001`, returned one `shared_order_id` group, `grouping_status=confident`, `pnl_status=unresolved`.
+- Execution `910003` with no orderId returned its own `ungrouped_single` group, `grouping_status=confident`, `pnl_status=unresolved`. Here confident means standalone grouping, **not** a confirmed completed trade.
+- Summary reported `total_executions=3`, `voided_count=0`, `already_imported_count=0`, `confident_groups=2`, `needs_confirmation_groups=0` (other summary fields not fully visible in screenshot).
+- Prior unauthenticated POST returned HTTP 403; authenticated malformed/empty-executions POST returned HTTP 422. These are separate preliminary tests.
+- **Not yet verified:** ambiguous pairing, voided fills, cross-account/date isolation, existing external-ID duplicate detection, database non-mutation, or owner final acceptance. Do not mark the slice fully accepted or deploy PROD based on this partial pass.
