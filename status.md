@@ -1,3 +1,17 @@
+## Current status — October 20, 2026 (15:26 PT)
+
+**Current milestone:** make daily journaling reliable and advance plan-first broker reconciliation. [PR #91](https://github.com/khammrich1/edgelog/pull/91) and [PR #96](https://github.com/khammrich1/edgelog/pull/96) were merged earlier on October 20 (read-only reconciliation preview and tests). The [broker-account registry PR #98](https://github.com/khammrich1/edgelog/pull/98) merged to main as `acedc542`, adding **unverified, user-entered** broker accounts only, not ownership proof, historical sync, or live tracking.
+
+**DEV incident and repair:** On public DEV `d.edgelog.trade` (DigitalOcean App Platform), authenticated broker-account POST/GET acceptance attempts returned HTTP 500. The connected **Supabase `edgelog-dev`** project was confirmed at Alembic revision `011`; migration `012` was applied there through the Supabase connector on October 20, and the `broker_accounts` table was verified present and initially empty. **Post-repair authenticated API acceptance has not yet been rerun; PR #98 is not owner-accepted.** This was DEV-only; no production database or droplet changes were made. The automatic App Platform migration path needs investigation to prevent a repeat.
+
+**Operations documentation:** [PR #99](https://github.com/khammrich1/edgelog/pull/99) merged October 20 as `cc1b4b1`, adding [docs/OPERATIONS_PREFLIGHT.md](docs/OPERATIONS_PREFLIGHT.md) and linking it from `AGENTS.md`. The detailed [environment reference](docs/ENVIRONMENT_REFERENCE.md) remains the infrastructure authority. Check available GitHub/Supabase connectors before requesting manual owner work.
+
+**Other active work:** [#85](https://github.com/khammrich1/edgelog/pull/85) P&L regression tests, [#86](https://github.com/khammrich1/edgelog/pull/86) agent multi-account selection, [#87](https://github.com/khammrich1/edgelog/pull/87) break-even UI, [#88](https://github.com/khammrich1/edgelog/pull/88) TopstepX diagnostic, and [#33](https://github.com/khammrich1/edgelog/pull/33) Practice execution remain open, not merged/owner accepted. Obsolete docs [#89](https://github.com/khammrich1/edgelog/pull/89) was closed. [Issue #62](https://github.com/khammrich1/edgelog/issues/62) anomalous P&L and TopstepX cost-field interpretation remain unresolved. Plan-first UI [#97](https://github.com/khammrich1/edgelog/issues/97) is scoped, not delivered.
+
+**Next gates:** (1) authenticated public DEV broker-account create/duplicate/list/delete retest after migration `012`, then owner PASS/FAIL; (2) verify/fix automatic DEV migration execution via scoped issue/PR; (3) reconcile #86 and #88 with current main, keeping broker import read-only and provider verification unclaimed. PROD revision/deployment remains unverified; **no production deployment authorized**.
+
+See [EOD_STATUS.md](EOD_STATUS.md) for the dated handoff. Older snapshots below are historical.
+
 # EdgeLog Status
 
 ## EOD follow-up — October 19, 2026 (Pacific; 14:24 PT snapshot continuation)

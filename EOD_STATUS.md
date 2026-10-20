@@ -1,6 +1,6 @@
 # EdgeLog — EOD Status
 
-Last updated: 2026-10-19
+Last updated: 2026-10-20
 
 Repository: khammrich1/edgelog
 Canonical status document: [status.md](status.md)
@@ -144,3 +144,75 @@ PR #91 Step 3A read-only reconciliation DEV acceptance: verify deployed SHA and 
 
 - Status update location: `main` direct documentation commit (see resulting commit link in handoff); no EOD-only PR.
 - Remaining evidence gaps: DEV/PROD SHAs, independent API/CI tests, real broker statement, #62 root cause and local agent state.
+
+---
+
+## 2026-10-20 — 15:26 PT
+
+Recorded at: 2026-10-20T15:26:00-07:00
+Evidence reviewed: GitHub main `cc1b4b13be1e0cfc80fd32132649d7dce0cf623d`, merged PR #99, PR #98, open PR search (#33, #85–#88), repository EOD workflow/template, DEV Supabase project `edgelog-dev` database migration and table verification, owner browser test results.
+Coverage: October 20 project conversation and GitHub/Supabase evidence; no independent DigitalOcean deployment SHA, backend logs, PROD runtime revision, or post-migration authenticated API test.
+
+### Current project status
+
+Existing EdgeLog journal is under active reliability and broker reconciliation development. Read-only reconciliation PRs #91/#96 and unverified broker-account registry PR #98 have merged; the broker registry does not verify account ownership or synchronize executions. DEV's missing broker-account schema was repaired; owner acceptance remains pending.
+
+### Current milestone / next gate
+
+Retest authenticated broker-account create, duplicate 409, list and delete on **public DEV** after schema repair; verify no regression and obtain owner PASS. Investigate why automatic DEV App Platform deployment did not advance Alembic migration. No PROD promotion yet.
+
+### Completed on this date
+
+- Merged [PR #99](https://github.com/khammrich1/edgelog/pull/99) operations preflight checklist and AGENTS.md link — October 20, 15:21–15:26 PT window; stage: merged documentation; commit `cc1b4b1`.
+- Merged [PR #98](https://github.com/khammrich1/edgelog/pull/98) unverified broker-account registry — October 20, 13:03 PT; stage: merged code; commit `acedc542`; owner acceptance pending.
+- Applied equivalent Alembic migration `012` to connected **DEV-only** Supabase `edgelog-dev` database after observing revision `011` — October 20, before this entry; stage: schema repair verified (`broker_accounts` table exists, initially 0 rows); authenticated API behavior not yet retested.
+- Read-only reconciliation PRs #91 and #96 previously merged on October 20, per project session; stage: merged; exact DEV/PROD runtime revisions not independently established in this EOD.
+
+### In progress
+
+- PR #98 public DEV acceptance — schema repaired; repeat authenticated create/duplicate/list/delete tests.
+- Automatic DEV App Platform migration execution — cause/remediation not yet verified.
+- #85 P&L tests, #86 agent multi-account selection, #87 B/E trade-card action, #88 read-only TopstepX history diagnostic, #33 Practice order execution — open PRs, owner gates outstanding.
+- Plan-first reconciliation UI issue #97 — scope only; no verified implementation.
+
+### Current blockers
+
+- Broker-account registry authenticated post-repair acceptance pending — blocks declaring #98 DEV PASS; responsible: Kyle/QA; next unblock action: rerun authenticated DEV smoke test and record statuses; follow-up: next session.
+- DEV App Platform migration process not verified — risks repeated 500s on future schema PRs; responsible: development/ops; next unblock action: inspect app spec/startup/release command and add safe migration automation through a scoped PR.
+- TopstepX fees versus commissions and cross-order fill grouping unverified — blocks trustworthy automatic trade import/net P&L; responsible: development/Kyle; next unblock action: real provider/statement verification and deterministic grouping; follow-up: before broker writes.
+- Original #62 P&L anomaly unexplained — blocks incident closure; responsible: development; next unblock action: compare actual stored/API/UI evidence.
+
+### Blockers resolved on this date
+
+- Missing DEV `broker_accounts` schema — October 20; Supabase project revision `011` observed, additive migration `012` applied, table verified present and empty. This resolves schema absence, **not** API acceptance or automatic migration configuration.
+- Obsolete docs PR #89 closed during October 20 PR reconciliation; no feature merge.
+
+### Verification and delivery
+
+- Implemented: broker registry code merged #98; read-only reconciliation preview/tests merged #91/#96; operational docs merged #99.
+- Tests: owner authenticated DEV broker-account test **failed HTTP 500 before migration** (POST twice and GET). Supabase schema existence verified after migration. No authenticated API retest or independent CI rerun in this EOD.
+- Merged: #91, #96, #98, #99 reported/verified from GitHub/session; #85–#88 and #33 remain open.
+- Deployed: public DEV previously served #98 authenticated route (HTTP 500 due to missing schema); post-#99 deployed SHA not verified. PROD SHA and deployment not verified.
+- Owner accepted: #98 not accepted; no new explicit owner PASS today for its functionality.
+
+### Decisions / scope boundaries
+
+- Public DEV is DigitalOcean App Platform with connected Supabase `edgelog-dev` database; PROD is a separate droplet. Do not conflate local droplet DEV with public DEV.
+- Read `AGENTS.md`, operations preflight, and environment reference before environment guidance; check connected tools first.
+- No broker verification claim, trade import/write synchronization, live execution authorization, production database changes or PROD deployment authorized by this EOD.
+- EOD reporting-only updates go directly to `main` without a PR; feature merges and PROD deployment remain owner gated.
+
+### Next actions
+
+1. Rerun broker-account authenticated create/duplicate/list/delete against public DEV and capture PASS/FAIL — responsible: Kyle/QA; due: next session.
+2. Inspect App Platform migration process and scope durable DEV migration fix — responsible: development/ops; due: next session.
+3. Reconcile #86/#88 with main and continue #62/fee semantics investigation without broker writes — responsible: Claude/development; due: unscheduled.
+
+### Kyle's input needed
+
+- Owner PASS/FAIL for the broker-account API after migration; later, one real TopstepX statement to compare broker fee semantics. No production authorization requested.
+
+### Publication / handoff
+
+- Status update location: [status.md](status.md) and [EOD_STATUS.md](EOD_STATUS.md) on `main`; resulting commit URL provided in chat.
+- Remaining evidence gaps: post-migration API results, exact DEV deployed SHA, automated migration mechanism, PROD revision, broker fee semantics and #62 root cause.
