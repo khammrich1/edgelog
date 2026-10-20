@@ -1,5 +1,10 @@
 # edgelog - Project onboarding and daily sync
 
+## What these documents do
+
+**EOD summarizes the day. Daily Sync gets this chat up to speed on the project and ready to work. Development Workflow records the current development process. Application Setup preserves the existing setup and operational knowledge.** Read [the source map](docs/PROJECT_DOCUMENTS.md) and [Application Setup](docs/APPLICATION_SETUP.md); follow the existing detailed sources rather than recreating their instructions.
+
+
 ## Run this in the project chat
 
 > Onboard yourself to this project for today's work, not just its status. Read docs/DAILY_SYNC_PROTOCOL.md on fresh main and follow it. Learn how the application actually works, how we develop it, how we operate it, the active work and my latest decisions. Reconcile conflicting/old instructions against current evidence. Return the required onboarding receipt with sources/revisions, application understanding, development workflow, verified operational facts, current gate, corrections and remaining gaps before saying you are ready. Do not execute implementation or operational changes as part of onboarding. Preserve the dated handoff history.
@@ -69,4 +74,3 @@ Review the carried-forward next actions against today's owner priorities before 
 - Shared project gates: [ProjectStatus reconciliation](https://github.com/khammrich1/ProjectStatus/blob/main/updates/2026-10-19-sync.md).
 - EOD history and canonical status remain authoritative; this file is the start-of-day handoff.
 - No implementation, test run, deployment, account action, or cross-project task/status mutation performed by this documentation update.
-

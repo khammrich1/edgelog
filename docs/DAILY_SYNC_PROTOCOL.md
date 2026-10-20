@@ -56,3 +56,7 @@ The receipt demonstrates understanding; it does not authorize feature work, exte
 ## Saving the handoff
 
 After reconciliation, append a timestamped receipt/evidence summary to DAILY-SYNC.md while preserving previous history. Update its current orientation only from supported facts. Publish reporting-only changes directly to fresh main under the owner's daily reporting instruction, preserving concurrent work and normal product release gates. Do not mix feature commits into reporting, force-push or bypass protections. Report an unpublished receipt as unpublished. Do not invent yesterday's accomplishments. Updating Todo/ProjectStatus across projects is a separate coordination action, not a prerequisite for understanding this application.
+
+## Document roles and existing setup
+
+Use [PROJECT_DOCUMENTS.md](PROJECT_DOCUMENTS.md) for each document's job. Read [APPLICATION_SETUP.md](APPLICATION_SETUP.md) and its existing detailed sources before giving setup/deploy instructions. EOD summarizes the day; daily sync orients this chat to work. Do not confuse one with the other or invent a second workflow/setup source when the repo already documents it.
