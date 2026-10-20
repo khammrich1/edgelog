@@ -41,15 +41,14 @@ Updated: 2026-10-20. Read this BEFORE giving EdgeLog deployment or testing comma
 - Neither wrapper verifies an HTTP response after deployment; perform separate health and acceptance checks.
 - Before running DEV wrapper, inspect uncommitted work and migrations; never run PROD wrapper without owner approval.
 
-## Authoritative delivery workflow
-Source: `docs/DEVELOPMENT_WORKFLOW.md`.
-1. GitHub issue -> Claude implementation PR -> assistant review.
-2. Deploy the exact PR to DEV using **`dev-el-deploy pr <PR_NUMBER>`**.
-3. Owner manually tests DEV. FAIL -> fix same PR, redeploy, retest.
-4. Explicit owner PASS -> merge to main.
-5. Separately approved production deployment using **`el-deploy`**.
-6. Verify production after deployment.
-Never deploy feature code to PROD without owner approval. Never use a generic git pull as a substitute for the documented deployment wrapper.
+## Authoritative delivery workflow — OWNER-CONFIRMED (2026-10-20)
+1. GitHub issue -> implementation branch and PR -> code/test review.
+2. **With explicit owner approval, merge PR into `main`.** This triggers automatic deployment of `main` to public DEV on DigitalOcean App Platform (`d.edgelog.trade`).
+3. Confirm the App Platform deployment succeeds and test the deployed feature on **public DEV**. Failed acceptance -> fix through a new PR/approved follow-up, merge to `main`, wait for App Platform redeploy, retest. Do not assume a GitHub push proves deployment.
+4. **Only after owner acceptance on DEV and separate explicit PROD deployment authorization**, SSH into the PROD droplet and run the documented **`el-deploy`** command. This deploys approved `main` to `edgelog.trade`.
+5. Verify PROD functionality and record deployed revision and acceptance results.
+**Do not use `dev-el-deploy pr N` as the public DEV workflow.** It only operates on a local test service on the PROD droplet. Do not deploy PROD without authorization.
+Note: `docs/DEVELOPMENT_WORKFLOW.md` and any other workflow references that prescribe PR-to-droplet-DEV before merge are **outdated and require reconciliation** against this owner-confirmed process.
 
 ## How requests reach the application (documented PROD config)
 Source: `deploy/nginx/edgelog.conf`.
@@ -81,7 +80,7 @@ Do not print runtime .env contents or secrets.
 ## Current PR acceptance focus (as of 2026-10-20)
 - PR #91: `feat/issue-80-reconciliation-preview`.
 - GitHub head observed: `b6bae1716b609b9b6168e939fe72b48caaa37d30`; re-fetch before deploying.
-- Public App Platform deployment of PR #91 is **not verified**; the droplet's `dev-el-deploy pr 91` wrapper deploys to the droplet, **not public App Platform**. Do not use that wrapper to claim public DEV deployment. Verify App Platform deployed revision/components and route mapping first.
+- Owner-confirmed release path: **merge PR #91 into `main` (authorized by owner) -> automatic App Platform DEV deployment -> owner acceptance on public DEV -> owner-authorized `el-deploy` on PROD droplet**. Do not use `dev-el-deploy pr 91` for public DEV. Verify actual merge/deployment/test status rather than assuming completion.
 - No broker writes, production changes, or historical journal mutation authorized.
 
 ## Outstanding runtime facts to record once verified
@@ -119,7 +118,7 @@ When evidence conflicts, verify actual host configuration rather than treating a
 2. Check public endpoint status. For unauthenticated reconciliation preview POST, expect 403 if the route is registered and protected; 404 indicates missing route or routing issue. Do not use `/api/openapi.json` as the sole test: FastAPI's OpenAPI may live at `/openapi.json` and ingress may not expose it.
 3. In App Platform backend Console, inspect registered routes directly (command above). If absent, inspect **that component's deployed SHA, source branch, build/deploy status, and code**, not droplet checkout SHAs or Nginx. App Platform console route inspection is read-only.
 4. If registered in App Platform but public URL still returns 404, inspect App Platform ingress mapping and application logs for that request. Preserve `/api` prefix unless evidence shows otherwise.
-5. After an **authorized** PR merge and successful App Platform deployment, rerun route registration and public unauthenticated POST; then perform authenticated acceptance with synthetic data and verify read-only behavior. **Do not mark PR #91/issue #80 accepted merely because route exists or tests pass.**
+5. **Owner-confirmed workflow:** authorized merge to `main` automatically deploys public DEV App Platform; verify route registration and public unauthenticated POST, then owner tests authenticated behavior with synthetic data. Only after DEV PASS and explicit authorization run `el-deploy` on the PROD droplet. **Do not mark PR #91/issue #80 accepted merely because route exists or tests pass.**
 6. Record the exact public DEV deployed commit and test results in this file, status and EOD. Avoid conflating `dev-el-deploy pr N` (droplet-local) with public App Platform deployment.
 
 **Operational gap:** Prior environment documentation incorrectly treated the PROD droplet's local DEV service as public DEV. This caused unnecessary Nginx, DNS and droplet testing. Public DEV deployment/rollback commands and precise component source/build settings still require confirmation; do not invent them.
