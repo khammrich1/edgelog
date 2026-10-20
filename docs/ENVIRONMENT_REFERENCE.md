@@ -152,3 +152,15 @@ Console summary: **3/3 PASS**. The 400 response is expected validation, not a fa
 - Owner reported **DEV good** after automatic App Platform deployment, then ran the separate PROD droplet release workflow and reported **PROD good**.
 - **Status: owner-confirmed production deployment and smoke test**. No independent production HTTP or runtime inspection performed by assistant; do not claim independent verification.
 - Issue #95 remains open: no verified mapping of broker account IDs to EdgeLog users. Must be addressed before any import/write workflow trusts broker account identity.
+
+
+### 2026-10-20 — Issue #95 implementation: broker-account registry (PR opened, not merged/deployed)
+
+- Implements the smallest secure slice described in issue #95's handoff: a new `broker_accounts` table (migration `012`, additive only, no change to any existing table, no backfill from `Trade.account_id`) and `GET/POST /api/v1/broker-accounts`, `DELETE /api/v1/broker-accounts/{id}`.
+- Every row created by these routes is stamped `verification_status="unverified"` -- no code path anywhere sets it to `"verified"`, because no provider-backed ownership check exists yet. This is deliberate scaffolding, not invented verification; see the migration/model docstrings in the PR for the full reasoning.
+- A partial unique index allows at most one *verified* claim per `(provider, account_id)` across all users, while leaving unverified claims unconstrained across users (nothing exists yet to arbitrate a collision). Verified directly against the database in this slice's tests, even though no route can produce a verified row today.
+- Existing per-user isolation is unchanged and newly covered here too: a user can never see, list, or delete another user's registered accounts.
+- The existing read-only reconciliation-preview endpoint (`POST /api/v1/journal/reconciliation/preview`) is untouched and remains backward compatible -- it still accepts any client-supplied `account_id`, scoped by `user_id` as before. This slice does not gate it on registration, since nothing can be verified yet and gating on an unverified registry would just move the same unearned trust somewhere else.
+- 13 new tests (225 total backend tests passing). Migration applies and reverses cleanly against the local dev database.
+- **Not done, by design:** no verification mechanism (blocked on a provider-backed channel between the local Trader Agent and this backend, which does not exist -- see issue #95), no change to the reconciliation-preview endpoint's behavior, no frontend.
+- PR opened for owner review; **not merged, not deployed to DEV or PROD.**
