@@ -47,13 +47,16 @@ The legacy `dev-el-deploy pr <PR_NUMBER>` function targets a **local test servic
 
 ## EdgeLog product constraints that affect implementation
 
-### Manual journaling is intentional
+### Plan-first journaling is intentional
 
-EdgeLog is manual-first by design. Automation may reduce clerical entry, but must not remove deliberate review.
+**Primary manual entry is the trade PLAN, not manual transcription of executed trades.** The trader deliberately records intentions before execution (instrument, direction, setup, entry, stop, target, risk, reasoning). Broker synchronization supplies objective executions after trading. EdgeLog proposes associations between fills and plans so the trader can compare intent against actual behavior and reflect on discipline.
 
+- The core flow is **Plan manually → Execute through broker → Synchronize executions → Match to plan → Review → Reflect**.
+- Broker fills, quantities, prices, timestamps, and verified costs should be synchronized rather than routinely retyped. Do not assume broker costs are available or equivalent without checking actual API responses.
+- Plan-to-execution association is a proposal for trader review, not an automatic certification. Do not silently alter historical journal data.
+- Manual execution entry remains available as a fallback for unsupported brokers, missing imports, or corrections; it is **not** the primary intended workflow.
 - AI/screenshot extraction may prefill candidate data; the trader confirms it.
-- Future execution integration may prefill objective execution facts; it must not silently complete the journal/reflection.
-- Analytics are downstream of the trader's deliberate journal.
+- Analytics measure planned versus actual behavior and remain downstream of deliberate planning and reflection.
 
 Core loop: **Plan → Trade → Journal → Reflect → Improve**.
 
