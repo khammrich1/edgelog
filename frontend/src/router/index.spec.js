@@ -140,6 +140,19 @@ describe('router auth guard', () => {
     expect(router.currentRoute.value.name).toBe('NotFound')
   })
 
+  it('resolves /reconciliation to the Reconciliation Preview view and requires auth like other protected routes', async () => {
+    const { router, authStore } = setupRouter()
+    authStore.refreshAuth = vi.fn().mockResolvedValue(false)
+
+    await router.push('/reconciliation')
+    expect(router.currentRoute.value.path).toBe('/login')
+
+    authStore.user = { id: 1, email: 'trader@edgelog.trade' }
+    authStore.accessToken = 'fake-access-token'
+    await router.push('/reconciliation')
+    expect(router.currentRoute.value.name).toBe('ReconciliationPreview')
+  })
+
   it('resolves /financials to the Financials view and requires auth like other protected routes', async () => {
     const { router, authStore } = setupRouter()
     authStore.refreshAuth = vi.fn().mockResolvedValue(false)
