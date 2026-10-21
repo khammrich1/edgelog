@@ -45,7 +45,9 @@ function buildPayload() {
 
   const trimmedAccountId = String(accountId.value ?? '').trim()
   if (!trimmedAccountId || !/^\d+$/.test(trimmedAccountId) || Number(trimmedAccountId) <= 0) {
-    inputError.value = 'Enter a positive whole-number account ID.'
+    inputError.value =
+      "Enter the broker's numeric API account ID (a positive whole number, e.g. 28592949) -- not the " +
+      'alphanumeric TopstepX display ID (e.g. "PRAC-V2-...") and not the EdgeLog broker-registry ID.'
     return null
   }
 
@@ -63,6 +65,47 @@ function buildPayload() {
   return { account_id: Number(trimmedAccountId), date: date.value, executions }
 }
 
+// A safe, numeric-account-ID fixture for DEV acceptance -- mirrors the
+// backend's own canonical test fixture (_execution() in
+// backend/app/tests/test_reconciliation_preview.py) exactly, so this is
+// known to pass the API's validation and account-scope check, not a
+// guess at a shape that might work.
+const SAFE_FIXTURE_ACCOUNT_ID = '28592949'
+const SAFE_FIXTURE_DATE = '2026-10-16'
+const SAFE_FIXTURE_EXECUTIONS = [
+  {
+    id: 1001,
+    accountId: 28592949,
+    contractId: 'CON.F.US.MNQ.Z25',
+    creationTimestamp: '2026-10-16T14:30:00Z',
+    price: '21000',
+    size: 2,
+    side: 0,
+    orderId: 500,
+    fees: '2.50',
+    commissions: '0.62',
+    voided: false
+  }
+]
+
+function loadSafeFixture() {
+  accountId.value = SAFE_FIXTURE_ACCOUNT_ID
+  date.value = SAFE_FIXTURE_DATE
+  executionsText.value = JSON.stringify(SAFE_FIXTURE_EXECUTIONS, null, 2)
+  inputError.value = null
+}
+
+// Every new preview attempt -- whether it fails validation before a
+// request is ever sent, fails at the API, or succeeds -- must not leave
+// a PRIOR attempt's result on screen looking like it belongs to this
+// one. Clearing first, before validation even runs, means a result is
+// visible only when it actually reflects the most recent request.
+function invalidatePriorResult() {
+  requestState.value = 'idle'
+  requestError.value = null
+  reconciliationStore.clearPreview()
+}
+
 async function sendPayload(payload) {
   requestState.value = 'loading'
   requestError.value = null
@@ -76,6 +119,7 @@ async function sendPayload(payload) {
 }
 
 async function runPreview() {
+  invalidatePriorResult()
   const payload = buildPayload()
   if (!payload) return
   lastPayload.value = payload
@@ -83,7 +127,9 @@ async function runPreview() {
 }
 
 async function retry() {
-  if (lastPayload.value) await sendPayload(lastPayload.value)
+  if (!lastPayload.value) return
+  invalidatePriorResult()
+  await sendPayload(lastPayload.value)
 }
 
 function resetAll() {
@@ -159,15 +205,18 @@ function formatDecimal(value) {
           v-model="accountId"
           type="number"
           min="1"
-          label="Account ID"
-          placeholder="e.g. 123"
+          label="Account ID (broker numeric API ID)"
+          placeholder="e.g. 28592949"
           autocomplete="off"
         />
         <BaseInput v-model="date" type="date" label="Trading date" />
       </div>
       <p class="field-caption">
-        Account ID is client-supplied and not verified against broker identity (see issue #95) -- it is used only
-        to scope this preview.
+        This is the broker's own <strong>numeric API account ID</strong> (e.g. <code>28592949</code>) -- it is
+        <em>not</em> the alphanumeric TopstepX display ID shown in the account selector (e.g.
+        <code>PRAC-V2-...</code>), and <em>not</em> the EdgeLog broker-registry ID from Settings (see issue #95).
+        The reconciliation API requires this same numeric ID for both <code>account_id</code> and every
+        execution's <code>accountId</code>; it is client-supplied here and not verified against broker identity.
       </p>
 
       <label class="base-input-label executions-label" for="executions-input">Execution JSON</label>
@@ -182,7 +231,13 @@ function formatDecimal(value) {
       <div class="executions-toolbar">
         <input ref="fileInput" type="file" accept="application/json,.json" class="file-input" @change="onFilePicked" />
         <BaseButton type="button" variant="ghost" @click="fileInput.click()">Upload JSON file</BaseButton>
+        <BaseButton type="button" variant="ghost" @click="loadSafeFixture">Load safe numeric fixture</BaseButton>
       </div>
+      <p class="field-caption">
+        "Load safe numeric fixture" fills in a known-safe, all-numeric example (account ID
+        <code>{{ SAFE_FIXTURE_ACCOUNT_ID }}</code>) for DEV acceptance testing -- the same shape the backend's own
+        test suite uses, not a guess at what the API will accept.
+      </p>
 
       <p v-if="inputError" class="el-error-state input-error" role="alert">{{ inputError }}</p>
 

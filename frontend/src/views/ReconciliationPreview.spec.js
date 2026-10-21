@@ -196,7 +196,7 @@ describe('ReconciliationPreview', () => {
 
     await submit(wrapper)
 
-    expect(wrapper.find('.input-error').text()).toMatch(/positive whole-number account ID/)
+    expect(wrapper.find('.input-error').text()).toMatch(/numeric API account ID/)
     expect(api.post).not.toHaveBeenCalled()
   })
 
@@ -330,6 +330,82 @@ describe('ReconciliationPreview', () => {
     }
     expect(Object.keys(api)).not.toContain('put')
     expect(Object.keys(api)).not.toContain('delete')
+  })
+
+  it('explains the broker numeric account ID versus the alphanumeric display ID and the broker-registry ID', async () => {
+    const wrapper = await mountView()
+
+    const text = wrapper.text()
+    expect(text).toMatch(/numeric API account ID/)
+    expect(text).toContain('PRAC-V2-')
+    expect(text).toMatch(/broker-registry ID/)
+  })
+
+  it('rejects a non-numeric account ID with guidance distinguishing it from the display/registry ID', async () => {
+    const wrapper = await mountView()
+    await fillValidInput(wrapper, { accountId: 'PRAC-V2-12345' })
+
+    await submit(wrapper)
+
+    const errorText = wrapper.find('.input-error').text()
+    expect(errorText).toMatch(/numeric API account ID/)
+    expect(errorText).toMatch(/TopstepX display ID/)
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
+  it('"Load safe numeric fixture" fills in a known-good numeric payload that the API accepts', async () => {
+    api.post.mockResolvedValue({ data: FIXTURE_RESPONSE })
+    const wrapper = await mountView()
+
+    const fixtureButton = wrapper.findAll('button').find((b) => b.text() === 'Load safe numeric fixture')
+    expect(fixtureButton).toBeTruthy()
+    await fixtureButton.trigger('click')
+
+    const inputs = wrapper.findAll('.base-input')
+    expect(inputs[0].element.value).toBe('28592949')
+    expect(inputs[1].element.value).toBe('2026-10-16')
+    expect(JSON.parse(wrapper.find('#executions-input').element.value)).toEqual([
+      expect.objectContaining({ id: 1001, accountId: 28592949 })
+    ])
+
+    await submit(wrapper)
+
+    expect(api.post).toHaveBeenCalledWith(
+      '/journal/reconciliation/preview',
+      expect.objectContaining({ account_id: 28592949, date: '2026-10-16' })
+    )
+  })
+
+  it('clears a prior successful result before showing a new validation error, instead of leaving it on screen', async () => {
+    api.post.mockResolvedValue({ data: FIXTURE_RESPONSE })
+    const wrapper = await mountView()
+    await fillValidInput(wrapper)
+    await submit(wrapper)
+    expect(wrapper.text()).toContain('Broker execution facts')
+
+    // Same account/date, but now break the executions input -- this
+    // attempt must not go out, and the OLD result must not linger as if
+    // it belonged to it.
+    await wrapper.find('#executions-input').setValue('')
+    await submit(wrapper)
+
+    expect(wrapper.find('.input-error').text()).toMatch(/Paste or upload execution JSON/)
+    expect(wrapper.text()).not.toContain('Broker execution facts')
+    expect(wrapper.find('.el-empty-state').exists()).toBe(true)
+  })
+
+  it('clears a prior successful result before showing a new failed request, instead of leaving it on screen', async () => {
+    api.post.mockResolvedValueOnce({ data: FIXTURE_RESPONSE })
+    const wrapper = await mountView()
+    await fillValidInput(wrapper)
+    await submit(wrapper)
+    expect(wrapper.text()).toContain('Broker execution facts')
+
+    api.post.mockRejectedValueOnce({ response: { status: 400, data: { detail: 'Execution(s) [1] report a different accountId.' } } })
+    await submit(wrapper)
+
+    expect(wrapper.find('.result-error').text()).toContain('Execution(s) [1] report a different accountId.')
+    expect(wrapper.text()).not.toContain('Broker execution facts')
   })
 
   it('Clear resets the input fields and the displayed result back to the empty state', async () => {
