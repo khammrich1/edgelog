@@ -359,10 +359,10 @@ def build_reconciliation_preview(
             plan_match_status = "unplanned"
             candidate_ids = ()
             plan_match_note = (
-                "No existing plan found for this symbol/date -- would import as "
-                "Unplanned / No pre-trade plan recorded."
+                "No existing journal Trade found for this symbol/date -- no candidate match to review. "
+                "This preview never imports; it only proposes a match, when one exists, for your review."
                 if status == "confident"
-                else "Grouping is ambiguous, so no plan match was attempted."
+                else "Grouping is ambiguous, so no journal Trade match was attempted."
             )
 
         pnl_status, gross_pnl, unresolved_reason = _candidate_pnl(
@@ -406,7 +406,14 @@ def _candidate_pnl(
     invented number."""
     if grouping_status != "confident":
         return "unresolved", None, "Fill grouping is ambiguous; group manually before P&L can be computed."
-    if len(group_executions) != 2:
+    if len(group_executions) == 1:
+        return (
+            "unresolved",
+            None,
+            "Only one fill in this group -- there is no counterpart fill yet to form a completed open/close "
+            "pair, so P&L can't be computed (e.g. a position opened but not yet closed in this batch).",
+        )
+    if len(group_executions) > 2:
         return (
             "unresolved",
             None,
@@ -424,8 +431,8 @@ def _candidate_pnl(
         return (
             "unresolved",
             None,
-            "No single unambiguous plan match to source direction from -- the broker's `side` encoding "
-            "is not independently confirmed, so direction can't be assumed.",
+            "No single unambiguous journal Trade candidate to source direction from -- the broker's `side` "
+            "encoding is not independently confirmed, so direction can't be assumed.",
         )
     if symbol is None:
         return "unresolved", None, "Could not derive a known contract symbol from this execution's contractId."

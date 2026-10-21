@@ -107,7 +107,17 @@ def test_a_single_unmatched_fill_is_its_own_confident_group_with_unresolved_pnl(
     assert group.execution_ids == (1,)
     assert group.grouping_status == "confident"
     assert group.pnl_status == "unresolved"
-    assert "two fills" in group.pnl_unresolved_reason.lower()
+    # Issue #104: observed on public DEV via the safe fixture -- a group
+    # of exactly one fill was previously (wrongly) given the ">2 fills"
+    # reason, which is false for a group this small. It must instead say
+    # there's no counterpart fill yet, never claim there are "more than
+    # two fills" (this assertion used to read "two fills" in the reason,
+    # which passed only because "more than two fills" happens to contain
+    # that substring -- it was unknowingly asserting the bug).
+    reason = group.pnl_unresolved_reason.lower()
+    assert "more than two fills" not in reason
+    assert "one fill" in reason
+    assert "counterpart" in reason
 
 
 def test_three_unlinked_fills_on_one_contract_are_each_ambiguous_not_grouped():
@@ -201,7 +211,14 @@ def test_unplanned_when_no_candidate_trade_matches_symbol():
     group = _group_for(result, 1)
     assert group.plan_match_status == "unplanned"
     assert group.candidate_trade_ids == ()
-    assert "unplanned" in group.plan_match_note.lower()
+    # Issue #104: the note must describe this accurately as "no journal
+    # Trade candidate found" -- never claim a plan was looked for (this
+    # preview matches existing journal Trade records, not TradePlan
+    # objects) or that anything would be imported (this endpoint never
+    # imports).
+    assert "journal trade" in group.plan_match_note.lower()
+    assert "plan" not in group.plan_match_note.lower()
+    assert "would import" not in group.plan_match_note.lower()
 
 
 def test_candidate_match_when_exactly_one_open_trade_matches_symbol():
