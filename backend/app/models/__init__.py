@@ -6,6 +6,7 @@ from .financial_entries import FinancialEntry
 from .page_view import PageView
 from .feedback import Feedback
 from .broker_accounts import BrokerAccount
+from .trade_plans import TradePlan
 
 __all__ = [
     "User",
@@ -18,4 +19,5 @@ __all__ = [
     "PageView",
     "Feedback",
     "BrokerAccount",
+    "TradePlan",
 ]
