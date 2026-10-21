@@ -5,6 +5,7 @@ from decimal import Decimal
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.trade_plans import TradePlan
@@ -345,6 +346,198 @@ async def test_max_risk_dollars_exceeded_flag(client: AsyncClient):
     )
     data = response.json()
     assert data["exceeds_max_risk"] is True
+
+
+@pytest.mark.asyncio
+async def test_approve_blocked_when_risk_exceeds_declared_ceiling(client: AsyncClient):
+    """Owner review (PR #101, merge blocker #1): the declared max_risk_dollars
+    ceiling must actually block approval, not just surface as a warning."""
+    headers = await _register_and_auth_headers(client)
+    create_resp = await client.post(
+        "/api/v1/trade-plans",
+        headers=headers,
+        json=_base_plan_payload(max_risk_dollars="50"),  # actual risk is $200
+    )
+    plan_id = create_resp.json()["id"]
+    assert create_resp.json()["exceeds_max_risk"] is True
+
+    approve_resp = await client.post(f"/api/v1/trade-plans/{plan_id}/approve", headers=headers)
+    assert approve_resp.status_code == 400
+    assert "exceeds" in approve_resp.json()["detail"].lower()
+
+    # No state change: the plan must still be pending, not partially decided.
+    get_resp = await client.get(f"/api/v1/trade-plans/{plan_id}", headers=headers)
+    data = get_resp.json()
+    assert data["status"] == "pending"
+    assert data["decided_at"] is None
+    assert data["decision_note"] is None
+
+
+@pytest.mark.asyncio
+async def test_approve_allowed_when_risk_is_within_declared_ceiling(client: AsyncClient):
+    headers = await _register_and_auth_headers(client)
+    create_resp = await client.post(
+        "/api/v1/trade-plans",
+        headers=headers,
+        json=_base_plan_payload(max_risk_dollars="500"),  # actual risk is $200
+    )
+    plan_id = create_resp.json()["id"]
+
+    approve_resp = await client.post(f"/api/v1/trade-plans/{plan_id}/approve", headers=headers)
+    assert approve_resp.status_code == 200
+    assert approve_resp.json()["status"] == "approved"
+
+
+@pytest.mark.asyncio
+async def test_superseded_plan_cannot_be_approved_rejected_invalidated_or_canceled(client: AsyncClient):
+    """Owner review (PR #101, merge blocker #2): once a newer revision
+    exists, no further lifecycle decision may be made on the old one."""
+    headers = await _register_and_auth_headers(client)
+    create_resp = await client.post("/api/v1/trade-plans", headers=headers, json=_base_plan_payload())
+    original_id = create_resp.json()["id"]
+
+    revise_resp = await client.post(
+        f"/api/v1/trade-plans/{original_id}/revise", headers=headers, json=_base_plan_payload(quantity=10)
+    )
+    assert revise_resp.status_code == 201
+
+    for action in ("approve", "reject", "invalidate", "cancel"):
+        resp = await client.post(f"/api/v1/trade-plans/{original_id}/{action}", headers=headers)
+        assert resp.status_code == 409, f"{action} should be blocked on a superseded plan"
+        assert "newer revision" in resp.json()["detail"].lower()
+
+    # Still exactly pending, untouched -- blocked actions caused no state change.
+    get_resp = await client.get(f"/api/v1/trade-plans/{original_id}", headers=headers)
+    assert get_resp.json()["status"] == "pending"
+    assert get_resp.json()["decided_at"] is None
+
+
+@pytest.mark.asyncio
+async def test_previous_version_id_unique_constraint_prevents_forked_revision_chain(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """Owner review (PR #101, merge blocker #2): the DB-level uniqueness on
+    previous_version_id -- not just the API's pre-check -- is what actually
+    stops two concurrent revisions from forking the chain. Proven directly
+    against the DB here, since two requests that share this test's single
+    AsyncSession can't meaningfully simulate a real race at the HTTP layer."""
+    headers = await _register_and_auth_headers(client)
+    create_resp = await client.post("/api/v1/trade-plans", headers=headers, json=_base_plan_payload())
+    original_id = create_resp.json()["id"]
+
+    result = await db_session.execute(select(TradePlan).where(TradePlan.id == original_id))
+    original = result.scalar_one()
+
+    first_child = TradePlan(
+        user_id=original.user_id,
+        previous_version_id=original.id,
+        revision_number=2,
+        symbol="MNQ",
+        direction="long",
+        entry_price=original.entry_price,
+        stop_price=original.stop_price,
+        quantity=5,
+        expires_at=original.expires_at,
+        status="pending",
+    )
+    db_session.add(first_child)
+    await db_session.flush()
+
+    second_child = TradePlan(
+        user_id=original.user_id,
+        previous_version_id=original.id,  # same parent as first_child -- must be rejected
+        revision_number=2,
+        symbol="MNQ",
+        direction="long",
+        entry_price=original.entry_price,
+        stop_price=original.stop_price,
+        quantity=99,
+        expires_at=original.expires_at,
+        status="pending",
+    )
+    db_session.add(second_child)
+    with pytest.raises(IntegrityError):
+        await db_session.flush()
+    await db_session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_revise_race_is_caught_and_returns_409(client: AsyncClient, db_session: AsyncSession):
+    """API-level counterpart to the DB-constraint test above: if a revision
+    somehow already exists for a plan (the race the unique index guards
+    against), revise_trade_plan's IntegrityError handler must turn that
+    into a clean 409, not a 500."""
+    headers = await _register_and_auth_headers(client)
+    create_resp = await client.post("/api/v1/trade-plans", headers=headers, json=_base_plan_payload())
+    original_id = create_resp.json()["id"]
+
+    # Simulate "another request already won the race": insert a revision
+    # directly, bypassing the API's own _is_superseded pre-check.
+    result = await db_session.execute(select(TradePlan).where(TradePlan.id == original_id))
+    original = result.scalar_one()
+    winner = TradePlan(
+        user_id=original.user_id,
+        previous_version_id=original.id,
+        revision_number=2,
+        symbol="MNQ",
+        direction="long",
+        entry_price=original.entry_price,
+        stop_price=original.stop_price,
+        quantity=5,
+        expires_at=original.expires_at,
+        status="pending",
+    )
+    db_session.add(winner)
+    await db_session.flush()
+
+    # A second revise attempt against the same original plan must fail
+    # cleanly, not with an unhandled IntegrityError/500.
+    losing_resp = await client.post(
+        f"/api/v1/trade-plans/{original_id}/revise", headers=headers, json=_base_plan_payload(quantity=10)
+    )
+    assert losing_resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_approved_plan_retains_account_identity_after_account_deleted(client: AsyncClient):
+    """Owner review (PR #101, merge blocker #3): an approved plan's account
+    identity must survive the broker_accounts registry row being deleted."""
+    headers = await _register_and_auth_headers(client)
+    account = await _register_broker_account(client, headers)
+
+    create_resp = await client.post(
+        "/api/v1/trade-plans", headers=headers, json=_base_plan_payload(broker_account_id=account["id"])
+    )
+    plan_id = create_resp.json()["id"]
+    approve_resp = await client.post(f"/api/v1/trade-plans/{plan_id}/approve", headers=headers)
+    assert approve_resp.json()["status"] == "approved"
+
+    delete_resp = await client.delete(f"/api/v1/broker-accounts/{account['id']}", headers=headers)
+    assert delete_resp.status_code == 204
+
+    get_resp = await client.get(f"/api/v1/trade-plans/{plan_id}", headers=headers)
+    data = get_resp.json()
+    assert data["status"] == "approved"
+    assert data["broker_account_id"] is None  # FK went null (ondelete=SET NULL)
+    # But the snapshot identity survives the registry row's deletion.
+    assert data["broker_account_label"] == "Practice 50K"
+    assert data["broker_account_provider"] == "topstepx"
+    assert data["broker_account_account_id"] == "PRACTICE-1"
+
+
+@pytest.mark.asyncio
+async def test_create_plan_accepts_naive_expires_at_as_utc(client: AsyncClient):
+    """A client that omits the UTC offset (unlike this repo's own frontend,
+    which always sends .toISOString()) must get a clean result, not a 500
+    from comparing a naive datetime against the server's aware clock."""
+    headers = await _register_and_auth_headers(client)
+    naive_future = (datetime.now(timezone.utc) + timedelta(hours=4)).replace(tzinfo=None).isoformat()
+
+    response = await client.post(
+        "/api/v1/trade-plans", headers=headers, json=_base_plan_payload(expires_at=naive_future)
+    )
+
+    assert response.status_code == 201
 
 
 @pytest.mark.asyncio

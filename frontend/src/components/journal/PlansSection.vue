@@ -364,7 +364,7 @@ onMounted(async () => {
           </div>
           <div class="plan-card__summary-right">
             <span v-if="plan.multiplier_known" class="info-value">${{ formatPrice(plan.risk_dollars) }} risk</span>
-            <span v-else class="info-value">{{ plan.risk_points }} pts risk</span>
+            <span v-else class="info-value">{{ formatPrice(plan.risk_points) }} pts risk</span>
           </div>
         </div>
 

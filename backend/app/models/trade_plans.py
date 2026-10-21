@@ -37,16 +37,31 @@ class TradePlan(Base):
     # Revision chain: previous_version_id is null for an original plan, and
     # set to the plan it replaces when a trader revises one. revision_number
     # starts at 1 and increments per chain. Nothing ever updates these on an
-    # existing row after creation.
-    previous_version_id = Column(Integer, ForeignKey("trade_plans.id", ondelete="SET NULL"), nullable=True, index=True)
+    # existing row after creation. unique=True is a DB-level guarantee (not
+    # just the API layer's own pre-check) that at most one plan can ever
+    # claim a given previous_version_id -- two concurrent revise requests on
+    # the same plan can both pass the API's _is_superseded check before
+    # either commits, and this is what actually stops the chain from
+    # forking into two parallel "latest" revisions (owner review, PR #101).
+    previous_version_id = Column(
+        Integer, ForeignKey("trade_plans.id", ondelete="SET NULL"), nullable=True, unique=True
+    )
     revision_number = Column(Integer, nullable=False, default=1)
 
-    # Reuses the broker-accounts registry (issue #95) instead of a
-    # free-text account field -- SET NULL (not CASCADE) so deleting a
-    # registered account never deletes the plans that referenced it; the
-    # plan just loses that attribution, same as a superseded revision
-    # never loses its own status.
+    # Reuses the broker-accounts registry (issue #95) for ownership
+    # validation at creation time -- SET NULL (not CASCADE) so deleting a
+    # registered account never deletes the plans that referenced it. The
+    # FK alone is NOT used to render broker_account_label/provider/
+    # account_id in API responses (see broker_account_provider/
+    # broker_account_account_id/broker_account_label below): a plan's
+    # approved identity must survive the registry row being edited or
+    # deleted later (owner review, PR #101), so those three are snapshotted
+    # once at creation, the same immutability pattern every other content
+    # field on this row already follows.
     broker_account_id = Column(Integer, ForeignKey("broker_accounts.id", ondelete="SET NULL"), nullable=True, index=True)
+    broker_account_provider = Column(String, nullable=True)
+    broker_account_account_id = Column(String, nullable=True)
+    broker_account_label = Column(String, nullable=True)
     symbol = Column(String, nullable=False)
     direction = Column(String, nullable=False)  # long | short
     entry_price = Column(Numeric(PRICE_PRECISION, PRICE_SCALE), nullable=False)  # intended limit entry

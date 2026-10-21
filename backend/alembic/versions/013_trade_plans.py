@@ -3,8 +3,13 @@
 Additive-only migration. TradePlan is a new, independent table -- it does
 not touch trades/trade_entries/trade_exits/trading_days in any way, so no
 existing data or behavior is affected. broker_account_id optionally
-reuses the broker_accounts registry (issue #95, migration 012) instead of
-a free-text account field.
+reuses the broker_accounts registry (issue #95, migration 012) for
+ownership validation at creation time; broker_account_provider/
+broker_account_account_id/broker_account_label snapshot that row's
+identity onto the plan itself so an approved plan's account identity
+survives the registry row being edited or deleted later (owner review,
+PR #101). previous_version_id is unique so the revision chain can never
+fork under a race between two concurrent revise requests.
 
 Revision ID: 013
 Revises: 012
@@ -33,6 +38,9 @@ def upgrade() -> None:
         sa.Column('previous_version_id', sa.Integer(), nullable=True),
         sa.Column('revision_number', sa.Integer(), nullable=False, server_default='1'),
         sa.Column('broker_account_id', sa.Integer(), nullable=True),
+        sa.Column('broker_account_provider', sa.String(), nullable=True),
+        sa.Column('broker_account_account_id', sa.String(), nullable=True),
+        sa.Column('broker_account_label', sa.String(), nullable=True),
         sa.Column('symbol', sa.String(), nullable=False),
         sa.Column('direction', sa.String(), nullable=False),
         sa.Column('entry_price', PRICE_TYPE, nullable=False),
@@ -56,7 +64,11 @@ def upgrade() -> None:
     op.create_index(op.f('ix_trade_plans_id'), 'trade_plans', ['id'], unique=False)
     op.create_index(op.f('ix_trade_plans_user_id'), 'trade_plans', ['user_id'], unique=False)
     op.create_index(op.f('ix_trade_plans_status'), 'trade_plans', ['status'], unique=False)
-    op.create_index(op.f('ix_trade_plans_previous_version_id'), 'trade_plans', ['previous_version_id'], unique=False)
+    # unique=True: a Postgres unique index still allows any number of NULL
+    # rows (an original plan with no previous_version_id), but forbids two
+    # rows from ever claiming the same non-null parent -- the DB-level
+    # guarantee against a forked revision chain (see model docstring).
+    op.create_index(op.f('ix_trade_plans_previous_version_id'), 'trade_plans', ['previous_version_id'], unique=True)
     op.create_index(op.f('ix_trade_plans_broker_account_id'), 'trade_plans', ['broker_account_id'], unique=False)
 
 
