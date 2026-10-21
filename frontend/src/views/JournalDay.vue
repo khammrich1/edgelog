@@ -6,6 +6,7 @@ import { useJournalStore } from '@/stores/journal'
 import { useTradesStore } from '@/stores/trades'
 import { formatSignedDollars, formatSignedPoints, resultClass } from '@/utils/trades'
 import TradesSection from '@/components/journal/TradesSection.vue'
+import PlansSection from '@/components/journal/PlansSection.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -19,7 +20,7 @@ const biasChartObjectUrl = ref(null)
 const uploadError = ref(null)
 const activeTab = ref('mood')
 function navigateTabs(event) {
-  const tabs = ['mood', 'trades', 'overview']
+  const tabs = ['mood', 'plans', 'trades', 'overview']
   const index = tabs.indexOf(activeTab.value)
   let next
   if (event.key === 'ArrowRight') next = (index + 1) % tabs.length
@@ -378,6 +379,18 @@ onBeforeUnmount(revokeBiasChartPreview)
       <button
         role="tab"
         class="day-tab"
+        :class="{ 'day-tab--active': activeTab === 'plans' }"
+        id="plans-tab"
+        aria-controls="plans-panel"
+        :tabindex="activeTab === 'plans' ? 0 : -1"
+        :aria-selected="activeTab === 'plans'"
+        @click="activeTab = 'plans'"
+      >
+        Plans
+      </button>
+      <button
+        role="tab"
+        class="day-tab"
         :class="{ 'day-tab--active': activeTab === 'trades' }"
         id="trades-tab"
         aria-controls="trades-panel"
@@ -576,6 +589,10 @@ onBeforeUnmount(revokeBiasChartPreview)
           </button>
         </section>
       </div>
+    </div>
+
+    <div v-show="activeTab === 'plans'" id="plans-panel" role="tabpanel" aria-labelledby="plans-tab" tabindex="0">
+      <PlansSection />
     </div>
 
     <div v-show="activeTab === 'trades'" id="trades-panel" role="tabpanel" aria-labelledby="trades-tab" tabindex="0">

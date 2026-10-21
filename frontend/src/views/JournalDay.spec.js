@@ -5,6 +5,7 @@ import JournalDay from './JournalDay.vue'
 import { useJournalStore } from '@/stores/journal'
 import { useTradesStore } from '@/stores/trades'
 import { useInstrumentsStore } from '@/stores/instruments'
+import { useTradePlansStore } from '@/stores/tradePlans'
 
 vi.mock('vue-router', () => ({
   useRoute: () => ({ params: { date: '2026-01-01' } }),
@@ -38,6 +39,9 @@ async function mountJournalDay(dayOverrides = {}) {
 
   const instrumentsStore = useInstrumentsStore()
   instrumentsStore.fetchMultipliers = vi.fn().mockResolvedValue({})
+
+  const tradePlansStore = useTradePlansStore()
+  tradePlansStore.fetchPlans = vi.fn().mockResolvedValue([])
 
   const wrapper = mount(JournalDay)
   await flushPromises()
@@ -74,10 +78,10 @@ describe('JournalDay tab navigation', () => {
   it('supports arrow, Home, and End navigation with one tab stop and linked panels', async () => {
     const wrapper = await mountJournalDay()
     const tabs = wrapper.findAll('[role="tab"]')
-    expect(tabs.map(tab => tab.attributes('tabindex'))).toEqual(['0', '-1', '-1'])
+    expect(tabs.map(tab => tab.attributes('tabindex'))).toEqual(['0', '-1', '-1', '-1'])
     await tabs[0].trigger('keydown', { key: 'ArrowRight' })
-    expect(wrapper.find('.day-tab--active').text()).toBe('Trades')
-    expect(wrapper.find('#trades-panel').isVisible()).toBe(true)
+    expect(wrapper.find('.day-tab--active').text()).toBe('Plans')
+    expect(wrapper.find('#plans-panel').isVisible()).toBe(true)
     await tabs[1].trigger('keydown', { key: 'End' })
     expect(wrapper.find('#overview-panel').isVisible()).toBe(true)
     await tabs[2].trigger('keydown', { key: 'ArrowRight' })
@@ -151,6 +155,9 @@ describe('JournalDay tab navigation', () => {
 
     const instrumentsStore = useInstrumentsStore()
     instrumentsStore.fetchMultipliers = vi.fn().mockResolvedValue({})
+
+    const tradePlansStore = useTradePlansStore()
+    tradePlansStore.fetchPlans = vi.fn().mockResolvedValue([])
 
     const wrapper = mount(JournalDay)
     await flushPromises()
@@ -231,6 +238,9 @@ describe('JournalDay tab navigation', () => {
     const instrumentsStore = useInstrumentsStore()
     instrumentsStore.fetchMultipliers = vi.fn().mockResolvedValue({})
 
+    const tradePlansStore = useTradePlansStore()
+    tradePlansStore.fetchPlans = vi.fn().mockResolvedValue([])
+
     const wrapper = mount(JournalDay)
     await flushPromises()
     await wrapper.findAll('.day-tab').find((t) => t.text() === 'Overview').trigger('click')
@@ -270,6 +280,9 @@ describe('JournalDay loadDay request parallelism (issue #71)', () => {
     tradesStore.fetchSetups = vi.fn().mockResolvedValue([])
     const instrumentsStore = useInstrumentsStore()
     instrumentsStore.fetchMultipliers = vi.fn().mockResolvedValue({})
+
+    const tradePlansStore = useTradePlansStore()
+    tradePlansStore.fetchPlans = vi.fn().mockResolvedValue([])
 
     mount(JournalDay)
     await flushPromises()

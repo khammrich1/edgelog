@@ -12,6 +12,7 @@ from .journal import router as journal_router
 from .reconciliation import router as reconciliation_router
 from .trades import router as trades_router
 from .tracking import router as tracking_router
+from .trade_plans import router as trade_plans_router
 
 api_router = APIRouter()
 
@@ -27,3 +28,4 @@ api_router.include_router(financial_ai_capture_router, tags=["financial-ai-captu
 api_router.include_router(admin_router, tags=["admin"])
 api_router.include_router(tracking_router, tags=["tracking"])
 api_router.include_router(feedback_router, tags=["feedback"])
+api_router.include_router(trade_plans_router, tags=["trade-plans"])
