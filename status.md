@@ -1,3 +1,19 @@
+## Current status — October 21, 2026 (15:26 PT)
+
+**Milestone:** operational stabilization of the existing journal, reliable migrations, accurate P&L and owner daily-use acceptance. October 21 Codex audit reviewed all 29 open issues and linked PR discussions; independently checked GitHub inventory: **29 open issues and six open draft PRs**. Mergeable: #100, #88, #86, #85; conflicting: #87, #33. Audit is evidence reconciliation, not a rerun of CI or deployed functionality.
+
+**Priority 1 — deployment reliability:** Draft [PR #100](https://github.com/khammrich1/edgelog/pull/100) is mergeable but review corrections remain (failure/lock cleanup, isolated scratch-test DB privileges, deployment-gating claims, migration 013 compatibility). Its `Closes #57` language must be removed: [#57](https://github.com/khammrich1/edgelog/issues/57) includes wider App Platform PROD cutover/rollback requirements. [PR #101](https://github.com/khammrich1/edgelog/pull/101) introduced migration 013; actual public DEV deployed SHA and Alembic revision remain unverified.
+
+**Priority 2 — journal correctness:** [#62](https://github.com/khammrich1/edgelog/issues/62) original MNQ -$19,884 versus +$116 incident remains unexplained; draft [#85](https://github.com/khammrich1/edgelog/pull/85) tests expected math, not the root cause. [#84](https://github.com/khammrich1/edgelog/issues/84) one-submission completed-trade/cost acceptance remains incomplete despite merged #81. October 21 owner DEV test: existing-trade Target Hit for MNQ 2 long at 25,000, exit 25,020, $5 total costs showed CLOSED, $80 gross, $75 net; reload persistence not verified. Owner clarified 'Already closed' is for creating a completed new record, while existing OPEN trades must be closed on their card; feedback recorded on #61. [#82](https://github.com/khammrich1/edgelog/issues/82) needs brief owner responsiveness acceptance.
+
+**Broker guardrails:** [#80](https://github.com/khammrich1/edgelog/issues/80) parent is stale despite merged #91/#96/#102/#105; draft diagnostics #88 and account selection #86 await Windows acceptance. [#95](https://github.com/khammrich1/edgelog/issues/95) provider-backed account ownership is unverified; broker imports remain read-only/no writes. TopstepX fee/commission semantics and deterministic grouping unresolved. Reconciliation candidates #25/#41/#78/#84 and incidents #68/#70 require evidence-based closure/narrowing, not automatic closure.
+
+**Standing workflow:** [AGENTS.md](AGENTS.md) updated on October 21 (commit `fafafbe`) to require assistant-owned post-merge issue closure or explicit remaining scope, duplicate PR reconciliation and full-backlog checks at sync/EOD. No issues were closed as part of this status-only EOD. No merges, deployment, migration or trading-data writes authorized.
+
+**Next:** Claude corrects #100 on the existing PR; review #85 and original #62 evidence; verify DEV schema 013 and short #70/#68/#82/#84 acceptance; then Windows #88/#86, conflict resolution #87/#33, and issue closure based on recorded acceptance. PROD remains untouched/unverified.
+
+See [EOD_STATUS.md](EOD_STATUS.md) for dated handoff. Older snapshots below are historical.
+
 ## Current status — October 20, 2026 (15:26 PT)
 
 **Current milestone:** make daily journaling reliable and advance plan-first broker reconciliation. [PR #91](https://github.com/khammrich1/edgelog/pull/91) and [PR #96](https://github.com/khammrich1/edgelog/pull/96) were merged earlier on October 20 (read-only reconciliation preview and tests). The [broker-account registry PR #98](https://github.com/khammrich1/edgelog/pull/98) merged to main as `acedc542`, adding **unverified, user-entered** broker accounts only, not ownership proof, historical sync, or live tracking.
