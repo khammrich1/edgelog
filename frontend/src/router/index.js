@@ -8,6 +8,7 @@ import Journal from '@/views/Journal.vue'
 import JournalDay from '@/views/JournalDay.vue'
 import TradeCalendar from '@/views/TradeCalendar.vue'
 import Financials from '@/views/Financials.vue'
+import ReconciliationPreview from '@/views/ReconciliationPreview.vue'
 import Settings from '@/views/Settings.vue'
 import Stats from '@/views/Stats.vue'
 import Admin from '@/views/Admin.vue'
@@ -86,6 +87,15 @@ export const routes = [
     path: '/financials/:year(\\d{4})',
     name: 'FinancialsYear',
     component: Financials,
+    meta: { requiresAuth: true }
+  },
+  {
+    // Issue #97: read-only broker execution reconciliation preview --
+    // reuses the existing read-only preview API (#80/#91/#96), makes no
+    // writes of its own, and is independent of the #59/#101 Plans feature.
+    path: '/reconciliation',
+    name: 'ReconciliationPreview',
+    component: ReconciliationPreview,
     meta: { requiresAuth: true }
   },
   {
