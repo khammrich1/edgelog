@@ -7,6 +7,7 @@ import Dashboard from '@/views/Dashboard.vue'
 import Journal from '@/views/Journal.vue'
 import JournalDay from '@/views/JournalDay.vue'
 import TradeCalendar from '@/views/TradeCalendar.vue'
+import ReconciliationPreview from '@/views/ReconciliationPreview.vue'
 import Financials from '@/views/Financials.vue'
 import Settings from '@/views/Settings.vue'
 import Stats from '@/views/Stats.vue'
@@ -70,6 +71,16 @@ export const routes = [
     path: '/trades/:date(\\d{4}-\\d{2}-\\d{2})',
     name: 'TradeCalendarWeek',
     component: TradeCalendar,
+    meta: { requiresAuth: true }
+  },
+  {
+    // DF-VS1.5 Step 3B (issue #97): read-only review of the existing
+    // broker-execution reconciliation preview API (PR #91). Deliberately
+    // its own route rather than a journal/trades tab, since the owner
+    // handoff asks for a "dedicated" view reachable from that nav.
+    path: '/reconciliation',
+    name: 'ReconciliationPreview',
+    component: ReconciliationPreview,
     meta: { requiresAuth: true }
   },
   {

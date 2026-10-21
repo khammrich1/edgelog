@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { LayoutDashboard, BookOpen, CalendarDays, ListOrdered, ChartNoAxesCombined, Wallet, MessageSquare, Settings, LogOut, Menu, X, Shield } from 'lucide-vue-next'
+import { LayoutDashboard, BookOpen, CalendarDays, ListOrdered, GitCompareArrows, ChartNoAxesCombined, Wallet, MessageSquare, Settings, LogOut, Menu, X, Shield } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { todayDateKey } from '@/utils/date'
 import EdgeLogLogo from './EdgeLogLogo.vue'
@@ -29,6 +29,7 @@ const links = [
   { to: `/journal/${todayDateKey()}`, label: 'Today', icon: BookOpen },
   { to: '/journal', label: 'Calendar', icon: CalendarDays, exact: true },
   { to: '/trades', label: 'Trades', icon: ListOrdered },
+  { to: '/reconciliation', label: 'Reconciliation', icon: GitCompareArrows },
   { to: '/stats', label: 'Stats', icon: ChartNoAxesCombined },
   { to: '/financials', label: 'Financials', icon: Wallet }
 ]
