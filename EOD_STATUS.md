@@ -216,3 +216,78 @@ Retest authenticated broker-account create, duplicate 409, list and delete on **
 
 - Status update location: [status.md](status.md) and [EOD_STATUS.md](EOD_STATUS.md) on `main`; resulting commit URL provided in chat.
 - Remaining evidence gaps: post-migration API results, exact DEV deployed SHA, automated migration mechanism, PROD revision, broker fee semantics and #62 root cause.
+
+---
+
+## 2026-10-21 — 15:26 PT
+
+Recorded at: 2026-10-21T15:26:00-07:00
+Evidence reviewed: Codex's October 21 full 29-issue audit supplied by owner; GitHub open issue/PR inventory and PR draft/mergeability checks; issue #25/#78/#84 bodies; PR #100 description; AGENTS.md commit fafafbea9748b556208a6eb3d102345b62b2ad18; October 21 owner DEV trade-card test; prior status.md and EOD_STATUS.md.
+Coverage: all 29 issue audit findings, six open PRs, owner discussion and journal QA; no independent CI rerun, DigitalOcean runtime revision, Supabase revision 013 check, Windows agent test or PROD verification.
+
+### Current project status
+
+Existing EdgeLog journal and read-only reconciliation UI have merged implementation, but deployment reliability, P&L incident resolution, daily-use acceptance and broker ownership remain open. GitHub inventory: 29 open issues, six draft PRs (#100/#88/#86/#85 mergeable; #87/#33 conflicting). No new feature work authorized.
+
+### Current milestone / next gate
+
+Operational stabilization first: resolve #100 review requests, remove erroneous 'Closes #57', verify DEV deployed SHA and migration 013. Then reconcile original #62 incident and finish owner journal acceptance #82/#84; keep import writes blocked by #95 and unverified cost/grouping semantics.
+
+### Completed on this date
+
+- Codex completed an evidence-based audit of all 29 open issues and six draft PRs — October 21; stage: audit/review only, no GitHub changes by Codex; evidence: owner-provided audit and GitHub inventory cross-check.
+- Updated AGENTS.md with mandatory assistant-owned post-merge issue/PR reconciliation — October 21; stage: merged documentation directly to main; commit https://github.com/khammrich1/edgelog/commit/fafafbea9748b556208a6eb3d102345b62b2ad18 .
+- Owner-tested existing-trade Target Hit on public DEV: MNQ 2 long @ 25,000, exit 25,020, $5 costs => CLOSED, $80 gross, $75 net — October 21; stage: owner observed UI PASS for close/math only, reload persistence and completed-new-trade path not established. UX feedback recorded on #61.
+- Reviewed Codex audit and established operational stabilization order — October 21; stage: PM decision/status only, no code or deployment.
+
+### In progress
+
+- #57 / draft PR #100 startup migrations — review corrections and migration 013 DEV verification pending; broader #57 remains open.
+- #62 / draft PR #85 P&L tests — original anomalous stored/API/UI data unresolved; test-only PR does not close incident.
+- #84 completed-trade acceptance, #82 daily responsiveness, #70 login incident, #68 gutter layout — focused owner checks and evidence-backed closure pending.
+- #80 broker reconciliation parent — merged #91/#96/#102/#105 require status reconciliation; draft #88 diagnostics and #86 account selection await Windows acceptance; #95 provider ownership unverified.
+- #61 draft #87 B/E and #26 draft #33 Practice execution — conflict resolution and acceptance outstanding; Strategy Trader execution remains gated.
+- #25/#41/#78 merged-foundation/audit parents — acceptance records need reconciliation before closure or narrowing.
+
+### Current blockers
+
+- PR #100 review concerns and DEV deployed migration 013 unverified — blocks reliable schema rollout; responsible: Claude for corrections, QA/DEV operator for SHA and schema proof; next: correct PR and verify startup/health/schema and authenticated broker registry; follow-up: next work session; evidence: #100/#57.
+- Original #62 -$19,884 anomaly unexplained — blocks incident closure; responsible: development/QA; next: compare original stored rows, API calculation, rendered output on identified build; follow-up: next review; evidence: #62/#85.
+- #84 full completed-trade, cost-edit, legacy and reload acceptance missing — blocks issue closure; responsible: owner/QA; next: focused public DEV tests; follow-up: next session; evidence: #84.
+- #95 provider-backed account ownership and TopstepX commission/fee interpretation unverified — blocks write-capable broker import and trustworthy broker-confirmed net P&L; responsible: development/owner for provider evidence; next: read-only diagnostic/statement correlation and ownership design; follow-up: before imports; evidence: #95/#80/#88.
+- #87/#33 conflict with main — blocks review/acceptance; responsible: developers; next: resolve conflicts and rerun tests; follow-up: after higher-priority stabilization.
+
+### Blockers resolved on this date
+
+- None independently verified resolved by this audit or EOD.
+
+### Verification and delivery
+
+- Implemented: #100/#85/#86/#87/#88/#33 changes exist on draft branches; no independent CI rerun. Merged earlier: #81, #91, #96, #98, #101, #102, #105 per GitHub/project evidence.
+- Tests: October 21 owner Target Hit UI math PASS; completed-trade one-submission and refresh persistence not verified. Codex audit did not rerun tests. CI statuses for draft heads not verified.
+- Merged: AGENTS.md workflow update fafafbe on October 21; no implementation PR merged by this EOD.
+- Deployed: public DEV owner tested existing-trade UI; exact SHA, schema 013 and PR #100 deployment unverified. PROD deployment/revision not verified.
+- Owner accepted: Target Hit calculation/close behavior only; no owner acceptance for #100, #84 full checklist, #85/#86/#87/#88/#33.
+
+### Decisions / scope boundaries
+
+- Finish existing journal reliability and acceptance before expanding features; #100 first, original #62 investigation and #82/#84 checks next.
+- Keep #57 open despite #100; remove 'Closes #57'. Keep #62 open despite #85 tests. No blanket closure without acceptance evidence.
+- Existing-trade exits belong on existing trade card; 'Already closed' creates a separate new completed trade. Keep #87 B/E focused; separate broader UX changes.
+- Broker preview/diagnostics remain read-only; no unverified ownership, guessed cost semantics, write-capable import, autonomous orders or PROD deployment.
+- Post-merge issue closure/reconciliation is the assistant's standing duty, documented in AGENTS.md.
+
+### Next actions
+
+1. Claude: address #100 review feedback on existing PR, verify compatibility with migration 013, remove 'Closes #57'; QA: inspect tests and DEV deployment/schema evidence — next work session.
+2. QA/development: review #85 and original #62 persisted/API/UI evidence; owner/QA: short #70/#68/#82/#84 DEV acceptance including completed-trade path and reload — next work session.
+3. TPM: reconcile #80 and completed parent issues against merged PRs; arrange #88/#86 Windows acceptance, then #87/#33 conflict resolution without overlapping scope — after stabilization.
+
+### Kyle's input needed
+
+- Brief owner DEV responsiveness/completed-trade checks when requested; explicit approval before major merges or any PROD deployment. A real broker statement will later be needed to validate fee/commission semantics. No immediate production action requested.
+
+### Publication / handoff
+
+- Status update location: main branch, status.md and EOD_STATUS.md, direct documentation commits (no PR).
+- Remaining evidence gaps: live DEV/PROD SHAs, migration 013, independent CI, original #62 data, full #84 acceptance, broker ownership and costs, local Windows acceptance.
