@@ -39,6 +39,11 @@ sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE edgelog_test TO edgel
 # Grant schema permissions (PostgreSQL 15+)
 sudo -u postgres psql -d edgelog_dev -c "GRANT ALL ON SCHEMA public TO edgelog; GRANT CREATE ON SCHEMA public TO edgelog;"
 sudo -u postgres psql -d edgelog_test -c "GRANT ALL ON SCHEMA public TO edgelog; GRANT CREATE ON SCHEMA public TO edgelog;"
+
+# Required for the scratch_database_url test fixture (backend/app/tests/conftest.py),
+# which creates/drops a throwaway database per test to exercise the real
+# Alembic migration chain (see issue #57).
+sudo -u postgres psql -c "ALTER USER edgelog CREATEDB;"
 ```
 
 ### 3. Set Up Python Environment
