@@ -70,7 +70,7 @@ async def test_create_long_plan_computes_risk_reward_with_mnq_multiplier(client:
     assert Decimal(data["risk_dollars"]) == Decimal("200.00")
     # reward = (24560-24500) * 5 = 300 points -> $600
     assert Decimal(data["reward_points"]) == Decimal("300")
-    assert Decimal(data["reward_dollars"]) == Decimal("1200.00")
+    assert Decimal(data["reward_dollars"]) == Decimal("600.00")
     assert Decimal(data["reward_risk_ratio"]) == Decimal("3")
 
 
