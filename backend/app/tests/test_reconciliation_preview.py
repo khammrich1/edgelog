@@ -209,7 +209,53 @@ async def test_preview_marks_unplanned_execution_when_no_plan_exists(client: Asy
 
     group = body["fill_groups"][0]
     assert group["plan_match_status"] == "unplanned"
-    assert "Unplanned" in group["plan_match_note"] or "unplanned" in group["plan_match_note"].lower()
+    # Issue #104: the note must describe this as no journal Trade
+    # candidate found -- never mention a "plan" or claim it "would
+    # import" anything, since this endpoint matches existing journal
+    # Trade records and never imports.
+    assert "journal trade" in group["plan_match_note"].lower()
+    assert "plan" not in group["plan_match_note"].lower()
+    assert "would import" not in group["plan_match_note"].lower()
+
+
+@pytest.mark.asyncio
+async def test_preview_single_execution_safe_fixture_is_confident_unplanned_and_unresolved_for_missing_counterpart(
+    client: AsyncClient,
+):
+    """Issue #104: reproduces exactly what the owner saw on public DEV
+    using the frontend's "Load safe numeric fixture" button (PR #102) --
+    one execution, no orderId. Must be one confident group, no journal
+    Trade candidate (not "no plan"/"would import"), and P&L unresolved
+    because there's no counterpart fill yet -- never "more than two
+    fills" for a group of exactly one."""
+    headers = await _register_and_auth_headers(client)
+    await _open_day(client, headers)
+
+    response = await client.post(
+        PREVIEW_URL,
+        headers=headers,
+        json={
+            "account_id": 28592949,
+            "date": "2026-10-16",
+            "executions": [_execution(id=1001, orderId=None)],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["summary"]["confident_groups"] == 1
+    assert body["summary"]["unplanned_groups"] == 1
+
+    group = body["fill_groups"][0]
+    assert group["execution_ids"] == [1001]
+    assert group["grouping_basis"] == "ungrouped_single"
+    assert group["grouping_status"] == "confident"
+    assert group["plan_match_status"] == "unplanned"
+    assert group["candidate_trade_ids"] == []
+    assert group["pnl_status"] == "unresolved"
+    reason = group["pnl_unresolved_reason"].lower()
+    assert "more than two fills" not in reason
+    assert "one fill" in reason
+    assert "counterpart" in reason
 
 
 @pytest.mark.asyncio
