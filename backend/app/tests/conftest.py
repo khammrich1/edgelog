@@ -1,4 +1,7 @@
 """Test configuration and fixtures."""
+import uuid
+
+import asyncpg
 import pytest
 from typing import AsyncGenerator
 from httpx import AsyncClient, ASGITransport
@@ -8,6 +11,38 @@ from app.core.database import Base, get_db
 
 # Test database URL
 TEST_DATABASE_URL = "postgresql+asyncpg://edgelog:edgelog_dev_password@localhost/edgelog_test"
+
+# Same local Postgres server/credentials as TEST_DATABASE_URL, used only to
+# issue CREATE DATABASE/DROP DATABASE admin commands -- asyncpg is used
+# directly here (not SQLAlchemy) because those statements can't run inside
+# a transaction block, which SQLAlchemy's asyncpg driver wraps by default.
+ADMIN_DSN = "postgresql://edgelog:edgelog_dev_password@localhost/edgelog_test"
+
+
+@pytest.fixture
+async def scratch_database_url() -> AsyncGenerator[str, None]:
+    """A freshly created, completely empty Postgres database (no tables,
+    no alembic_version) for tests that need to exercise the real Alembic
+    migration chain -- the `db_session`/`test_engine` fixtures above use
+    Base.metadata.create_all(), which bypasses Alembic entirely and never
+    creates an alembic_version table, so they can't be used for this.
+    Dropped again after the test, even on failure."""
+    db_name = f"edgelog_scratch_{uuid.uuid4().hex[:12]}"
+
+    admin_conn = await asyncpg.connect(ADMIN_DSN)
+    try:
+        await admin_conn.execute(f'CREATE DATABASE "{db_name}"')
+    finally:
+        await admin_conn.close()
+
+    try:
+        yield f"postgresql+asyncpg://edgelog:edgelog_dev_password@localhost/{db_name}"
+    finally:
+        admin_conn = await asyncpg.connect(ADMIN_DSN)
+        try:
+            await admin_conn.execute(f'DROP DATABASE IF EXISTS "{db_name}" WITH (FORCE)')
+        finally:
+            await admin_conn.close()
 
 
 @pytest.fixture(scope="function")
