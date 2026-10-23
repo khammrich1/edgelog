@@ -7,11 +7,13 @@ from trader_agent.state import ConnectionStatus
 
 
 class _FakeRestClient:
-    def __init__(self, accounts=None, contracts=None):
+    def __init__(self, accounts=None, contracts=None, trades=None):
         self.token = None
         self._accounts = accounts or []
         self._contracts = contracts or []
+        self._trades = trades or []
         self.authenticate_called = False
+        self.search_trades_calls = []
 
     def authenticate(self):
         self.authenticate_called = True
@@ -23,6 +25,10 @@ class _FakeRestClient:
 
     def list_available_contracts(self, live=False):
         return self._contracts
+
+    def search_trades(self, account_id, start_timestamp, end_timestamp=None):
+        self.search_trades_calls.append((account_id, start_timestamp, end_timestamp))
+        return self._trades
 
 
 class _FakeTransport:
@@ -59,7 +65,7 @@ class _FakeTransport:
         self.event_handlers[event](payload)
 
 
-def _provider(accounts=None, contracts=None, practice_account_id=None):
+def _provider(accounts=None, contracts=None, trades=None, practice_account_id=None):
     transports = []
 
     def factory(url, token):
@@ -67,7 +73,7 @@ def _provider(accounts=None, contracts=None, practice_account_id=None):
         transports.append(t)
         return t
 
-    rest = _FakeRestClient(accounts=accounts, contracts=contracts)
+    rest = _FakeRestClient(accounts=accounts, contracts=contracts, trades=trades)
     provider = TopstepXProvider(
         rest_client=rest,
         rtc_base_url="https://rtc.topstepx.com",
@@ -240,3 +246,15 @@ def test_disconnect_tears_down_both_hubs():
     provider.disconnect()
 
     assert provider.connection_status == ConnectionStatus.RECONNECTING
+
+
+def test_search_trades_delegates_to_rest_client_with_the_given_range():
+    from trader_agent.providers.base import TradeRecord
+
+    record = TradeRecord(id=1, account_id=111, raw={"id": 1, "accountId": 111})
+    provider, rest, _t = _provider(trades=[record])
+
+    result = provider.search_trades(111, "2026-10-01T00:00:00+00:00", "2026-10-02T00:00:00+00:00")
+
+    assert result == [record]
+    assert rest.search_trades_calls == [(111, "2026-10-01T00:00:00+00:00", "2026-10-02T00:00:00+00:00")]

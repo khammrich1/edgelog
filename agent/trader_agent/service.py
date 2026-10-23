@@ -5,14 +5,16 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Optional
 
 from trader_agent.config import AgentConfig, load_config
 from trader_agent.logging_setup import audit, setup_logging
-from trader_agent.providers.base import Account, Contract, ExecutionProvider, Quote
+from trader_agent.providers.base import Account, Contract, ExecutionProvider, Quote, TradeRecord
 from trader_agent.providers.topstepx.client import TopstepXRestClient
 from trader_agent.providers.topstepx.provider import TopstepXProvider
 from trader_agent.state import ConnectionStatus
+from trader_agent.trade_diagnostics import redact_identifier, to_utc_iso
 
 
 @dataclass(frozen=True)
@@ -76,6 +78,24 @@ class TraderAgentService:
     def stop(self) -> None:
         self._provider.disconnect()
         audit(self.logger, "agent.stopped")
+
+    def search_trades(self, account_id: int, start: datetime, end: Optional[datetime] = None) -> list[TradeRecord]:
+        """Authenticates only -- no contract resolution, no realtime
+        connection -- then pulls read-only execution/fill history for one
+        account over [start, end). Backs the `trades` CLI diagnostic
+        (issue #80 Step 2's real-account verification spike). Never
+        writes anywhere, EdgeLog cloud or otherwise; the account ID is
+        redacted before it ever reaches a log line."""
+        masked_account = redact_identifier(account_id)
+        audit(self.logger, "agent.trade_search.starting", account_id=masked_account)
+        self._provider.authenticate()
+
+        start_iso = to_utc_iso(start)
+        end_iso = to_utc_iso(end) if end is not None else None
+        trades = self._provider.search_trades(account_id, start_iso, end_iso)
+
+        audit(self.logger, "agent.trade_search.completed", account_id=masked_account, record_count=len(trades))
+        return trades
 
     def status(self) -> AgentStatus:
         current_price = self._provider.get_current_price(self._contract.id) if self._contract else None

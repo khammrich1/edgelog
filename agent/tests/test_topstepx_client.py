@@ -249,3 +249,100 @@ def test_network_error_raises_provider_connection_error():
 
     with pytest.raises(ProviderConnectionError):
         client.authenticate()
+
+
+def test_search_trades_sends_account_and_date_range():
+    session = _FakeSession(
+        responses=[
+            _FakeResponse(json_body={"success": True, "token": "jwt-token"}),
+            _FakeResponse(json_body={"trades": []}),
+        ]
+    )
+    client = _client(session)
+    client.authenticate()
+
+    client.search_trades(111, "2026-10-01T00:00:00+00:00", "2026-10-02T00:00:00+00:00")
+
+    search_call = session.calls[1]
+    assert search_call["url"] == "https://api.topstepx.com/api/Trade/search"
+    assert search_call["json"] == {
+        "accountId": 111,
+        "startTimestamp": "2026-10-01T00:00:00+00:00",
+        "endTimestamp": "2026-10-02T00:00:00+00:00",
+    }
+
+
+def test_search_trades_allows_a_null_end_timestamp():
+    session = _FakeSession(
+        responses=[
+            _FakeResponse(json_body={"success": True, "token": "jwt-token"}),
+            _FakeResponse(json_body={"trades": []}),
+        ]
+    )
+    client = _client(session)
+    client.authenticate()
+
+    client.search_trades(111, "2026-10-01T00:00:00+00:00")
+
+    assert session.calls[1]["json"]["endTimestamp"] is None
+
+
+def test_search_trades_parses_documented_fields_and_keeps_the_raw_item():
+    raw_item = {
+        "id": 555,
+        "accountId": 111,
+        "contractId": "CON.F.US.MNQ.Z25",
+        "creationTimestamp": "2026-10-01T14:30:00Z",
+        "price": 21005.5,
+        "profitAndLoss": 38.0,
+        "fees": 2.5,
+        "side": 0,
+        "size": 2,
+        "voided": False,
+        "orderId": 999,
+    }
+    session = _FakeSession(
+        responses=[
+            _FakeResponse(json_body={"success": True, "token": "jwt-token"}),
+            _FakeResponse(json_body={"trades": [raw_item]}),
+        ]
+    )
+    client = _client(session)
+    client.authenticate()
+
+    trades = client.search_trades(111, "2026-10-01T00:00:00+00:00")
+
+    assert len(trades) == 1
+    trade = trades[0]
+    assert trade.id == 555
+    assert trade.account_id == 111
+    assert trade.price == 21005.5
+    assert trade.profit_and_loss == 38.0
+    assert trade.fees == 2.5
+    assert trade.side == 0
+    assert trade.voided is False
+    assert trade.order_id == 999
+    assert trade.raw == raw_item
+
+
+def test_search_trades_requires_prior_authentication():
+    client = _client(_FakeSession())
+
+    with pytest.raises(AuthenticationError):
+        client.search_trades(111, "2026-10-01T00:00:00+00:00")
+
+
+def test_search_trades_falls_back_to_data_key_when_trades_key_absent():
+    session = _FakeSession(
+        responses=[
+            _FakeResponse(json_body={"success": True, "token": "jwt-token"}),
+            _FakeResponse(json_body={"data": [{"id": 1, "accountId": 111}]}),
+        ]
+    )
+    client = _client(session)
+    client.authenticate()
+
+    trades = client.search_trades(111, "2026-10-01T00:00:00+00:00")
+
+    assert len(trades) == 1
+    assert trades[0].id == 1

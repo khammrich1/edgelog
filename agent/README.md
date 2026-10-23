@@ -122,6 +122,93 @@ connection=connected execution_capable=True account=123456 contract=CON.F.US.MNQ
   `TOPSTEPX_STALE_AFTER_SECONDS` (default 15s) -- check your network and
   that the market is open.
 
+## Read-only execution-history diagnostic (issue #80)
+
+```powershell
+python -m trader_agent trades --start 2026-10-14 --account-id 123456
+```
+
+This is a **diagnostic, not a sync feature**: it calls the documented
+`POST /api/Trade/search` (reference doc Sec.8) for one account over a date
+range, and prints a report of which documented fields the *live* response
+actually contains -- it writes nothing to any database and makes no call
+to EdgeLog's backend. `/api/Trade/search`'s response shape has never been
+exercised against a real account before this command exists; unlike
+`accounts`/`status`, treat its output as the thing to verify, not an
+assumption to build on.
+
+- `--start` -- `YYYY-MM-DD` or a full ISO-8601 datetime.
+- `--end` -- optional, defaults to 24h after `--start`.
+- `--account-id` -- optional, defaults to `TOPSTEPX_PRACTICE_ACCOUNT_ID` from
+  `.env`.
+
+The printed report never shows your real account ID, order/trade IDs, or
+any dollar figure -- only whether each documented field was present, what
+Python type its value took, and (for `side`/`voided` only, since those are
+small enums rather than financial data) the distinct raw values seen. Any
+field in the live response that isn't in the documented schema is flagged
+separately, along with a fixed finding on commission vs. fees: the
+documented schema has exactly one cost field (`fees`), not a separate
+`commission` field, so this endpoint alone cannot populate EdgeLog's
+`commission` column.
+
+**Owner acceptance steps:**
+1. Run `python -m trader_agent status` first if you don't already know your
+   account ID, or pass `--account-id` directly.
+2. Run the command above for a date range you know has real trades on it.
+3. Confirm the report's "PRESENT" column shows the documented fields you'd
+   expect (`price`, `size`, `side`, etc.) actually came back non-null.
+4. Paste the printed report (not your `.env`, not raw logs) into a comment
+   on issue #80 -- it's already safe to share as-is.
+5. If any field you expected is missing, or the `side`/`voided` observed
+   values look unexpected (e.g. strings instead of integers), note that too
+   -- that's exactly the kind of gap this diagnostic exists to surface
+   before any reconciliation logic gets built on top of an assumed shape.
+
+### Seeing the real execution rows: `--show-rows`
+
+The default report above never prints a dollar figure. If you want to see
+your actual executions -- e.g. to sanity-check `price`/`profitAndLoss`/`fees`
+against what TopstepX's own UI shows for the same date -- opt in explicitly:
+
+```powershell
+python -m trader_agent trades --start 2026-10-14 --account-id 123456 --show-rows
+```
+
+This prints a `WARNING:` banner, then one line per execution with the real
+`price`/`profitAndLoss`/`fees` values, the contract/symbol, `side` and
+`size`, and any undocumented field the live response adds (e.g. a
+`commissions` figure some accounts return alongside `fees`) -- all shown in
+full. Trade/order IDs (and any other identifier-shaped field, by name) stay
+masked even here. **Unlike the default report, this output is not
+automatically safe to paste into a public issue/PR comment** -- review it
+first if you plan to share it; strip anything you don't want visible.
+
+Two things this diagnostic deliberately does **not** do, even in
+`--show-rows` mode:
+- **It never groups fills into trades.** Each row is one broker execution
+  (fill) -- if a date returns 39 records, that is 39 fills, not 39
+  completed trades. Grouping opens/closes/partial fills into a logical
+  trade belongs to #80's EOD reconciliation design, not this diagnostic.
+- **It never guesses what an undocumented field means.** If `profitAndLoss`
+  is present on only some records, the default report notes a *plausible
+  but unverified* hypothesis (opening/adding fills may carry no P&L, only
+  closing/reducing fills do) and says so explicitly as a question to verify,
+  not a fact. The same goes for an undocumented `commissions` field: this
+  diagnostic reports that it's present and what type it is, and nothing
+  more -- it does not assume `commissions` is included in or separate from
+  `fees`, and does not add the two together into any P&L figure.
+
+**Owner acceptance checks for `--show-rows`:**
+1. Run it against a date with real trades; confirm the `WARNING:` banner
+   prints before any row.
+2. Confirm `price`/`profitAndLoss`/`fees` (and `commissions`, if your
+   account returns it) show their real values, not `(value redacted...)`.
+3. Confirm the `trade_id=`/`order_id=` fields show a masked value (e.g.
+   `**49`), never the real ID.
+4. Run the same command *without* `--show-rows`; confirm no row, no
+   `WARNING:` banner, and no dollar figure appears anywhere in that output.
+
 ## Logs
 
 Structured (JSON-line) logs go to `agent/logs/agent-<date>.log` and to
@@ -172,6 +259,15 @@ codebase is written defensively rather than guessing -- notably:
   subscribed to" itself rather than trying to parse one out of each
   quote. This only works because ST0 subscribes to one contract at a
   time -- revisit if a later issue needs multiple simultaneous contracts.
+- **`/api/Trade/search`'s response shape is implemented per the
+  reference doc but still unverified against a live account.** The
+  `trades` CLI command above exists specifically to close that gap --
+  run it and report back per its "Owner acceptance steps" rather than
+  assuming the documented field list (`id`/`accountId`/`contractId`/
+  `creationTimestamp`/`price`/`profitAndLoss`/`fees`/`side`/`size`/
+  `voided`/`orderId`) matches reality, especially `side`'s encoding and
+  whether `fees` is ever split into separate commission/exchange-fee
+  figures by an undocumented field.
 - **Practice-account detection remains a name-based heuristic.** The
   reference's documented `/api/Account/search` fields
   (`id`/`name`/`balance`/`canTrade`/`isVisible`) don't include anything

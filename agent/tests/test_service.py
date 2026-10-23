@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from trader_agent.config import AgentConfig
 from trader_agent.providers.base import Account, Contract, ExecutionProvider, Quote
 from trader_agent.service import TraderAgentService
@@ -5,14 +7,18 @@ from trader_agent.state import ConnectionStatus
 
 
 class _FakeProvider(ExecutionProvider):
-    def __init__(self, accounts=None, contract=None, quote=None, raise_on_resolve_contract=False):
+    def __init__(
+        self, accounts=None, contract=None, quote=None, trades=None, raise_on_resolve_contract=False
+    ):
         self.calls = []
         self._accounts = accounts or []
         self._contract = contract
         self._quote = quote
+        self._trades = trades or []
         self._raise_on_resolve_contract = raise_on_resolve_contract
         self._connected = False
         self._authenticated = False
+        self.search_trades_calls = []
 
     def authenticate(self):
         self.calls.append("authenticate")
@@ -49,6 +55,11 @@ class _FakeProvider(ExecutionProvider):
     def disconnect(self):
         self.calls.append("disconnect")
         self._connected = False
+
+    def search_trades(self, account_id, start_timestamp, end_timestamp=None):
+        self.calls.append(("search_trades", account_id, start_timestamp, end_timestamp))
+        self.search_trades_calls.append((account_id, start_timestamp, end_timestamp))
+        return self._trades
 
     @property
     def connection_status(self):
@@ -126,3 +137,33 @@ def test_stop_disconnects_the_provider():
 
     assert provider.calls[-1] == "disconnect"
     assert service.status().connection_status == ConnectionStatus.DISCONNECTED
+
+
+def test_search_trades_authenticates_without_resolving_contract_or_connecting_realtime():
+    provider = _FakeProvider(trades=["fake-trade"])
+    service = TraderAgentService(_config(), provider)
+
+    result = service.search_trades(111, datetime(2026, 10, 1, tzinfo=timezone.utc))
+
+    assert provider.calls[0] == "authenticate"
+    assert not any(call[0] == "resolve_contract" for call in provider.calls if isinstance(call, tuple))
+    assert "connect_realtime" not in provider.calls
+    assert result == ["fake-trade"]
+
+
+def test_search_trades_converts_naive_datetimes_to_utc_iso_and_passes_through_account_id():
+    provider = _FakeProvider()
+    service = TraderAgentService(_config(), provider)
+
+    service.search_trades(111, datetime(2026, 10, 1, 0, 0, 0), datetime(2026, 10, 2, 0, 0, 0))
+
+    assert provider.search_trades_calls == [(111, "2026-10-01T00:00:00+00:00", "2026-10-02T00:00:00+00:00")]
+
+
+def test_search_trades_passes_none_end_through_when_not_given():
+    provider = _FakeProvider()
+    service = TraderAgentService(_config(), provider)
+
+    service.search_trades(111, datetime(2026, 10, 1, tzinfo=timezone.utc))
+
+    assert provider.search_trades_calls == [(111, "2026-10-01T00:00:00+00:00", None)]
