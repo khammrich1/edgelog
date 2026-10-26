@@ -2,7 +2,7 @@
 
 Give this file to each project chat and say:
 
-> Run EOD: update project status, append a dated entry to EOD_STATUS.md, and commit and push the documentation directly to main. Do not open a PR.
+> Run EOD: reconcile and update the relevant GitHub tickets and PRs with today's work, evidence, blockers, decisions and next actions; then update project status, append EOD_STATUS.md, and push reporting documentation directly to main. Do not open a reporting PR. Do not claim EOD complete until ticket changes and publication are verified, or report the exact incomplete steps.
 
 ## Standard document
 
@@ -16,6 +16,24 @@ Every project uses one file at the repository root: `EOD_STATUS.md`.
 - Each entry is a complete snapshot of current status, with that date's progress, blockers, and next actions.
 - Preserve all previous entries. For another update the same day, append a new timestamped entry with only newly completed work in its completion list. Label corrections explicitly and reference the entry corrected.
 - Do not create separate daily files. Keep the existing canonical status document current and link it to `EOD_STATUS.md`; the EOD file is the chronological history.
+
+
+## Mandatory ticket reconciliation - EOD completion requirement
+
+**Owner instruction, October 25, 2026:** EOD updates the tickets; it does not merely produce a status report. A request to run EOD authorizes the relevant factual GitHub issue/PR status updates and evidence comments described here. Existing implementation, acceptance, merge, deployment and data-safety gates remain in force. Preserve any stronger project-specific reconciliation duties.
+
+Perform these steps BEFORE finalizing the status/EOD log, so the handoff links to actual published ticket updates:
+
+1. Identify the day's worked, reviewed, tested, merged, blocked or owner-decided issues and their linked PRs. Read their current bodies, comments, acceptance criteria, actual GitHub states and relevant commit/check evidence. Follow dependencies or related tickets whose status changed; obey any project rule requiring a broader backlog reconciliation. Do not equate a PR mention with full issue completion.
+2. Update the authoritative issue body/checklist when scope, decisions, completed criteria, remaining criteria or next action changed. Preserve valid acceptance criteria and unique evidence. Explicitly supersede obsolete instructions rather than stacking contradictory assignments in comments. Keep parked work parked and avoid duplicate tickets/assignments.
+3. Publish a concise, dated EOD progress/evidence comment on each affected issue and relevant active PR when there is new information to record. Include concrete work/results, exact PR/commit links, tests and who verified them, DEV/PROD evidence separately, owner PASS/FAIL, blockers and responsible party, unresolved decisions, remaining scope and next action. Do not fabricate owners or deadlines. Record event dates in Pacific time; repeated historical results are not new accomplishments.
+4. Reconcile ticket state against the FULL completion criteria. Close a fully completed issue with an evidence-backed note when all required implementation/integration and owner-testing/acceptance gates are satisfied. Leave partial or unaccepted work open and state the exact remaining gate. Reopen an incorrectly closed issue when evidence establishes unmet criteria; explain the correction. Do not reopen explicitly canceled, superseded or owner-accepted work merely because later improvements exist. Update existing labels/project fields only where their meanings and access are established; do not invent a new status system.
+5. Reconcile linked PR descriptions/checklists where status or remaining work changed. A merged PR is not proof of deployment/acceptance. Never merge a PR as an EOD action. Do not close an active implementation PR as superseded without clear evidence and the applicable project authority; report ambiguous overlaps instead. Preserve existing project-specific duplicate-PR cleanup rules.
+6. Verify the issue/PR state, saved body/checklist and comment URLs after writing. If the same day's evidence was already recorded, avoid duplicate comments and record the existing evidence link; update only the delta. Check for concurrent edits and preserve them. Inspect automatic closing links and actual issue state after merges rather than assuming reconciliation happened.
+7. Update canonical project status and append EOD_STATUS.md with a **Ticket reconciliation** section: issue/PR, actual change, resulting state, evidence/comment link, remaining gate and next action. Distinguish ticket mutations from documentation-only publication. Keep sensitive user/customer/trading data, credentials and private transcripts out of public tickets.
+8. Report what was actually updated and verified. If ticket access or a required decision blocks a change, report the exact ticket, intended change and failure/missing evidence. Publish unaffected factual updates and mark the EOD **partially complete**; do not substitute proposed ticket text or a status report for a successful update. Do not claim the whole EOD complete while required ticket changes remain unpublished.
+
+EOD still summarizes the DAY; ticket reconciliation makes that summary actionable and durable in the work tracker. Daily Sync remains project onboarding and readiness for work. Reporting does not authorize new implementation, external developer dispatches, deployments, simulations, trades or database mutations.
 
 ## Instructions for each project chat
 

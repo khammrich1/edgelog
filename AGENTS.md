@@ -36,3 +36,7 @@ The assistant owns EdgeLog product/technical program management, scope, coordina
 7. At each daily sync, reconcile the **entire** open issue and PR backlog against merged PRs, not just the most recent items. Report any items that cannot safely be closed and why.
 
 Issue closure is a workflow responsibility, not a request for automatic blanket closure: a partial PR does not complete an issue. Do not close issues whose required owner testing or other explicit acceptance gate remains outstanding; record that gate instead.
+
+## EOD includes ticket updates
+
+When Kyle requests EOD, follow [docs/PROJECT_EOD_UPDATE.md](docs/PROJECT_EOD_UPDATE.md), including mandatory issue/PR reconciliation. This owner instruction authorizes relevant factual ticket body/checklist, evidence-comment and justified state updates as part of EOD; a status report alone is insufficient. Preserve acceptance gates, verify writes, avoid duplicate comments, and report partial completion when required ticket updates are blocked. No implementation merge, deployment, developer dispatch or application-data mutation is authorized by EOD.

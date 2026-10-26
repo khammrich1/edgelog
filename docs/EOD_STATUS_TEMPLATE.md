@@ -64,3 +64,11 @@ Coverage: <period reviewed and any inaccessible sources>
 
 - Status update location: <main branch link; return the resulting commit URL in the handoff, or explicitly report unpublished changes>. No EOD-only PR.
 - Remaining evidence gaps: <details, or none>.
+
+### Ticket reconciliation
+
+| Issue / PR | Published update and resulting state | Evidence / comment URL | Remaining gate / next action |
+| --- | --- | --- | --- |
+| Fill with actual affected tickets; use None affected only after checking | Record verified mutations or already-current/no-change | Link actual evidence, not proposed text | Record incomplete/blocked work explicitly |
+
+Ticket reconciliation coverage: Complete / Partially complete (explain failures or missing acceptance evidence). Verify writes before reporting completion; avoid duplicate comments. The template describes fields to fill, not proof that an update occurred.
